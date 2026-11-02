@@ -41,6 +41,13 @@ npm.cmd run vendor:test
 - Test handoff on actual Android and iPhone WhatsApp installations, including
   a full-catalogue requirement, before sharing with customers.
 
+## Appearance
+
+The app uses a blue theme across the catalogue, cart, checkout and mobile controls,
+with gold accents for the festive artwork. Shared colours are defined in
+`styles.css`; the browser theme colour and favicon in `index.html` match the brand.
+Changing the theme does not change order recording, pricing or WhatsApp messages.
+
 ## Hosting
 
 ### Netlify
