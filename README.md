@@ -1,8 +1,9 @@
 # Sai Baba Crackers Centre
 
-Mobile-friendly 2026 catalogue with 68 products, a saved selection, estimated
-totals and a customer-reviewed WhatsApp enquiry. Static files only: no backend,
-payment collection, accounts or secret keys.
+Mobile-friendly 2026 catalogue with 68 products, a saved selection, an automatic
+15% discount and a customer-reviewed WhatsApp enquiry including the customer's
+name, mobile number and address. Static files only: no backend, payment
+collection, accounts or secret keys.
 
 ## Local preview
 

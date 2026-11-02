@@ -1,5 +1,5 @@
 import { products, categories, vendor } from "./catalog.mjs";
-import { CART_KEY, MAX_QUANTITY, sanitizeCart, cartLines, total, money, localDate, createRequirement, prepareMessages } from "./order.mjs";
+import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, total, money, localDate, createRequirement, prepareMessages } from "./order.mjs";
 
 const $ = selector => document.querySelector(selector);
 let cart = {};
@@ -81,7 +81,7 @@ function updateQuantity(id, change, fromCart) {
   saveCart();
   renderProducts();
   renderCart();
-  $("#announcement").textContent = `${products.find(product => product.id === id).name}: ${next} selling units selected. Estimated total ${money(total(cart))}.`;
+  $("#announcement").textContent = `${products.find(product => product.id === id).name}: ${next} selling units selected. Estimated total after ${DISCOUNT_PERCENT}% discount ${money(total(cart))}.`;
   const scope = fromCart ? "#cart-items" : "#products";
   const direction = change > 0 ? "increase" : "decrease";
   const active = $(`${scope} [data-id="${id}"] [data-direction="${direction}"]:not(:disabled)`) ??
@@ -141,12 +141,31 @@ function renderProducts() {
   }));
 }
 
+function pricingSummary(withIds = false) {
+  const amounts = pricing(cart);
+  const summary = element("div", "pricing-summary");
+  const rows = [
+    ["Subtotal", money(amounts.subtotal), "pricing-row", "cart-subtotal"],
+    [amounts.subtotal ? `Discount applied (${DISCOUNT_PERCENT}%)` : `Discount (${DISCOUNT_PERCENT}%)`,
+      `\u2212${money(amounts.discount)}`, "pricing-row discount-row", "cart-discount"],
+    ["Estimated total after discount", money(amounts.total), "cart-total", "cart-total"],
+  ];
+  for (const [label, value, className, id] of rows) {
+    const row = element("div", className);
+    const amount = element("strong", "", value);
+    if (withIds) amount.id = id;
+    row.append(element("span", "", label), amount);
+    summary.append(row);
+  }
+  return summary;
+}
+
 function renderCart() {
   const lines = cartLines(cart);
   const units = lines.reduce((sum, line) => sum + line.quantity, 0);
   $("#header-count").textContent = units;
   $("#cart-count").textContent = lines.length;
-  $("#cart-total").textContent = money(total(cart));
+  $("#cart-pricing").replaceChildren(pricingSummary(true));
   $("#review").disabled = lines.length === 0;
   $("#clear-cart").hidden = lines.length === 0;
   $("#mobile-cart").hidden = lines.length === 0;
@@ -184,9 +203,7 @@ function showReview() {
       element("strong", "", money(line.amount)));
     summary.append(row);
   }
-  const grandTotal = element("div", "cart-total");
-  grandTotal.append(element("span", "", "Estimated total"), element("strong", "", money(total(cart))));
-  summary.append(grandTotal);
+  summary.append(pricingSummary());
   $("#checkout-summary").replaceChildren(summary);
   $("#customer-form").hidden = false;
   $("#message-preview").hidden = true;

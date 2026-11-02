@@ -109,6 +109,11 @@ h2 { font-family: Georgia, "Times New Roman", serif; font-size: 27px; font-weigh
 .cart-empty p { font-size: 11px; line-height: 1.9; color: var(--muted); margin-top: 9px; }
 .cart-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 17px; font-size: 12px; }
 .cart-total > strong { font-size: 22px; font-weight: 650; white-space: nowrap; }
+.pricing-summary { display: grid; gap: 12px; }
+.pricing-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; line-height: 1.7; }
+.pricing-row strong { white-space: nowrap; font-weight: 600; }
+.discount-row { color: var(--green); }
+.discount-row > span { font-weight: 600; }
 .estimate-note { font-size: 10px; color: var(--muted); line-height: 1.7; margin: 12px 0 17px; }
 .button { border: 1px solid transparent; border-radius: 7px; padding: 13px 15px; font-size: 12px; font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 15px; text-decoration: none; line-height: 1.5; text-align: center; }
 .primary { background: var(--green); color: white; }
@@ -157,7 +162,7 @@ body:has(dialog[open]) { overflow: hidden; }
 .review-lines { border: 1px solid var(--line); border-radius: 9px; padding: 15px; margin-bottom: 24px; }
 .review-line { display: flex; justify-content: space-between; gap: 18px; font-size: 12px; line-height: 1.7; padding: 7px 0; }
 .review-line strong { white-space: nowrap; }
-.review-lines .cart-total { margin-top: 12px; }
+.review-lines .pricing-summary { margin-top: 16px; }
 dialog h3 { font-size: 17px; font-weight: 600; margin-bottom: 15px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 17px; }
 .form-grid label, .message-label { display: block; font-size: 12px; font-weight: 600; line-height: 1.7; }
@@ -165,6 +170,7 @@ dialog h3 { font-size: 17px; font-weight: 600; margin-bottom: 15px; }
 textarea { resize: vertical; }
 .full-width { grid-column: 1 / -1; }
 .optional { font-weight: 400; color: var(--muted); font-size: 10px; }
+.address-help { font-size: 11px; color: var(--muted); line-height: 1.7; margin-top: -8px; }
 .privacy-note { font-size: 11px; line-height: 1.8; color: var(--muted); margin: 17px 0; }
 .consent { display: flex; align-items: start; gap: 10px; font-size: 12px; line-height: 1.7; margin: 20px 0; }
 .consent input { accent-color: var(--green); width: 18px; height: 18px; flex-shrink: 0; }

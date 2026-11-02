@@ -28,8 +28,8 @@ npm.cmd run vendor:test
 - `vendor.whatsapp` defaults to **919849293951**, the first number on the PDF,
   not a verified WhatsApp account. Confirm ownership and WhatsApp availability.
   Update the phone links in `index.html` too if either shop number changes.
-- Confirm actual pickup arrangements. There is no delivery promise or address
-  collection.
+- Confirm actual pickup arrangements. The required customer address is shared
+  with the vendor, but collecting it does not promise delivery.
 - Have the vendor confirm its licence, applicable rules for online fireworks
   enquiries/orders, age restrictions and the hosting provider's acceptable-use
   policy. This prototype is not legal clearance to trade.
@@ -76,11 +76,17 @@ uploading just the public app files is an alternative.
 
 - Selection quantities are whole **selling units**, between 1 and 99 per product.
   A selling unit can be a box, packet, or individual piece as shown in the list.
+- A **15% discount** applies automatically to the complete catalogue subtotal.
+  Cart and review show the subtotal, discount applied and discounted estimated
+  total; the mobile cart and WhatsApp message use the same discounted total.
+  Calculations use integer paise and round the discount once at subtotal level.
+  Catalogue and individual line prices remain the original printed rates.
 - Search includes product names, numbers, brands and categories. Categories and
   price/name sorting work together.
 - The cart is saved to local storage, not to a server. Invalid saved data and
-  storage failures are reported. Contact details remain in memory only, and the
-  review form and message are cleared when the dialog is closed.
+  storage failures are reported. Required name, mobile number and full address
+  (10-500 characters) remain in memory only, and the review form and message are
+  cleared when the dialog is closed. Multiline addresses are preserved.
 - The customer validates details and explicitly agrees before message links are
   generated. Customer details are included in the WhatsApp URL only when they
   open the chat. The site cannot verify that a message was sent or delivered.

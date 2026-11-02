@@ -2,11 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { products, categories, vendor } from "../vendor-app/catalog.mjs";
 import {
-  sanitizeCart, cartLines, total, validateCustomer, createRequirement,
+  sanitizeCart, cartLines, pricing, total, money, validateCustomer, createRequirement,
   whatsappUrl, prepareMessages, localDate,
 } from "../vendor-app/order.mjs";
 
-const customer = { name: "Ravi Kumar", phone: "9876543210", pickup: "2026-11-05", notes: "Please confirm stock." };
+const customer = {
+  name: "Ravi Kumar", phone: "9876543210",
+  address: "Flat 12, Example Street\nSanathnagar, Hyderabad 500018",
+  pickup: "2026-11-05", notes: "Please confirm stock.",
+};
 const today = "2026-11-02";
 
 test("catalogue contains all 68 numbered products and the PDF's exact rates", () => {
@@ -27,10 +31,27 @@ test("catalogue contains all 68 numbered products and the PDF's exact rates", ()
 });
 
 test("quantities count selling units rather than pieces", () => {
-  assert.equal(total({ 1: 2, 12: 1 }), 370);
+  assert.equal(total({ 1: 2, 12: 1 }), 314.5);
   assert.equal(cartLines({ 1: 2 })[0].unit, "10 pcs / box");
   assert.equal(total({}), 0);
-  assert.equal(total({ 32: 99 }), 594000);
+  assert.equal(total({ 32: 99 }), 504900);
+});
+
+test("15% discount is applied once to the subtotal, with paise preserved", () => {
+  assert.deepEqual(pricing({ 1: 2, 12: 1 }), { subtotal: 370, discount: 55.5, total: 314.5 });
+  assert.deepEqual(pricing({ 18: 1 }), { subtotal: 25, discount: 3.75, total: 21.25 });
+  assert.deepEqual(pricing({ 21: 1 }), { subtotal: 20, discount: 3, total: 17 });
+  assert.deepEqual(pricing({}), { subtotal: 0, discount: 0, total: 0 });
+  assert.ok(money(314.5).endsWith("314.50"));
+  assert.ok(money(21.25).endsWith("21.25"));
+  assert.ok(money(70).endsWith("70"));
+  for (const quantity of [1, 2, 17, 99]) {
+    const cart = Object.fromEntries(products.map(product => [product.id, quantity]));
+    const amounts = pricing(cart);
+    const subtotalPaise = products.reduce((sum, product) => sum + product.price * quantity * 100, 0);
+    assert.equal(Math.round(amounts.discount * 100), Math.round(subtotalPaise * 15 / 100));
+    assert.equal(Math.round(amounts.total * 100) + Math.round(amounts.discount * 100), subtotalPaise);
+  }
 });
 
 test("invalid saved carts cannot change the catalogue or inject quantities", () => {
@@ -50,13 +71,25 @@ test("customer validation accepts formatted Indian phones and optional fields", 
   assert.equal(localDate(new Date(2026, 10, 2, 0, 15)), today);
 });
 
-test("invalid names, phones, dates and oversized notes fail explicitly", () => {
+test("invalid names, phones, addresses, dates and oversized notes fail explicitly", () => {
   for (const change of [{ name: "" }, { name: "A" }, { name: "A\nCustomer" },
     { name: "a".repeat(81) }, { phone: "1234567890" }, { phone: "98765" },
-    { phone: "+1 9876543210" }, { pickup: "2026-11-01" }, { pickup: "2027-02-29" },
+    { phone: "+1 9876543210" }, { address: undefined }, { address: "" },
+    { address: " \n " }, { address: "Too short" }, { address: "a".repeat(501) },
+    { pickup: "2026-11-01" }, { pickup: "2027-02-29" },
     { pickup: "not-a-date" }, { notes: "a".repeat(501) }]) {
     assert.throws(() => validateCustomer({ ...customer, ...change }, today));
   }
+});
+
+test("addresses retain multiline and Unicode text while normalizing line endings", () => {
+  assert.equal(validateCustomer({ ...customer, address: `  ${customer.address.replace("\n", "\r\n")}  ` }, today).address,
+    customer.address);
+  for (const length of [10, 500]) {
+    assert.equal(validateCustomer({ ...customer, address: "a".repeat(length) }, today).address.length, length);
+  }
+  const address = "ఇంటి నంబర్ 12\nహైదరాబాద్ 500018";
+  assert.equal(validateCustomer({ ...customer, address }, today).address, address);
 });
 
 test("message contains every detail, line amount, pack, brand and estimated total", () => {
@@ -64,10 +97,14 @@ test("message contains every detail, line amount, pack, brand and estimated tota
   for (const content of ["Ravi Kumar", "+91 9876543210", "2026-11-05",
     "#1 Ground Chakkar Big | STANDARD", "Pack: 10 pcs / box",
     "2 selling unit(s) x Rs.70 = Rs.140", "#12 Flower Pot Special",
-    "Estimated total: Rs.370", "Please confirm stock.", "not a confirmed order"]) {
+    `Address: ${customer.address}`, "Subtotal: Rs.370.00", "Discount applied (15%): -Rs.55.50",
+    "Estimated total after discount: Rs.314.50", "Please confirm stock.", "not a confirmed order"]) {
     assert.ok(message.includes(content), content);
   }
   assert.throws(() => createRequirement({}, customer, today), /at least one/);
+  const fractional = createRequirement({ 18: 1 }, customer, today);
+  assert.ok(fractional.includes("Discount applied (15%): -Rs.3.75"));
+  assert.ok(fractional.includes("Estimated total after discount: Rs.21.25"));
 });
 
 test("WhatsApp links encode customer content without permitting URL injection", () => {
@@ -109,7 +146,8 @@ test("a basket containing all 68 products is split without losing any details", 
 
 test("Unicode customer details, long notes and huge individual lines split losslessly", () => {
   const text = createRequirement({ 1: 2 }, {
-    ...customer, name: "రవి కుమార్", notes: "దీపావళి 🎉 ".repeat(35),
+    ...customer, name: "రవి కుమార్", address: "హైదరాబాద్ 500018\n".repeat(25),
+    notes: "దీపావళి 🎉 ".repeat(35),
   }, today);
   assertLosslessSplit(text);
   assertLosslessSplit("🎉".repeat(500));

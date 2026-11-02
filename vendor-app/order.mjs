@@ -2,9 +2,11 @@ import { products, vendor } from "./catalog.mjs";
 
 export const MAX_QUANTITY = 99;
 export const CART_KEY = "sai-baba-cart-v1";
+export const DISCOUNT_PERCENT = 15;
 const byId = new Map(products.map(product => [product.id, product]));
 export const money = value => new Intl.NumberFormat("en-IN", {
-  style: "currency", currency: "INR", maximumFractionDigits: 0,
+  style: "currency", currency: "INR",
+  minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2,
 }).format(value);
 
 export function sanitizeCart(value) {
@@ -28,8 +30,18 @@ export function cartLines(cart) {
   }));
 }
 
+export function pricing(cart) {
+  const subtotalPaise = cartLines(cart).reduce((sum, line) => sum + line.amount * 100, 0);
+  const discountPaise = Math.round(subtotalPaise * DISCOUNT_PERCENT / 100);
+  return {
+    subtotal: subtotalPaise / 100,
+    discount: discountPaise / 100,
+    total: (subtotalPaise - discountPaise) / 100,
+  };
+}
+
 export function total(cart) {
-  return cartLines(cart).reduce((sum, line) => sum + line.amount, 0);
+  return pricing(cart).total;
 }
 
 export function localDate(date = new Date()) {
@@ -39,6 +51,7 @@ export function localDate(date = new Date()) {
 export function validateCustomer(input, today = localDate()) {
   const name = String(input.name ?? "").trim();
   const phone = String(input.phone ?? "").trim();
+  const address = String(input.address ?? "").replace(/\r\n?/g, "\n").trim();
   const pickup = String(input.pickup ?? "").trim();
   const notes = String(input.notes ?? "").trim();
   if (name.length < 2 || name.length > 80 || /[\r\n]/.test(name)) {
@@ -48,6 +61,9 @@ export function validateCustomer(input, today = localDate()) {
   if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
     throw new Error("Enter a valid 10-digit Indian mobile number.");
   }
+  if (address.length < 10 || address.length > 500) {
+    throw new Error("Enter your full address between 10 and 500 characters.");
+  }
   if (pickup && (!/^\d{4}-\d{2}-\d{2}$/.test(pickup) ||
       !Number.isFinite(Date.parse(`${pickup}T00:00:00Z`)) ||
       new Date(`${pickup}T00:00:00Z`).toISOString().slice(0, 10) !== pickup ||
@@ -55,22 +71,26 @@ export function validateCustomer(input, today = localDate()) {
     throw new Error("Choose today or a future date for pickup.");
   }
   if (notes.length > 500) throw new Error("Keep notes to 500 characters or fewer.");
-  return { name, phone: normalizedPhone, pickup, notes };
+  return { name, phone: normalizedPhone, address, pickup, notes };
 }
 
 export function createRequirement(cart, input, today) {
   const lines = cartLines(cart);
   if (!lines.length) throw new Error("Add at least one product to your requirement.");
   const customer = validateCustomer(input, today);
+  const amounts = pricing(cart);
   return [
     `New requirement - ${vendor.name} (${vendor.year} catalogue)`,
     "",
     `Customer: ${customer.name}`,
     `Mobile: +91 ${customer.phone}`,
+    `Address: ${customer.address}`,
     ...(customer.pickup ? [`Preferred pickup: ${customer.pickup}`] : []),
     "",
     ...lines.map(line => `#${line.id} ${line.name} | ${line.brand}\nPack: ${line.unit}\n${line.quantity} selling unit(s) x Rs.${line.price} = Rs.${line.amount}\n`),
-    `Estimated total: Rs.${total(cart)}`,
+    `Subtotal: Rs.${amounts.subtotal.toFixed(2)}`,
+    `Discount applied (${DISCOUNT_PERCENT}%): -Rs.${amounts.discount.toFixed(2)}`,
+    `Estimated total after discount: Rs.${amounts.total.toFixed(2)}`,
     ...(customer.notes ? ["", `Notes: ${customer.notes}`] : []),
     "",
     "Please confirm availability, final price and pickup arrangements.",
