@@ -11,6 +11,135 @@
   <script type="module" src="./app.mjs"></script>
 </head>
 <body>
+  <svg class="product-artwork-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="product-art-chakkar" viewBox="0 0 64 64">
+        <ellipse cx="29" cy="38" rx="19" ry="15" fill="currentColor" fill-opacity=".12"/>
+        <path d="M42 38c0-7-8-11-15-8-8 3-7 12 0 14 6 2 12-3 9-7-2-4-9-3-9 1"/>
+        <path d="m43 27 5-7m-2 0 5-5m1 12 7-1m-8-10 1-7M15 20l-5-5M8 32H3"/>
+        <circle cx="54" cy="20" r="2" fill="var(--accent)"/>
+      </symbol>
+      <symbol id="product-art-pencil" viewBox="0 0 64 64">
+        <rect x="18" y="27" width="9" height="31" rx="2" fill="currentColor" fill-opacity=".15"/>
+        <rect x="36" y="33" width="9" height="25" rx="2" fill="var(--accent)"/>
+        <path d="M18 45h9m9 3h9M22 27v-8m18 14v-7M22 14V5m-6 12-6-5m18 5 6-5m6 11 6-7m-6 4v-7"/>
+        <circle cx="12" cy="24" r="1.5" fill="currentColor"/>
+        <circle cx="51" cy="27" r="1.5" fill="var(--accent)"/>
+      </symbol>
+      <symbol id="product-art-twinkling" viewBox="0 0 64 64">
+        <path d="M12 57c-8-9 19-9 10-19s16-9 12-20" stroke-width="5"/>
+        <path d="m35 8 2 5 6 1-5 4 1 6-5-3-5 3 1-6-5-4 6-1z" fill="var(--accent)"/>
+        <path d="m46 31 5 4m-9 8 6 1M16 17l-5-3m36-3 4-4"/>
+      </symbol>
+      <symbol id="product-art-flower-pot" viewBox="0 0 64 64">
+        <path d="m25 33-10 24h34L39 33z" fill="currentColor" fill-opacity=".15"/>
+        <ellipse cx="32" cy="33" rx="7" ry="3" fill="var(--accent)"/>
+        <path d="M20 46h24m-26 7h28M32 29V8M27 27c0-9-5-15-11-18m21 18c0-9 5-15 11-18M23 29l-12-9m30 9 12-9"/>
+        <circle cx="32" cy="5" r="2" fill="var(--accent)"/>
+        <circle cx="12" cy="7" r="2" fill="var(--accent)"/>
+        <circle cx="52" cy="7" r="2" fill="var(--accent)"/>
+      </symbol>
+      <symbol id="product-art-crackers" viewBox="0 0 64 64">
+        <rect x="10" y="24" width="12" height="31" rx="3" fill="currentColor" fill-opacity=".15"/>
+        <rect x="26" y="18" width="12" height="37" rx="3" fill="var(--accent)"/>
+        <rect x="42" y="24" width="12" height="31" rx="3" fill="currentColor" fill-opacity=".15"/>
+        <path d="M10 31h12m4-6h12m4 6h12M10 47h44M16 24c0-8 7-5 7-12m9 6V7m16 17c0-8-7-5-7-12"/>
+      </symbol>
+      <symbol id="product-art-bomb" viewBox="0 0 64 64">
+        <rect x="17" y="25" width="30" height="31" rx="8" fill="currentColor" fill-opacity=".18"/>
+        <path d="m20 31 24 18m-24-9 19 14m-8-29c-2-10 12-5 11-14"/>
+        <path d="m42 5 1-3m5 7 5-2m-5 8 4 3" stroke="var(--accent)" stroke-width="3"/>
+        <path d="M22 25h20"/>
+      </symbol>
+      <symbol id="product-art-garland" viewBox="0 0 64 64">
+        <path d="M32 5v53"/>
+        <g fill="currentColor" fill-opacity=".15">
+          <path d="m15 10 13-3 3 10-13 3zm21-3 13 3-3 10-13-3zM15 27l13-3 3 10-13 3zm21-3 13 3-3 10-13-3zM15 44l13-3 3 10-13 3zm21-3 13 3-3 10-13-3z"/>
+        </g>
+        <path d="m30 58-3 3m7-3 3 3" stroke="var(--accent)"/>
+      </symbol>
+      <symbol id="product-art-matches" viewBox="0 0 64 64">
+        <path d="M16 10v19m9-23v23m9-17v17" stroke-width="3"/>
+        <g fill="var(--accent)"><ellipse cx="16" cy="8" rx="3" ry="4"/><ellipse cx="25" cy="5" rx="3" ry="4"/><ellipse cx="34" cy="10" rx="3" ry="4"/></g>
+        <rect x="10" y="28" width="37" height="28" rx="3" fill="currentColor" fill-opacity=".15"/>
+        <path d="M47 32h7v24H17m2-18h20m-20 8h20"/>
+      </symbol>
+      <symbol id="product-art-roll-caps" viewBox="0 0 64 64">
+        <path d="M33 16h18v33H33" fill="var(--accent)"/>
+        <ellipse cx="28" cy="33" rx="18" ry="20" fill="currentColor" fill-opacity=".12"/>
+        <ellipse cx="28" cy="33" rx="10" ry="12"/>
+        <ellipse cx="28" cy="33" rx="3" ry="4" fill="currentColor"/>
+        <path d="M51 24h-5m5 10h-5m5 10h-5"/>
+      </symbol>
+      <symbol id="product-art-pop-pops" viewBox="0 0 64 64">
+        <path d="m8 31 20-9 14 7-20 10z" fill="var(--accent)"/>
+        <path d="M8 31v21l14 7V39m0 20 20-10V29" fill="currentColor" fill-opacity=".12"/>
+        <path d="M45 10c-7 5-9 12-3 14s10-5 3-14zm12 19c-6 4-8 10-3 12s9-4 3-12z" fill="var(--accent)"/>
+        <path d="m45 10 2-6m10 25 3-4"/>
+      </symbol>
+      <symbol id="product-art-cap-gun" viewBox="0 0 64 64">
+        <path d="M8 16h39v17H29L22 54H10l7-21H8z" fill="currentColor" fill-opacity=".18"/>
+        <path d="M47 19h9v10h-9" fill="var(--accent)"/>
+        <path d="M29 33v10h9l5-10M15 22h23m-23 5h23M16 42h7"/>
+      </symbol>
+      <symbol id="product-art-helicopter" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="36" rx="12" ry="8" fill="var(--accent)"/>
+        <path d="M32 28V18M8 18h48M17 11l30 14M20 36H7l-3-7m20 15-4 10m20-10 4 10M16 54h32"/>
+        <path d="M29 32h6"/>
+      </symbol>
+      <symbol id="product-art-butterfly" viewBox="0 0 64 64">
+        <path d="M30 31C10 1 1 19 19 35 0 43 15 61 30 39m4-8C54 1 63 19 45 35c19 8 4 26-11 4" fill="currentColor" fill-opacity=".15"/>
+        <path d="M30 25h4v23h-4z" fill="var(--accent)"/>
+        <path d="m31 25-7-9m9 9 7-9M17 27l8 6m14 0 8-6"/>
+      </symbol>
+      <symbol id="product-art-siren" viewBox="0 0 64 64">
+        <rect x="23" y="25" width="18" height="32" rx="3" fill="currentColor" fill-opacity=".15"/>
+        <path d="M23 45h18m-18 6h18M32 25V14m-8-7a13 13 0 0 0 0 18m16-18a13 13 0 0 1 0 18M17 4a18 18 0 0 0 0 25M47 4a18 18 0 0 1 0 25"/>
+        <path d="m29 31 7 5-7 5z" fill="var(--accent)"/>
+      </symbol>
+      <symbol id="product-art-novelty" viewBox="0 0 64 64">
+        <path d="M12 32h40v25H12z" fill="currentColor" fill-opacity=".15"/>
+        <path d="M12 40h40M32 32v25"/>
+        <path d="m32 5 3 8 9 1-7 6 2 9-7-5-7 5 2-9-7-6 9-1z" fill="var(--accent)"/>
+        <path d="m12 16-5-4m45 4 5-4"/>
+      </symbol>
+      <symbol id="product-art-rocket" viewBox="0 0 64 64">
+        <path d="M32 42v19"/>
+        <path d="M25 21h14v22H25z" fill="currentColor" fill-opacity=".15"/>
+        <path d="m23 21 9-16 9 16z" fill="var(--accent)"/>
+        <path d="m25 33-7 12 7-3m14-9 7 12-7-3M25 28h14m-10 9h6"/>
+        <path d="m14 18-5-3m40 15 6-2"/>
+      </symbol>
+      <symbol id="product-art-fountain" viewBox="0 0 64 64">
+        <rect x="18" y="36" width="28" height="22" rx="3" fill="currentColor" fill-opacity=".15"/>
+        <path d="M18 50h28M26 36c0-13-7-17-12-20m24 20c0-13 7-17 12-20M32 34V9m-10 21L9 25m33 5 13-5"/>
+        <g fill="var(--accent)"><circle cx="32" cy="5" r="2"/><circle cx="10" cy="11" r="2"/><circle cx="54" cy="11" r="2"/></g>
+      </symbol>
+      <symbol id="product-art-shots" viewBox="0 0 64 64">
+        <path d="m10 30 22-9 22 9-22 10z" fill="var(--accent)"/>
+        <path d="M10 30v22l22 10V40m0 22 22-10V30" fill="currentColor" fill-opacity=".15"/>
+        <ellipse cx="23" cy="29" rx="3" ry="2"/><ellipse cx="32" cy="25" rx="3" ry="2"/><ellipse cx="41" cy="29" rx="3" ry="2"/>
+        <path d="M32 15V5m-7 8-5-6m19 6 5-6"/>
+      </symbol>
+      <symbol id="product-art-comet" viewBox="0 0 64 64">
+        <path d="M24 37h16v20H24z" fill="currentColor" fill-opacity=".15"/>
+        <ellipse cx="32" cy="37" rx="8" ry="3" fill="var(--accent)"/>
+        <path d="M32 33V21m-5 12V23m10 10V23"/>
+        <path d="m32 3 3 7 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z" fill="var(--accent)"/>
+      </symbol>
+      <symbol id="product-art-peacock" viewBox="0 0 64 64">
+        <path d="M32 40C4 36 4 8 13 10s19 18 19 30C4 24 23 0 32 7c9-7 28 17 0 33 0-12 10-28 19-30s9 26-19 30z" fill="currentColor" fill-opacity=".12"/>
+        <path d="M32 40V10m0 30L15 15m17 25 17-25"/>
+        <path d="m22 42-7 16h34l-7-16z" fill="var(--accent)"/>
+        <path d="M20 51h24"/>
+      </symbol>
+      <symbol id="product-art-sparklers" viewBox="0 0 64 64">
+        <path d="m13 59 12-30m7 30V23m19 36L40 30"/>
+        <path d="m23 17 2 5 5 2-5 2-2 5-2-5-5-2 5-2zm9-13 2 6 6 2-6 2-2 6-2-6-6-2 6-2zm10 13 2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="var(--accent)"/>
+        <path d="m10 15-4-3m45 3 4-3M20 8l-2-4m27 3 2-4"/>
+      </symbol>
+    </defs>
+  </svg>
   <a class="skip-link" href="#catalogue">Skip to catalogue</a>
   <header class="site-header">
     <a class="wordmark" href="./" aria-label="Sai Baba Crackers Centre home">

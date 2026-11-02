@@ -92,11 +92,41 @@ function updateQuantity(id, change, fromCart) {
   active.focus({ preventScroll: true });
 }
 
-const categorySymbols = {
-  Chakkars: "\u273a", "Pencils & stars": "\u2727", "Flower pots": "\u2740",
-  Crackers: "\u2726", Novelties: "\u2736", Rockets: "\u2197",
-  "Fountains & shots": "\u2737", Sparklers: "\u2733",
+const categoryArtwork = {
+  Chakkars: "chakkar", "Pencils & stars": "pencil", "Flower pots": "flower-pot",
+  Crackers: "crackers", Novelties: "novelty", Rockets: "rocket",
+  "Fountains & shots": "fountain", Sparklers: "sparklers",
 };
+
+const artworkVariants = {
+  "Pencils & stars": [[/twinkling/i, "twinkling"]],
+  Crackers: [[/wala/i, "garland"], [/bomb/i, "bomb"]],
+  Novelties: [
+    [/matches/i, "matches"], [/roll caps/i, "roll-caps"], [/pop-pop/i, "pop-pops"],
+    [/gun/i, "cap-gun"], [/helicopter/i, "helicopter"], [/butterfly/i, "butterfly"],
+    [/merry go round/i, "chakkar"], [/siren/i, "siren"],
+  ],
+  "Fountains & shots": [
+    [/comet/i, "comet"], [/shots/i, "shots"], [/peacock/i, "peacock"],
+    [/candle|torch/i, "pencil"],
+  ],
+};
+
+function productIllustration(product) {
+  const type = artworkVariants[product.category]?.find(([pattern]) => pattern.test(product.name))?.[1] ??
+    categoryArtwork[product.category];
+  if (typeof type !== "string") throw new Error(`Missing artwork for category: ${product.category}`);
+  const namespace = "http://www.w3.org/2000/svg";
+  const illustration = document.createElementNS(namespace, "svg");
+  illustration.setAttribute("class", "product-illustration");
+  illustration.setAttribute("viewBox", "0 0 64 64");
+  illustration.setAttribute("aria-hidden", "true");
+  illustration.setAttribute("focusable", "false");
+  const use = document.createElementNS(namespace, "use");
+  use.setAttribute("href", `#product-art-${type}`);
+  illustration.append(use);
+  return illustration;
+}
 
 function renderCategories() {
   $("#categories").replaceChildren(...categories.map(name => {
@@ -128,7 +158,7 @@ function renderProducts() {
     const art = element("div", `product-art art-${categories.indexOf(product.category) % 4}`);
     art.setAttribute("aria-hidden", "true");
     art.append(element("span", "product-number", `NO. ${String(product.id).padStart(2, "0")}`),
-      element("span", "product-symbol", categorySymbols[product.category]),
+      productIllustration(product),
       element("span", "art-category", product.category));
     const body = element("div", "product-body");
     body.append(element("p", "product-brand", product.brand), element("h3", "", product.name),

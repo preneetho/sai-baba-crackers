@@ -47,6 +47,10 @@ The app uses a blue theme across the catalogue, cart, checkout and mobile contro
 with gold accents for the festive artwork. Shared colours are defined in
 `styles.css`; the browser theme colour and favicon in `index.html` match the brand.
 Changing the theme does not change order recording, pricing or WhatsApp messages.
+Product cards use bundled SVG illustrations matched to the cracker type, with
+specific variants for items such as rockets, sparklers, garlands and flower pots.
+These are illustrative, not manufacturer product photos. On mobile, the artwork
+band is 56 px high with a 40 px illustration; desktop artwork remains larger.
 
 ## Hosting
 

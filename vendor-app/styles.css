@@ -88,7 +88,8 @@ h2 { font-family: Georgia, "Times New Roman", serif; font-size: 27px; font-weigh
 .art-1 { background: #edf4ff; color: #3a70b5; }
 .art-2 { background: #e5effb; color: #4d74a8; }
 .art-3 { background: #f0f3ff; color: #5b6fb3; }
-.product-symbol { font-family: Georgia, serif; font-size: 64px; line-height: 1; }
+.product-artwork-definitions { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+.product-illustration { width: 64px; height: 64px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .product-number { position: absolute; top: 12px; left: 12px; font-size: 8px; letter-spacing: 1.4px; color: var(--muted); }
 .art-category { position: absolute; bottom: 10px; right: 12px; font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
 .product-body { padding: 16px 14px 14px; display: flex; flex-direction: column; flex: 1; }
@@ -239,7 +240,10 @@ textarea { resize: vertical; }
   .results-bar label { font-size: 0; }
   .results-bar select { min-height: 28px; font-size: 10px; }
   .product-grid { gap: 11px; }
-  .product-art { min-height: 105px; }
+  .product-art { min-height: 56px; }
+  .product-illustration { width: 40px; height: 40px; }
+  .product-number { top: 8px; left: 8px; }
+  .art-category { display: none; }
   .product-body { padding: 12px 10px; }
   .product-body h3 { font-size: 12px; min-height: 36px; }
   .product-bottom { gap: 8px; flex-wrap: wrap; }
