@@ -78,7 +78,7 @@
         <div id="cart-pricing"></div>
         <p class="estimate-note">Final prices and availability will be confirmed by the vendor.</p>
         <button id="review" class="button primary wide" type="button" disabled>Review requirement <span aria-hidden="true">&#8594;</span></button>
-        <p class="cart-footnote">No payment now. Just a conversation.</p>
+        <p class="cart-footnote">Free home delivery or store pickup. No payment now.</p>
         <button id="clear-cart" class="text-button" type="button" hidden>Clear selection</button>
         <div class="vendor-note"><span aria-hidden="true">&#10022;</span><p><strong>Need a hand choosing?</strong><br><a id="vendor-call" href="tel:+919849293951">Call the shop</a> for a little festive advice.</p></div>
       </aside>
@@ -86,9 +86,9 @@
 
     <section id="contact" class="contact-section" aria-labelledby="contact-title">
       <div><p class="eyebrow green">YOUR NEIGHBOURHOOD FESTIVE STOP</p><h2 id="contact-title">Come for the crackers.<br>Stay for the festive spirit.</h2><p>Sai Baba Crackers Centre<br>Sanathnagar, Hyderabad</p></div>
-      <div class="contact-details"><h3>Let's make your list</h3><a href="tel:+919849293951">+91 98492 93951</a><a href="tel:+919000592233">+91 90005 92233</a><p>Contact the shop to confirm opening hours,<br>availability and pickup arrangements.</p></div>
+      <div class="contact-details"><h3>Let's make your list</h3><a href="tel:+919849293951">+91 98492 93951</a><a href="tel:+919000592233">+91 90005 92233</a><p>Free home delivery or store pickup.<br>Contact the shop to confirm availability,<br>delivery area and timing.</p></div>
     </section>
-    <section class="fine-print" aria-label="Important information"><p><strong>Celebrate responsibly.</strong> Follow local rules, age restrictions and product safety instructions. This site collects enquiries only; it does not confirm a sale or offer delivery.</p><p>Vendor's printed terms: goods once sold cannot be returned or exchanged; manufacturing defects are subject to the manufacturer's terms. Applicable consumer rights are not excluded.</p></section>
+    <section class="fine-print" aria-label="Important information"><p><strong>Celebrate responsibly.</strong> Follow local rules, age restrictions and product safety instructions. This site collects enquiries only; it does not confirm a sale. Free home delivery availability, service area and timing must be confirmed by the vendor.</p><p>Vendor's printed terms: goods once sold cannot be returned or exchanged; manufacturing defects are subject to the manufacturer's terms. Applicable consumer rights are not excluded.</p></section>
   </main>
   <footer><span>SAI BABA CRACKERS CENTRE</span><span>A brighter Diwali, together. &middot; 2026</span></footer>
   <a id="mobile-cart" class="mobile-cart" href="#requirement" hidden><span id="mobile-cart-label"></span><span>View list &#8594;</span></a>
@@ -99,28 +99,38 @@
     <div id="checkout-summary"></div>
     <form id="customer-form">
       <h3>Your details</h3>
+      <fieldset class="fulfilment-options">
+        <legend>How would you like to receive your items? <span aria-hidden="true">*</span></legend>
+        <div class="fulfilment-grid">
+          <label class="fulfilment-option"><input id="fulfilment-delivery" type="radio" name="fulfilment" value="delivery" required><span><strong>Home delivery</strong><small class="free-badge">FREE</small></span></label>
+          <label class="fulfilment-option"><input id="fulfilment-pickup" type="radio" name="fulfilment" value="pickup" required><span><strong>Store pickup</strong><small>Collect from the shop</small></span></label>
+        </div>
+        <p class="fulfilment-help">Choose one option. Delivery area and timing will be confirmed by the vendor.</p>
+      </fieldset>
       <div class="form-grid">
         <label>Your name <span aria-hidden="true">*</span><input name="name" autocomplete="name" required minlength="2" maxlength="80" placeholder="Full name"></label>
         <label>Mobile number <span aria-hidden="true">*</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required maxlength="20" placeholder="10-digit Indian mobile"></label>
-        <label class="full-width">Your address <span aria-hidden="true">*</span><textarea name="address" autocomplete="street-address" rows="3" required minlength="10" maxlength="500" aria-describedby="address-help" placeholder="House / flat, street, area, city and PIN code"></textarea></label>
-        <p id="address-help" class="address-help full-width">Your address will be shared with the vendor. Delivery is not promised; confirm arrangements directly with the shop.</p>
-        <label>Preferred pickup date <span class="optional">(optional)</span><input id="pickup-date" name="pickup" type="date"></label>
+        <label class="full-width"><span id="address-label">Your address</span> <span aria-hidden="true">*</span><textarea name="address" autocomplete="street-address" rows="3" required minlength="10" maxlength="500" aria-describedby="address-help" placeholder="House / flat, street, area, city and PIN code"></textarea></label>
+        <p id="address-help" class="address-help full-width">Your address and selected delivery or pickup option will be shared with the vendor.</p>
+        <label><span id="preferred-date-label">Preferred date</span> <span class="optional">(optional)</span><input id="preferred-date" name="preferredDate" type="date"></label>
         <label class="full-width">Notes <span class="optional">(optional)</span><textarea name="notes" rows="3" maxlength="500" placeholder="Any preferences or questions for the vendor?"></textarea></label>
       </div>
-      <p class="privacy-note">Only your product selection is saved on this device. Your name, mobile number and address are not stored by this site. WhatsApp receives them when you open the prepared chat.</p>
-      <label class="consent"><input id="consent" type="checkbox" required><span>I agree to share my contact details, address and requirement with the vendor through WhatsApp and understand this is not a confirmed order.</span></label>
-      <p id="form-error" class="error" role="alert" hidden></p>
-      <button class="button primary wide" type="submit">Prepare WhatsApp message <span aria-hidden="true">&#8594;</span></button>
+      <p class="privacy-note">Your selection is saved on this device. On submission, your name, mobile number, address and requirement are recorded in the vendor's Google Sheet. They are also sent to WhatsApp when you open the prepared chat. Contact the vendor to correct or remove a recorded requirement.</p>
+      <label class="consent"><input id="consent" type="checkbox" required><span>I agree to save my details and requirement in the vendor's Google Sheet and share them through WhatsApp. I understand this is not a confirmed order.</span></label>
+      <p id="save-status" class="privacy-note" role="status" hidden>Saving your requirement to the vendor's order tracker. Please keep this review open.</p>
+      <p id="form-error" class="error" role="alert" tabindex="-1" hidden></p>
+      <button id="submit-requirement" class="button primary wide" type="submit">Save requirement &amp; prepare WhatsApp</button>
     </form>
     <section id="message-preview" aria-labelledby="message-title" hidden>
       <h3 id="message-title">Ready for your WhatsApp chat</h3>
+      <p id="order-reference" class="recipient order-reference"></p>
       <p id="handoff-instructions"></p>
       <p class="recipient">Recipient: <strong id="recipient"></strong></p>
       <div id="message-links"></div>
       <label class="message-label" for="full-message">Your complete requirement</label><textarea id="full-message" rows="10" readonly></textarea>
-      <div class="message-tools"><button id="copy-message" class="button secondary" type="button">Copy complete message</button><button id="download-message" class="button secondary" type="button">Download .txt</button><button id="edit-details" class="text-button" type="button">Edit details</button></div>
+      <div class="message-tools"><button id="copy-message" class="button secondary" type="button">Copy complete message</button><button id="download-message" class="button secondary" type="button">Download .txt</button><button id="edit-details" class="text-button" type="button">Revise details</button></div>
       <p id="copy-status" role="status"></p>
-      <p class="privacy-note">Nothing is submitted automatically. Press Send inside WhatsApp. If a link does not work, copy the complete message and paste it into the vendor's chat.</p>
+      <p class="privacy-note">Your requirement has been recorded, but WhatsApp has not been sent and the sale is not confirmed. Press Send inside WhatsApp. If a link does not work, copy the complete message into the vendor's chat. Revising recorded details creates a new reference; tell the vendor which reference to fulfil.</p>
     </section>
   </dialog>
   <noscript><div class="noscript">Enable JavaScript to build your requirement, or call the shop on +91 98492 93951.</div></noscript>

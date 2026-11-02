@@ -9,7 +9,7 @@ import {
 const customer = {
   name: "Ravi Kumar", phone: "9876543210",
   address: "Flat 12, Example Street\nSanathnagar, Hyderabad 500018",
-  pickup: "2026-11-05", notes: "Please confirm stock.",
+  fulfilment: "pickup", preferredDate: "2026-11-05", notes: "Please confirm stock.",
 };
 const today = "2026-11-02";
 
@@ -66,8 +66,8 @@ test("customer validation accepts formatted Indian phones and optional fields", 
   for (const phone of ["9876543210", "+91 98765 43210", "919876543210", "(98765) 43210"]) {
     assert.equal(validateCustomer({ ...customer, phone }, today).phone, "9876543210");
   }
-  assert.equal(validateCustomer({ ...customer, pickup: "", notes: "" }, today).pickup, "");
-  assert.equal(validateCustomer({ ...customer, pickup: today }, today).pickup, today);
+  assert.equal(validateCustomer({ ...customer, preferredDate: "", notes: "" }, today).preferredDate, "");
+  assert.equal(validateCustomer({ ...customer, preferredDate: today }, today).preferredDate, today);
   assert.equal(localDate(new Date(2026, 10, 2, 0, 15)), today);
 });
 
@@ -76,9 +76,47 @@ test("invalid names, phones, addresses, dates and oversized notes fail explicitl
     { name: "a".repeat(81) }, { phone: "1234567890" }, { phone: "98765" },
     { phone: "+1 9876543210" }, { address: undefined }, { address: "" },
     { address: " \n " }, { address: "Too short" }, { address: "a".repeat(501) },
-    { pickup: "2026-11-01" }, { pickup: "2027-02-29" },
-    { pickup: "not-a-date" }, { notes: "a".repeat(501) }]) {
+    { preferredDate: "2026-11-01" }, { preferredDate: "2027-02-29" },
+    { preferredDate: "not-a-date" }, { notes: "a".repeat(501) }]) {
     assert.throws(() => validateCustomer({ ...customer, ...change }, today));
+  }
+});
+
+test("delivery or pickup is an explicit required choice", () => {
+  for (const fulfilment of [undefined, "", "courier", "Delivery", " pickup "]) {
+    assert.throws(() => validateCustomer({ ...customer, fulfilment }, today),
+      /Choose free home delivery or store pickup/);
+  }
+  for (const fulfilment of ["delivery", "pickup"]) {
+    assert.equal(validateCustomer({ ...customer, fulfilment }, today).fulfilment, fulfilment);
+    assert.throws(() => validateCustomer({ ...customer, fulfilment, address: "" }, today), /address/);
+    assert.throws(() => validateCustomer({ ...customer, fulfilment, preferredDate: "2026-11-01" }, today),
+      new RegExp(`future date for ${fulfilment === "delivery" ? "delivery" : "pickup"}`));
+  }
+});
+
+test("free home delivery and pickup retain the same 15% discounted total", () => {
+  for (const fulfilment of ["delivery", "pickup"]) {
+    const text = createRequirement({ 1: 2, 12: 1 }, { ...customer, fulfilment }, today);
+    assert.ok(text.includes("Discount applied (15%): -Rs.55.50"));
+    assert.ok(text.includes("Estimated total after discount: Rs.314.50"));
+    assert.ok(text.includes(`Address: ${customer.address}`));
+    if (fulfilment === "delivery") {
+      assert.ok(text.includes("Fulfilment: Free home delivery"));
+      assert.ok(text.includes("Home delivery charge: Rs.0.00 (FREE)"));
+      assert.ok(text.includes("Preferred delivery date: 2026-11-05"));
+      assert.ok(text.includes("delivery arrangements."));
+      assert.ok(!text.includes("pickup"));
+    } else {
+      assert.ok(text.includes("Fulfilment: Store pickup"));
+      assert.ok(text.includes("Preferred pickup date: 2026-11-05"));
+      assert.ok(!text.includes("delivery charge"));
+      assert.ok(!text.includes("delivery arrangements."));
+    }
+    const withoutDate = createRequirement({ 18: 1 },
+      { ...customer, fulfilment, preferredDate: "" }, today);
+    assert.ok(!withoutDate.includes("Preferred "));
+    assert.ok(withoutDate.includes("Estimated total after discount: Rs.21.25"));
   }
 });
 
@@ -137,11 +175,14 @@ function assertLosslessSplit(text, maximum = 1800) {
   assert.equal(reconstructed, text);
 }
 
-test("a basket containing all 68 products is split without losing any details", () => {
+test("a basket containing all 68 products preserves both fulfilment options when split", () => {
   const cart = Object.fromEntries(products.map(product => [product.id, 99]));
-  const text = createRequirement(cart, customer, today);
-  assertLosslessSplit(text);
-  for (const product of products) assert.ok(text.includes(`#${product.id} ${product.name}`));
+  for (const fulfilment of ["delivery", "pickup"]) {
+    const text = createRequirement(cart, { ...customer, fulfilment }, today);
+    assertLosslessSplit(text);
+    for (const product of products) assert.ok(text.includes(`#${product.id} ${product.name}`));
+    assert.ok(text.includes(`Address: ${customer.address}`));
+  }
 });
 
 test("Unicode customer details, long notes and huge individual lines split losslessly", () => {

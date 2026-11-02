@@ -2,6 +2,14 @@
   base = "vendor-app"
   publish = "."
   command = ""
+  ignore = "exit 1"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "../netlify/functions"
+  node_bundler = "esbuild"
 
 [[headers]]
   for = "/*"

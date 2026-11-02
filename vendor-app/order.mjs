@@ -52,8 +52,12 @@ export function validateCustomer(input, today = localDate()) {
   const name = String(input.name ?? "").trim();
   const phone = String(input.phone ?? "").trim();
   const address = String(input.address ?? "").replace(/\r\n?/g, "\n").trim();
-  const pickup = String(input.pickup ?? "").trim();
+  const fulfilment = String(input.fulfilment ?? "");
+  const preferredDate = String(input.preferredDate ?? "").trim();
   const notes = String(input.notes ?? "").trim();
+  if (fulfilment !== "delivery" && fulfilment !== "pickup") {
+    throw new Error("Choose free home delivery or store pickup.");
+  }
   if (name.length < 2 || name.length > 80 || /[\r\n]/.test(name)) {
     throw new Error("Enter a customer name between 2 and 80 characters.");
   }
@@ -64,14 +68,14 @@ export function validateCustomer(input, today = localDate()) {
   if (address.length < 10 || address.length > 500) {
     throw new Error("Enter your full address between 10 and 500 characters.");
   }
-  if (pickup && (!/^\d{4}-\d{2}-\d{2}$/.test(pickup) ||
-      !Number.isFinite(Date.parse(`${pickup}T00:00:00Z`)) ||
-      new Date(`${pickup}T00:00:00Z`).toISOString().slice(0, 10) !== pickup ||
-      pickup < today)) {
-    throw new Error("Choose today or a future date for pickup.");
+  if (preferredDate && (!/^\d{4}-\d{2}-\d{2}$/.test(preferredDate) ||
+      !Number.isFinite(Date.parse(`${preferredDate}T00:00:00Z`)) ||
+      new Date(`${preferredDate}T00:00:00Z`).toISOString().slice(0, 10) !== preferredDate ||
+      preferredDate < today)) {
+    throw new Error(`Choose today or a future date for ${fulfilment === "delivery" ? "delivery" : "pickup"}.`);
   }
   if (notes.length > 500) throw new Error("Keep notes to 500 characters or fewer.");
-  return { name, phone: normalizedPhone, address, pickup, notes };
+  return { name, phone: normalizedPhone, address, fulfilment, preferredDate, notes };
 }
 
 export function createRequirement(cart, input, today) {
@@ -79,21 +83,25 @@ export function createRequirement(cart, input, today) {
   if (!lines.length) throw new Error("Add at least one product to your requirement.");
   const customer = validateCustomer(input, today);
   const amounts = pricing(cart);
+  const delivery = customer.fulfilment === "delivery";
+  const arrangement = delivery ? "delivery" : "pickup";
   return [
     `New requirement - ${vendor.name} (${vendor.year} catalogue)`,
     "",
     `Customer: ${customer.name}`,
     `Mobile: +91 ${customer.phone}`,
+    `Fulfilment: ${delivery ? "Free home delivery" : "Store pickup"}`,
     `Address: ${customer.address}`,
-    ...(customer.pickup ? [`Preferred pickup: ${customer.pickup}`] : []),
+    ...(customer.preferredDate ? [`Preferred ${arrangement} date: ${customer.preferredDate}`] : []),
     "",
     ...lines.map(line => `#${line.id} ${line.name} | ${line.brand}\nPack: ${line.unit}\n${line.quantity} selling unit(s) x Rs.${line.price} = Rs.${line.amount}\n`),
     `Subtotal: Rs.${amounts.subtotal.toFixed(2)}`,
     `Discount applied (${DISCOUNT_PERCENT}%): -Rs.${amounts.discount.toFixed(2)}`,
+    ...(delivery ? ["Home delivery charge: Rs.0.00 (FREE)"] : []),
     `Estimated total after discount: Rs.${amounts.total.toFixed(2)}`,
     ...(customer.notes ? ["", `Notes: ${customer.notes}`] : []),
     "",
-    "Please confirm availability, final price and pickup arrangements.",
+    `Please confirm availability, final price and ${arrangement} arrangements.`,
     "This is an enquiry, not a confirmed order. No payment has been made.",
   ].join("\n");
 }

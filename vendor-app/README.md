@@ -1,8 +1,9 @@
 # Sai Baba Crackers Centre catalogue
 
-A standalone, mobile-friendly static enquiry app. No framework, dependencies,
-backend, accounts, payment collection, analytics or automatic WhatsApp messaging.
-The existing Product Memory Graph application is unchanged.
+A standalone, mobile-friendly enquiry app with a static frontend, a Netlify
+order-recording function and a Google Apps Script integration. No frontend
+framework, npm dependencies, customer accounts, payments, analytics or automatic
+WhatsApp messaging. The existing Product Memory Graph application is unchanged.
 
 ## Run
 
@@ -14,6 +15,9 @@ npm.cmd run vendor:dev
 
 Open <http://127.0.0.1:4173>. Set `VENDOR_PORT` to choose another port.
 The preview binds to loopback only; it is not a public deployment.
+Catalogue and cart work without credentials. Saving a requirement needs the
+Google Sheets configuration described below; missing configuration is reported
+explicitly and never treated as a saved order.
 
 ```powershell
 npm.cmd run vendor:test
@@ -28,8 +32,9 @@ npm.cmd run vendor:test
 - `vendor.whatsapp` defaults to **919849293951**, the first number on the PDF,
   not a verified WhatsApp account. Confirm ownership and WhatsApp availability.
   Update the phone links in `index.html` too if either shop number changes.
-- Confirm actual pickup arrangements. The required customer address is shared
-  with the vendor, but collecting it does not promise delivery.
+- Confirm actual delivery and pickup arrangements and any local restrictions.
+  Customers explicitly choose **free home delivery** or **store pickup**.
+  The vendor confirms delivery service area, availability and timing.
 - Have the vendor confirm its licence, applicable rules for online fireworks
   enquiries/orders, age restrictions and the hosting provider's acceptable-use
   policy. This prototype is not legal clearance to trade.
@@ -41,36 +46,30 @@ npm.cmd run vendor:test
 ### Netlify
 
 The repository's `netlify.toml` selects `vendor-app` as the base directory,
-publishes that directory directly and requires no build command. It also sets
-security headers and the JavaScript content type for `.mjs` files.
+publishes that directory directly and requires no build command. Server functions
+live outside the published files in `../netlify/functions`. The configuration
+also sets security headers and the JavaScript content type for `.mjs` files.
+Builds are not skipped when only the functions outside the base directory change.
 
 In Netlify, choose **Add new project > Import an existing project > GitHub**,
 authorize only the vendor app repository and select its `main` branch.
 Use the checked-in settings: base directory `vendor-app`, publish directory `.`
-(relative to the base), and an empty build command. No environment variables
-are required. Deploy, then test the generated HTTPS URL on a real phone.
+(relative to the base), and an empty build command. Set
+`GOOGLE_SHEETS_WEBHOOK_URL` and `ORDER_TRACKING_SECRET` in Netlify's Functions
+environment. Follow the [Google Sheets setup guide](../integrations/google-sheets/README.md)
+before publishing, then verify the generated HTTPS URL on a real phone.
 Subsequent pushes to `main` trigger a new deployment once the GitHub integration
 is connected.
 
-For manual deployment without GitHub integration, upload the contents of
-`vendor-app` using Netlify's manual deploy interface. Uploads do not get the
-root-level `netlify.toml`; repository import is preferred for configuration and
-automatic deployments.
+Static drag-and-drop deployment does not deploy the required order-recording
+function. Use the GitHub-connected deployment with the root `netlify.toml`.
 
 ### Other static hosts
 
-Publish **only the `vendor-app` directory** to a static host supporting HTTPS,
-for example Cloudflare Pages or an equivalent approved provider. No build
-command is required; the publish directory is `vendor-app`. Alternatively copy
-its HTML, CSS and MJS files to a static web root. Hosting must serve `.mjs` files
-as JavaScript. Keep the files together; relative paths also support subdirectory
-hosting. No secret keys or server environment variables are required.
-
-For Cloudflare Pages, connect the repository, select no framework, leave the
-build command empty and set the output directory to `vendor-app`. A custom
-domain is optional. This repository may contain unrelated internal code:
-do not grant a hosting provider repository access without the owner's approval;
-uploading just the public app files is an alternative.
+The catalogue can be previewed as static files, but submission now requires the
+Netlify `/api/orders` function. Another host needs an equivalent server endpoint;
+uploading only `vendor-app` will not provide working order recording. Never put
+the server function, shared secret or spreadsheet credentials in public files.
 
 ## Behaviour and privacy
 
@@ -81,21 +80,37 @@ uploading just the public app files is an alternative.
   total; the mobile cart and WhatsApp message use the same discounted total.
   Calculations use integer paise and round the discount once at subtotal level.
   Catalogue and individual line prices remain the original printed rates.
+- Delivery or pickup is a required choice with no preselected option. Home
+  delivery has **zero charge**, shown in the review and WhatsApp message; the
+  15% discounted total is unchanged. WhatsApp includes the selected method,
+  address and optional preferred delivery/pickup date. Address remains required
+  for both options. No delivery radius, minimum order or delivery date guarantee
+  is assumed; the vendor confirms arrangements directly.
 - Search includes product names, numbers, brands and categories. Categories and
   price/name sorting work together.
 - The cart is saved to local storage, not to a server. Invalid saved data and
-  storage failures are reported. Required name, mobile number and full address
-  (10-500 characters) remain in memory only, and the review form and message are
-  cleared when the dialog is closed. Multiline addresses are preserved.
-- The customer validates details and explicitly agrees before message links are
-  generated. Customer details are included in the WhatsApp URL only when they
-  open the chat. The site cannot verify that a message was sent or delivered.
+  storage failures are reported. Contact details are not saved to local storage.
+  Required name, mobile number and full address (10-500 characters) are recorded
+  in the vendor's Google Sheet after explicit consent. Multiline addresses are
+  preserved. Closing the review clears the local form and message, not sheet rows.
+- The customer agrees to Sheets recording and WhatsApp sharing. The server
+  recalculates amounts, then records an enquiry with an `SBC-` reference before
+  returning a WhatsApp message containing that reference. Failures are shown and
+  keep details available for retry; no failed save is represented as success.
+  Retries of unchanged details in the same review reuse the reference.
+- Revisions create a new reference. The vendor must confirm which reference to
+  fulfil and cancel obsolete enquiries. The vendor manages status directly in
+  the sheet; status does not automatically track WhatsApp messages.
+- Customer details enter the WhatsApp URL when the customer opens the prepared
+  chat. The site cannot verify that a WhatsApp message was sent or delivered.
 - Each encoded WhatsApp URL is capped at a conservative 1,800 characters.
   Longer requirements are split into numbered parts without truncation. All
   parts must be sent manually. This cap is an implementation safeguard, not a
   guarantee across every WhatsApp client.
 - Copy and plain-text download preserve the complete requirement as fallbacks.
   Downloads and clipboard contents may contain personal details; customers
-  control these copies. There is no server-side enquiry register.
-- A confirmed sale, availability, final prices and pickup are handled directly
-  by the vendor. No selection is automatically cleared after opening WhatsApp.
+  control these copies. Google Sheets holds the enquiry register; the vendor
+  controls sharing, corrections, retention and deletion.
+- A confirmed sale, availability, final prices and delivery/pickup arrangements
+  are handled directly by the vendor. No selection is automatically cleared
+  after opening WhatsApp.

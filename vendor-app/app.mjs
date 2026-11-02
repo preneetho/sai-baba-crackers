@@ -1,5 +1,5 @@
 import { products, categories, vendor } from "./catalog.mjs";
-import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, total, money, localDate, createRequirement, prepareMessages } from "./order.mjs";
+import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, total, money, localDate, validateCustomer, prepareMessages } from "./order.mjs";
 
 const $ = selector => document.querySelector(selector);
 let cart = {};
@@ -8,6 +8,8 @@ let query = "";
 let sort = "catalogue";
 let fullMessage = "";
 let lastReviewTrigger = null;
+let submission = null;
+let saving = false;
 const warning = $("#storage-warning");
 
 function showStorageWarning(message, reset = false) {
@@ -148,6 +150,8 @@ function pricingSummary(withIds = false) {
     ["Subtotal", money(amounts.subtotal), "pricing-row", "cart-subtotal"],
     [amounts.subtotal ? `Discount applied (${DISCOUNT_PERCENT}%)` : `Discount (${DISCOUNT_PERCENT}%)`,
       `\u2212${money(amounts.discount)}`, "pricing-row discount-row", "cart-discount"],
+    ...(!withIds && $("#fulfilment-delivery").checked ?
+      [["Home delivery charge", "FREE", "pricing-row discount-row", "delivery-charge"]] : []),
     ["Estimated total after discount", money(amounts.total), "cart-total", "cart-total"],
   ];
   for (const [label, value, className, id] of rows) {
@@ -194,6 +198,19 @@ function renderCart() {
   }));
 }
 
+function updateFulfilment() {
+  const method = $("#customer-form").elements.fulfilment.value;
+  const delivery = method === "delivery";
+  $("#preferred-date-label").textContent = delivery ? "Preferred delivery date" :
+    method === "pickup" ? "Preferred pickup date" : "Preferred date";
+  $("#address-label").textContent = delivery ? "Delivery address" : "Your address";
+  $("#address-help").textContent = delivery ?
+    "Free home delivery to this address. The vendor will confirm service area and timing." :
+    method === "pickup" ? "Your address will be shared with the vendor. You will collect the items from the shop." :
+      "Your address and selected delivery or pickup option will be shared with the vendor.";
+  $("#checkout-summary .pricing-summary")?.replaceWith(pricingSummary());
+}
+
 function showReview() {
   lastReviewTrigger = document.activeElement;
   const summary = element("div", "review-lines");
@@ -208,19 +225,37 @@ function showReview() {
   $("#customer-form").hidden = false;
   $("#message-preview").hidden = true;
   $("#form-error").hidden = true;
-  $("#pickup-date").min = localDate();
+  $("#preferred-date").min = localDate();
+  updateFulfilment();
   $("#checkout").showModal();
 }
 
 function closeReview() {
+  if (saving) return;
   $("#checkout").close();
 }
 
+function setSaving(value) {
+  saving = value;
+  for (const control of $("#customer-form").elements) control.disabled = value;
+  $("#close-checkout").disabled = value;
+  $("#customer-form").setAttribute("aria-busy", String(value));
+  $("#submit-requirement").textContent = value ?
+    "Saving to order tracker..." : "Save requirement & prepare WhatsApp";
+  $("#save-status").hidden = !value;
+}
+
+$("#checkout").addEventListener("cancel", event => {
+  if (saving) event.preventDefault();
+});
 $("#checkout").addEventListener("close", () => {
   $("#customer-form").reset();
+  updateFulfilment();
   $("#message-links").replaceChildren();
   $("#full-message").value = "";
   fullMessage = "";
+  submission = null;
+  $("#order-reference").textContent = "";
   lastReviewTrigger?.focus({ preventScroll: true });
 });
 $("#review").addEventListener("click", showReview);
@@ -254,14 +289,50 @@ $("#clear-cart").addEventListener("click", () => {
   renderCart();
   $("#search").focus();
 });
-$("#customer-form").addEventListener("submit", event => {
+$("#customer-form").addEventListener("change", event => {
+  if (event.target.name === "fulfilment") updateFulfilment();
+});
+$("#customer-form").addEventListener("submit", async event => {
   event.preventDefault();
+  if (saving) return;
   $("#form-error").hidden = true;
   try {
-    const customer = Object.fromEntries(new FormData(event.currentTarget));
-    fullMessage = createRequirement(cart, customer);
+    const customer = validateCustomer(Object.fromEntries(new FormData(event.currentTarget)));
+    const selection = sanitizeCart(cart);
+    const fingerprint = JSON.stringify({ cart: selection, customer });
+    if (!submission || submission.fingerprint !== fingerprint) {
+      submission = { requestId: crypto.randomUUID(), fingerprint };
+    }
+    setSaving(true);
+    let response;
+    try {
+      response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: submission.requestId, cart: selection, customer, consent: true }),
+        signal: AbortSignal.timeout(25000),
+      });
+    } catch {
+      throw new Error("We could not confirm saving your requirement. Keep this review open and retry with the same details to avoid duplicate records.");
+    }
+    if (response.status === 429) throw new Error("Too many submissions. Wait a minute, then retry with this review open.");
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error("The order tracker returned an unreadable response. Keep this review open and retry, or contact the shop.");
+    }
+    if (!response.ok) throw new Error(typeof result?.error === "string" ? result.error :
+      "We could not confirm saving your requirement. Keep this review open and retry.");
+    const orderId = `SBC-${submission.requestId.toUpperCase()}`;
+    if (result?.orderId !== orderId || typeof result.message !== "string" ||
+        !result.message.startsWith(`Order ID: ${orderId}\n`) || result.message.length > 65536) {
+      throw new Error("The order tracker did not confirm the expected reference. Keep this review open and retry.");
+    }
+    fullMessage = result.message;
     const messages = prepareMessages(fullMessage);
     $("#full-message").value = fullMessage;
+    $("#order-reference").textContent = `Recorded in the vendor's order sheet. Reference: ${orderId}`;
     $("#recipient").textContent = `${vendor.name} \u00b7 ${vendor.phone}`;
     $("#handoff-instructions").textContent = messages.length === 1 ?
       "Open the chat below, then press Send in WhatsApp. The vendor will confirm your requirement." :
@@ -282,6 +353,9 @@ $("#customer-form").addEventListener("submit", event => {
   } catch (error) {
     $("#form-error").textContent = error.message;
     $("#form-error").hidden = false;
+    $("#form-error").focus();
+  } finally {
+    setSaving(false);
   }
 });
 $("#edit-details").addEventListener("click", () => {

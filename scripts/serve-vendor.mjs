@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { Readable } from "node:stream";
+import { handleOrderRequest } from "../netlify/functions/orders.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -18,17 +20,34 @@ const server = createServer(async (request, response) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("Referrer-Policy", "no-referrer");
   response.setHeader("Cache-Control", "no-store");
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    response.writeHead(405, { Allow: "GET, HEAD" });
-    response.end("Method not allowed");
-    return;
-  }
   let pathname;
   try {
     pathname = new URL(request.url, "http://localhost").pathname;
   } catch {
     response.writeHead(400);
     response.end("Invalid URL");
+    return;
+  }
+  if (pathname === "/api/orders") {
+    try {
+      const init = { method: request.method, headers: request.headers };
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        init.body = Readable.toWeb(request);
+        init.duplex = "half";
+      }
+      const result = await handleOrderRequest(new Request(`http://127.0.0.1:${port}/api/orders`, init));
+      response.writeHead(result.status, Object.fromEntries(result.headers));
+      response.end(Buffer.from(await result.arrayBuffer()));
+    } catch {
+      console.error("Local order endpoint could not process the request.");
+      response.writeHead(500, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ error: "The local order tracker could not process the request." }));
+    }
+    return;
+  }
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    response.writeHead(405, { Allow: "GET, HEAD" });
+    response.end("Method not allowed");
     return;
   }
   const file = files.get(pathname);
