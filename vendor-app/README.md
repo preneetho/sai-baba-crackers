@@ -56,6 +56,25 @@ specific variants for items such as rockets, sparklers, garlands and flower pots
 These are illustrative, not manufacturer product photos. On mobile, the artwork
 band is 56 px high with a 40 px illustration; desktop artwork remains larger.
 
+### WhatsApp link preview
+
+Link previews use the separate `diwali-crackers-preview.png` image (1200 x 630),
+not the Sai Baba portrait used in the header and favicon. The editable artwork is
+`diwali-crackers-preview.svg`; the PNG is the shareable raster export. Open Graph
+and Twitter card tags are included directly in `index.html`, so link-preview
+crawlers do not need to run JavaScript. Keep the image publicly accessible.
+
+The metadata uses the deployed site's absolute HTTPS URL,
+`https://saibabacrackers.netlify.app/`. Update the metadata URLs if the domain
+changes. Deploy the HTML and PNG together through the Git-connected Netlify site;
+this image change does not require updating Apps Script or environment variables.
+
+WhatsApp may cache previews independently of Netlify. After deployment, check the
+public PNG URL and try sharing a fresh URL such as
+`https://saibabacrackers.netlify.app/?share=diwali2026` if the original link still
+shows the old portrait. A fresh query can trigger a new fetch, but cache refresh
+timing is controlled by WhatsApp. Existing messages are not updated by this change.
+
 ## Hosting
 
 ### Netlify

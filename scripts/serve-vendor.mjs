@@ -16,6 +16,7 @@ const files = new Map([
   ["/catalog.mjs", ["catalog.mjs", "text/javascript; charset=utf-8"]],
   ["/order.mjs", ["order.mjs", "text/javascript; charset=utf-8"]],
   ["/sai-baba-logo.png", ["sai-baba-logo.png", "image/png"]],
+  ["/diwali-crackers-preview.png", ["diwali-crackers-preview.png", "image/png"]],
 ]);
 const server = createServer(async (request, response) => {
   response.setHeader("X-Content-Type-Options", "nosniff");

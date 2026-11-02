@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <title>Diwali crackers - Sai Baba Crackers Centre</title>
+  <desc>Blue and gold festive artwork with rockets, sparklers, a flower pot and a ground chakkar.</desc>
+  <defs>
+    <linearGradient id="night" x2="1" y2="1">
+      <stop stop-color="#102c60"/><stop offset="1" stop-color="#1e4f91"/>
+    </linearGradient>
+    <linearGradient id="gold" x2=".8" y2="1">
+      <stop stop-color="#fff0b5"/><stop offset=".45" stop-color="#edc078"/><stop offset="1" stop-color="#e99c35"/>
+    </linearGradient>
+    <linearGradient id="orange" x2=".8" y2="1">
+      <stop stop-color="#ffbb65"/><stop offset="1" stop-color="#ed722e"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop stop-color="#edc078" stop-opacity=".2"/><stop offset="1" stop-color="#edc078" stop-opacity="0"/>
+    </radialGradient>
+    <g id="burst" fill="none" stroke="#edc078" stroke-linecap="round">
+      <circle r="45" stroke-opacity=".15"/>
+      <path d="M0-70v30M0 40v30M-70 0h30M40 0h30M-50-50l22 22M28 28l22 22M-50 50l22-22M28-28l22-22" stroke-width="3"/>
+      <path d="m-26-63 10 24M16 39l10 24M-63-26l24 10M39 16l24 10M-63 26l24-10M39-16l24-10M-26 63l10-24M16-39l10-24" stroke-width="2" opacity=".65"/>
+      <circle r="5" fill="#fff0b5" stroke="none"/>
+    </g>
+    <g id="spark" fill="#fff0b5">
+      <path d="m0-12 3 9 9 3-9 3-3 9-3-9-9-3 9-3z"/>
+    </g>
+  </defs>
+  <rect width="1200" height="630" fill="url(#night)"/>
+  <circle cx="930" cy="320" r="390" fill="url(#glow)"/>
+  <path d="M580 0v630" stroke="#d4e2f7" stroke-opacity=".08"/>
+  <rect x="22" y="22" width="1156" height="586" rx="22" fill="none" stroke="#edc078" stroke-opacity=".45"/>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <text x="64" y="88" fill="#edc078" font-size="22" font-weight="700" letter-spacing="1.6">SAI BABA CRACKERS CENTRE</text>
+    <path d="M64 115h75" stroke="#edc078" stroke-width="3"/>
+    <text x="60" y="246" fill="#f8fbff" font-family="Georgia, serif" font-size="104">Diwali</text>
+    <text x="60" y="347" fill="#edc078" font-family="Georgia, serif" font-size="96">Crackers</text>
+    <text x="66" y="395" fill="#d4e2f7" font-size="23">Wholesale rates. Festive smiles.</text>
+    <rect x="64" y="435" width="153" height="49" rx="24.5" fill="#edc078"/>
+    <text x="140.5" y="467" fill="#102c60" text-anchor="middle" font-size="24" font-weight="750">15% OFF</text>
+    <text x="66" y="524" fill="#f8fbff" font-size="22">Free home delivery / Store pickup</text>
+    <text x="66" y="572" fill="#d4e2f7" font-size="20">saibabacrackers.netlify.app</text>
+  </g>
+  <g opacity=".85">
+    <use href="#burst" transform="translate(1045 137) scale(1.05)"/>
+    <use href="#burst" transform="translate(690 150) scale(.65)"/>
+    <use href="#burst" transform="translate(910 78) scale(.43)"/>
+  </g>
+  <g>
+    <use href="#spark" transform="translate(820 124) scale(.7)"/>
+    <use href="#spark" transform="translate(1105 273)"/>
+    <use href="#spark" transform="translate(640 365) scale(.7)"/>
+    <use href="#spark" transform="translate(925 220) scale(.6)"/>
+    <use href="#spark" transform="translate(1130 469) scale(.6)"/>
+    <g fill="#edc078">
+      <circle cx="752" cy="83" r="3"/><circle cx="1106" cy="69" r="3"/>
+      <circle cx="970" cy="302" r="3"/><circle cx="660" cy="245" r="3"/>
+      <circle cx="1132" cy="367" r="3"/><circle cx="862" cy="181" r="2"/>
+      <circle cx="767" cy="213" r="2"/><circle cx="655" cy="477" r="2"/>
+    </g>
+  </g>
+  <ellipse cx="898" cy="564" rx="245" ry="25" fill="#0b2452" opacity=".5"/>
+  <g transform="translate(675 317) rotate(-17)">
+    <path d="M29 123v117" stroke="#d8bb86" stroke-width="7" stroke-linecap="round"/>
+    <path d="M0 0 29-62 58 0z" fill="url(#orange)"/>
+    <rect width="58" height="123" rx="5" fill="#eaf1ff"/>
+    <path d="M0 22h58v24H0zM0 70h58v24H0z" fill="#4a80c1"/>
+    <path d="m0 87-19 42 19-9M58 87l19 42-19-9" fill="#edc078"/>
+    <path d="M9 115h40" stroke="#1e4f91" stroke-width="3"/>
+    <use href="#spark" transform="translate(29 60) scale(.65)"/>
+  </g>
+  <g transform="translate(829 256) rotate(14)">
+    <path d="M33 145v136" stroke="#d8bb86" stroke-width="7" stroke-linecap="round"/>
+    <path d="M0 0 33-73 66 0z" fill="url(#gold)"/>
+    <rect width="66" height="145" rx="5" fill="url(#orange)"/>
+    <path d="m0 92-21 56 21-10M66 92l21 56-21-10" fill="#edc078"/>
+    <path d="m0 20 66 25v23L0 43zM0 72l66 25v23L0 95z" fill="#fff0b5" opacity=".9"/>
+    <rect x="10" y="129" width="46" height="6" rx="3" fill="#102c60" opacity=".6"/>
+  </g>
+  <g transform="translate(1051 489)" fill="none" stroke-linecap="round">
+    <path d="M0-12c-9-75-45-129-106-168M0-12c-1-96 4-150 28-202M0-12c27-93 54-142 103-179" stroke="#edc078" stroke-width="4"/>
+    <path d="M0-12c-34-72-75-94-138-108M0-12c24-70 65-96 111-100M0-12c-9-104-27-155-60-201" stroke="#fff0b5" stroke-width="2"/>
+    <g stroke="#edc078" stroke-width="3">
+      <path d="m-116-188-9-13m26 20-2-15M29-225l4-16m-17 8-2-10M105-199l8-12m-5 30 14-7M-144-122l-14-6M120-115l16-5"/>
+    </g>
+    <g fill="#fff0b5" stroke="none">
+      <circle cx="-85" cy="-183" r="3"/><circle cx="-18" cy="-231" r="3"/>
+      <circle cx="74" cy="-214" r="3"/><circle cx="128" cy="-155" r="3"/>
+      <circle cx="-148" cy="-153" r="3"/><circle cx="-65" cy="-237" r="3"/>
+    </g>
+    <path d="M-25 0h50l31 68q-56 26-112 0z" fill="url(#orange)" stroke="#ffdaa0" stroke-width="2"/>
+    <ellipse rx="25" ry="8" fill="#edc078" stroke="none"/>
+    <path d="M-43 43q43 16 86 0" stroke="#fff0b5" stroke-width="9"/>
+    <use href="#spark" transform="translate(0 26) scale(.65)"/>
+  </g>
+  <g transform="translate(817 513)">
+    <rect width="119" height="52" rx="7" fill="url(#gold)"/>
+    <path d="M9 13h101M9 38h101" stroke="#ed9e3f" stroke-width="2"/>
+    <text x="59.5" y="32" fill="#102c60" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="750">SPARKLERS</text>
+    <g stroke-linecap="round">
+      <path d="M18 1 4-61M37 1l4-82M55 1l29-66" stroke="#d4e2f7" stroke-width="3"/>
+      <g stroke="#edc078" stroke-width="2">
+        <path d="M4-71v-11m-9 16-9-6m27 6 9-6M41-91v-11m-9 16-9-6m27 6 9-6M84-75v-11m-9 16-9-6m27 6 9-6"/>
+      </g>
+    </g>
+    <g fill="#fff0b5"><circle cx="4" cy="-61" r="4"/><circle cx="41" cy="-81" r="4"/><circle cx="84" cy="-65" r="4"/></g>
+  </g>
+  <g transform="translate(740 548) rotate(-12)">
+    <ellipse rx="53" ry="23" fill="#edc078"/>
+    <ellipse rx="47" ry="18" fill="#d7a254"/>
+    <path d="M31 0c0-14-35-20-52-7-17 13 3 25 21 20 17-5 16-17 2-17-10 0-13 7-5 9" fill="none" stroke="#fff0b5" stroke-width="4" stroke-linecap="round"/>
+    <path d="m43-7 12-10m4 5 10-1m-13-7 1-9" stroke="#fff0b5" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>
