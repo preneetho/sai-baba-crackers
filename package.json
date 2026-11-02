@@ -1,0 +1,16 @@
+{
+  "name": "sai-baba-crackers",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sai Baba Crackers Centre static catalogue and WhatsApp enquiry app.",
+  "scripts": {
+    "dev": "node scripts/serve-vendor.mjs",
+    "vendor:dev": "node scripts/serve-vendor.mjs",
+    "test": "node --test tests/vendor-ordering.test.mjs",
+    "vendor:test": "node --test tests/vendor-ordering.test.mjs"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

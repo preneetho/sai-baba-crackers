@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#244b3e">
+  <meta name="description" content="Explore Sai Baba Crackers Centre's 2026 catalogue. Build your requirement and share it with the Sanathnagar vendor on WhatsApp.">
+  <title>Sai Baba Crackers Centre | Diwali 2026</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23244b3e'/%3E%3Cpath d='M32 8l5 18 19 6-19 6-5 18-6-18-18-6 18-6z' fill='%23f4c578'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#catalogue">Skip to catalogue</a>
+  <header class="site-header">
+    <a class="wordmark" href="./" aria-label="Sai Baba Crackers Centre home">
+      <span class="brand-mark" aria-hidden="true">&#10038;</span>
+      <span>SAI BABA<span class="wordmark-sub">CRACKERS CENTRE</span></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a class="nav-active" href="#catalogue">Catalogue</a>
+      <a href="#contact">Visit & contact</a>
+    </nav>
+    <a class="header-cart" href="#requirement">Your selection <span id="header-count">0</span></a>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="little-star" aria-hidden="true">&#10022;</span> A SEASON OF LIGHT & TOGETHERNESS</p>
+        <h1 id="hero-title">A little sparkle.<br>A lot of <em>celebration.</em></h1>
+        <p>Make your festive list, your way. Explore our Diwali collection and share your requirement with us on WhatsApp.</p>
+        <a class="hero-link" href="#catalogue">Find your festive favourites <span aria-hidden="true">&#8595;</span></a>
+        <div class="hero-meta"><span>2026 COLLECTION</span><span>Sanathnagar, Hyderabad</span></div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <svg viewBox="0 0 420 340" fill="none">
+          <circle cx="220" cy="170" r="132" stroke="currentColor" stroke-opacity=".14"/>
+          <circle cx="220" cy="170" r="98" stroke="currentColor" stroke-opacity=".14"/>
+          <g stroke="#edc078" stroke-width="3" stroke-linecap="round">
+            <path d="M220 40v50m0 160v50M90 170h50m160 0h50M128 78l35 35m114 114 35 35M128 262l35-35M277 113l35-35"/>
+            <path d="m170 50 18 44m64 152 18 44M100 120l44 18m152 64 44 18M100 220l44-18m152-64 44-18M170 290l18-44m64-152 18-44" opacity=".65"/>
+          </g>
+          <path d="m220 112 12 43 45 15-45 14-12 44-14-44-44-14 44-15z" fill="#edc078"/>
+          <g fill="#edc078"><circle cx="128" cy="78" r="5"/><circle cx="312" cy="262" r="5"/><circle cx="350" cy="170" r="5"/><circle cx="220" cy="40" r="5"/></g>
+          <path d="m68 30 4 14 14 4-14 4-4 14-4-14-14-4 14-4zM356 63l3 10 10 3-10 3-3 10-3-10-10-3 10-3zM70 258l3 10 10 3-10 3-3 10-3-10-10-3 10-3z" fill="#edc078"/>
+          <path d="M194 325h52m-43-10h34" stroke="#edc078" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="art-caption">LET THE GOOD TIMES GLOW</span>
+      </div>
+    </section>
+
+    <div class="how-it-works" aria-label="How it works">
+      <span><b>01</b> Pick your favourites</span><i aria-hidden="true"></i>
+      <span><b>02</b> Review your list</span><i aria-hidden="true"></i>
+      <span><b>03</b> Share on WhatsApp</span>
+    </div>
+
+    <div id="storage-warning" class="notice" role="status" hidden></div>
+    <div class="shop-layout">
+      <section id="catalogue" class="catalogue" aria-labelledby="catalogue-title">
+        <div class="section-heading">
+          <div><p class="eyebrow green">THE FESTIVE EDIT</p><h2 id="catalogue-title">Something for every celebration</h2></div>
+          <span class="catalogue-year">2026 price list</span>
+        </div>
+        <label class="search-box"><span aria-hidden="true">&#9906;</span><span class="sr-only">Search products, brands or product numbers</span><input id="search" type="search" placeholder="Search sparklers, flower pots, brands..." maxlength="100"><kbd aria-hidden="true">SEARCH</kbd></label>
+        <div id="categories" class="categories" role="group" aria-label="Filter by category"></div>
+        <div class="results-bar"><p id="results-count" role="status"></p><label>Sort by <select id="sort"><option value="catalogue">Catalogue order</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name: A to Z</option></select></label></div>
+        <p class="unit-hint">Prices are per listed pack. Select the number of packs, not individual pieces.</p>
+        <div id="products" class="product-grid"></div>
+        <div id="no-results" class="empty-state" hidden><span aria-hidden="true">&#10023;</span><h3>No matching favourites yet</h3><p>Try a different product name or category.</p><button id="reset-filters" class="button secondary" type="button">Reset filters</button></div>
+      </section>
+
+      <aside id="requirement" class="requirement" aria-labelledby="requirement-title">
+        <div class="cart-title"><h2 id="requirement-title">Your festive list</h2><span id="cart-count" class="count-pill">0</span></div>
+        <p class="cart-subtitle">A little of this. A little of that.</p>
+        <div id="cart-items"></div>
+        <div class="cart-total"><span>Estimated total</span><strong id="cart-total"></strong></div>
+        <p class="estimate-note">Final prices and availability will be confirmed by the vendor.</p>
+        <button id="review" class="button primary wide" type="button" disabled>Review requirement <span aria-hidden="true">&#8594;</span></button>
+        <p class="cart-footnote">No payment now. Just a conversation.</p>
+        <button id="clear-cart" class="text-button" type="button" hidden>Clear selection</button>
+        <div class="vendor-note"><span aria-hidden="true">&#10022;</span><p><strong>Need a hand choosing?</strong><br><a id="vendor-call" href="tel:+919849293951">Call the shop</a> for a little festive advice.</p></div>
+      </aside>
+    </div>
+
+    <section id="contact" class="contact-section" aria-labelledby="contact-title">
+      <div><p class="eyebrow green">YOUR NEIGHBOURHOOD FESTIVE STOP</p><h2 id="contact-title">Come for the crackers.<br>Stay for the festive spirit.</h2><p>Sai Baba Crackers Centre<br>Sanathnagar, Hyderabad</p></div>
+      <div class="contact-details"><h3>Let's make your list</h3><a href="tel:+919849293951">+91 98492 93951</a><a href="tel:+919000592233">+91 90005 92233</a><p>Contact the shop to confirm opening hours,<br>availability and pickup arrangements.</p></div>
+    </section>
+    <section class="fine-print" aria-label="Important information"><p><strong>Celebrate responsibly.</strong> Follow local rules, age restrictions and product safety instructions. This site collects enquiries only; it does not confirm a sale or offer delivery.</p><p>Vendor's printed terms: goods once sold cannot be returned or exchanged; manufacturing defects are subject to the manufacturer's terms. Applicable consumer rights are not excluded.</p></section>
+  </main>
+  <footer><span>SAI BABA CRACKERS CENTRE</span><span>A brighter Diwali, together. &middot; 2026</span></footer>
+  <a id="mobile-cart" class="mobile-cart" href="#requirement" hidden><span id="mobile-cart-label"></span><span>View list &#8594;</span></a>
+  <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+
+  <dialog id="checkout" aria-labelledby="checkout-title">
+    <div class="dialog-heading"><div><p class="eyebrow green">ONE STEP CLOSER TO CELEBRATION</p><h2 id="checkout-title">Review your requirement</h2></div><button id="close-checkout" class="icon-button" type="button" aria-label="Close review">&times;</button></div>
+    <div id="checkout-summary"></div>
+    <form id="customer-form">
+      <h3>Your details</h3>
+      <div class="form-grid">
+        <label>Your name <span aria-hidden="true">*</span><input name="name" autocomplete="name" required minlength="2" maxlength="80" placeholder="Full name"></label>
+        <label>Mobile number <span aria-hidden="true">*</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required maxlength="20" placeholder="10-digit Indian mobile"></label>
+        <label>Preferred pickup date <span class="optional">(optional)</span><input id="pickup-date" name="pickup" type="date"></label>
+        <label class="full-width">Notes <span class="optional">(optional)</span><textarea name="notes" rows="3" maxlength="500" placeholder="Any preferences or questions for the vendor?"></textarea></label>
+      </div>
+      <p class="privacy-note">Only your product selection is saved on this device. Your contact details are not stored by this site. WhatsApp receives them when you open the prepared chat.</p>
+      <label class="consent"><input id="consent" type="checkbox" required><span>I agree to share these details with the vendor through WhatsApp and understand this is not a confirmed order.</span></label>
+      <p id="form-error" class="error" role="alert" hidden></p>
+      <button class="button primary wide" type="submit">Prepare WhatsApp message <span aria-hidden="true">&#8594;</span></button>
+    </form>
+    <section id="message-preview" aria-labelledby="message-title" hidden>
+      <h3 id="message-title">Ready for your WhatsApp chat</h3>
+      <p id="handoff-instructions"></p>
+      <p class="recipient">Recipient: <strong id="recipient"></strong></p>
+      <div id="message-links"></div>
+      <label class="message-label" for="full-message">Your complete requirement</label><textarea id="full-message" rows="10" readonly></textarea>
+      <div class="message-tools"><button id="copy-message" class="button secondary" type="button">Copy complete message</button><button id="download-message" class="button secondary" type="button">Download .txt</button><button id="edit-details" class="text-button" type="button">Edit details</button></div>
+      <p id="copy-status" role="status"></p>
+      <p class="privacy-note">Nothing is submitted automatically. Press Send inside WhatsApp. If a link does not work, copy the complete message and paste it into the vendor's chat.</p>
+    </section>
+  </dialog>
+  <noscript><div class="noscript">Enable JavaScript to build your requirement, or call the shop on +91 98492 93951.</div></noscript>
+</body>
+</html>
