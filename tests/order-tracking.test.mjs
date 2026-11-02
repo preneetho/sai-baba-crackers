@@ -29,7 +29,7 @@ function request(body = input, headers = {}, method = "POST") {
 }
 function handle(req, fetchImpl = async () => {
   const order = buildOrder(input, now);
-  return Response.json({ ok: true, orderId: order.orderId });
+  return Response.json({ ok: true, orderId: order.orderId, createdAt: order.createdAt });
 }, overrides = {}) {
   return handleOrderRequest(req, { env, now: () => now, fetchImpl, ...overrides });
 }
@@ -72,12 +72,12 @@ test("Google Sheet acknowledgement is required before exposing WhatsApp message"
     const body = JSON.parse(options.body);
     assert.equal(body.secret, env.ORDER_TRACKING_SECRET);
     recorded = body.order;
-    return Response.json({ ok: true, orderId: recorded.orderId });
+    return Response.json({ ok: true, orderId: recorded.orderId, createdAt: recorded.createdAt });
   });
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.orderId, recorded.orderId);
-  assert.equal(body.message, recorded.message);
+  assert.equal(body.message, recorded.message.replace("\n", "\nOrder date & time: 2026-11-02 15:30:00 IST\n"));
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.ok(!JSON.stringify(body).includes(env.ORDER_TRACKING_SECRET));
 });
@@ -100,6 +100,17 @@ test("endpoint rejects wrong origin, wrong content type, malformed and oversized
     assert.ok((await response.json()).error);
   }
   assert.equal(calls, 0);
+});
+
+test("missing and invalid saved timestamps never produce a successful WhatsApp handoff", async () => {
+  for (const createdAt of [undefined, null, "", "not-a-date", "2026-02-30T10:00:00.000Z", "2026-11-02T10:00:00Z"]) {
+    const response = await handle(request(), async () =>
+      Response.json({ ok: true, orderId: buildOrder(input, now).orderId, createdAt }));
+    assert.equal(response.status, 503);
+    const result = await response.json();
+    assert.ok(result.error.includes("recorded order time"));
+    assert.equal(result.message, undefined);
+  }
 });
 
 test("configuration is server-only and restricted to a deployed Google Apps Script URL", async () => {
@@ -143,10 +154,12 @@ function sheetHarness() {
   const rows = [];
   let sheetExists = false;
   let maxRows = 2;
+  let maxColumns = 26;
   let openCount = 0;
   let lockAvailable = true;
   let releases = 0;
   const validations = [];
+  const warnings = [];
   function range(row, column, height = 1, width = 1) {
     return {
       getValues: () => Array.from({ length: height }, (_, i) =>
@@ -179,6 +192,8 @@ function sheetHarness() {
   const sheet = {
     getRange: range, getLastRow: () => rows.length, getMaxRows: () => maxRows,
     insertRowsAfter: (_, count) => { maxRows += count; },
+    getMaxColumns: () => maxColumns,
+    insertColumnsAfter: (_, count) => { maxColumns += count; },
     setFrozenRows() {}, setColumnWidth() {}, hideColumns() {},
   };
   const properties = new Map([
@@ -209,24 +224,33 @@ function sheetHarness() {
       MimeType: { JSON: "application/json" },
       createTextOutput: text => ({ setMimeType() { return this; }, getContent: () => text }),
     },
-    console: { error() {} },
+    Utilities: {
+      formatDate(date, timeZone, format) {
+        assert.equal(timeZone, "Asia/Kolkata");
+        assert.equal(format, "yyyy-MM-dd HH:mm:ss 'IST'");
+        return new Date(date.getTime() + 330 * 60000).toISOString().slice(0, 19).replace("T", " ") + " IST";
+      },
+    },
+    console: { error() {}, warn(message) { warnings.push(message); } },
   });
   vm.runInContext(source, context);
   function post(order, secret = env.ORDER_TRACKING_SECRET) {
     return JSON.parse(context.doPost({ postData: { contents: JSON.stringify({ order, secret }) } }).getContent());
   }
   return {
-    rows, validations, context, post, properties,
+    rows, validations, warnings, context, post, properties,
     get openCount() { return openCount; },
     get releases() { return releases; },
     set lockAvailable(value) { lockAvailable = value; },
+    get maxColumns() { return maxColumns; },
+    set maxColumns(value) { maxColumns = value; },
   };
 }
 
 test("Apps Script writes one row, preserves numeric totals and gives the vendor a status dropdown", () => {
   const harness = sheetHarness();
   const order = buildOrder(input, now);
-  assert.deepEqual(harness.post(order), { ok: true, orderId: order.orderId });
+  assert.deepEqual(harness.post(order), { ok: true, orderId: order.orderId, createdAt: order.createdAt });
   assert.equal(harness.rows.length, 2);
   const row = harness.rows[1];
   assert.equal(row[0], order.orderId);
@@ -237,11 +261,111 @@ test("Apps Script writes one row, preserves numeric totals and gives the vendor 
   assert.equal(row[11], 55.5);
   assert.equal(row[12], 0);
   assert.equal(row[13], 314.5);
+  assert.equal(row[1], "'" + order.createdAt);
+  assert.equal(row[16], "'2026-11-02 15:30:00 IST");
+  assert.equal(harness.rows[0][16], "Order date & time (IST)");
   assert.ok(row[8].includes("#12 Flower Pot Special"));
   assert.equal(harness.validations[0].column, 3);
   assert.ok(harness.validations[0].value.values.includes("Completed"));
   assert.equal(harness.validations[0].value.allowInvalid, false);
   assert.equal(harness.releases, 1);
+});
+
+test("sheet and WhatsApp use the original IST timestamp across midnight and later retries", async () => {
+  const harness = sheetHarness();
+  const fetchImpl = async (_, options) => {
+    const payload = JSON.parse(options.body);
+    return Response.json(harness.post(payload.order, payload.secret));
+  };
+  const firstTime = new Date("2026-11-02T18:35:12.000Z");
+  const first = await handle(request(), fetchImpl, { now: () => firstTime });
+  assert.equal(first.status, 200);
+  const saved = await first.json();
+  assert.ok(saved.message.includes("Order date & time: 2026-11-03 00:05:12 IST"));
+  assert.equal(harness.rows[1][16], "'2026-11-03 00:05:12 IST");
+  harness.rows[1][2] = "Confirmed";
+  const retry = await handle(request(), fetchImpl, { now: () => new Date("2026-11-03T18:35:12.000Z") });
+  assert.equal(retry.status, 200);
+  assert.equal((await retry.json()).message, saved.message);
+  assert.equal(harness.rows.length, 2);
+  assert.equal(harness.rows[1][1], "'" + firstTime.toISOString());
+  assert.equal(harness.rows[1][16], "'2026-11-03 00:05:12 IST");
+  assert.equal(harness.rows[1][2], "Confirmed");
+});
+
+test("setup upgrades the original 16-column sheet without moving order data or statuses", () => {
+  const harness = sheetHarness();
+  const order = buildOrder(input, now);
+  harness.post(order);
+  harness.rows[0].pop();
+  harness.rows[1].pop();
+  harness.rows[1][2] = "Completed";
+  harness.maxColumns = 16;
+  const existing = structuredClone(harness.rows);
+  harness.context.setupOrdersSheet();
+  assert.deepEqual(harness.rows.map(row => row.slice(0, 16)), existing);
+  assert.equal(harness.rows[0][16], "Order date & time (IST)");
+  assert.equal(harness.rows[1][16], "'2026-11-02 15:30:00 IST");
+  assert.equal(harness.maxColumns, 17);
+  harness.context.setupOrdersSheet();
+  assert.equal(harness.rows.length, 2);
+  assert.equal(harness.rows[1][2], "Completed");
+});
+
+test("IST dates remain correct at midnight, month and year boundaries", async () => {
+  for (const [instant, expected] of [
+    ["2026-11-02T18:29:59.999Z", "2026-11-02 23:59:59 IST"],
+    ["2026-11-02T18:30:00.000Z", "2026-11-03 00:00:00 IST"],
+    ["2026-11-30T18:30:00.000Z", "2026-12-01 00:00:00 IST"],
+    ["2026-12-31T18:30:00.000Z", "2027-01-01 00:00:00 IST"],
+  ]) {
+    const harness = sheetHarness();
+    const payload = { ...input, customer: { ...input.customer, preferredDate: "" } };
+    const response = await handle(request(payload), async (_, options) => {
+      const body = JSON.parse(options.body);
+      return Response.json(harness.post(body.order, body.secret));
+    }, { now: () => new Date(instant) });
+    assert.equal(response.status, 200);
+    assert.ok((await response.json()).message.includes(`Order date & time: ${expected}`));
+    assert.equal(harness.rows[1][16], "'" + expected);
+  }
+});
+
+test("legacy Google date cells convert to IST without changing the original stored instant", () => {
+  const harness = sheetHarness();
+  harness.post(buildOrder(input, now));
+  harness.rows[0].pop();
+  harness.rows[1].pop();
+  const stored = new Date("2026-11-02T18:30:00.000Z");
+  harness.rows[1][1] = stored;
+  harness.context.setupOrdersSheet();
+  assert.equal(harness.rows[1][1], stored);
+  assert.equal(harness.rows[1][16], "'2026-11-03 00:00:00 IST");
+  assert.equal(harness.post(buildOrder(input, now)).createdAt, stored.toISOString());
+});
+
+test("migration never invents missing historical timestamps or overwrites custom columns", () => {
+  const missing = sheetHarness();
+  missing.post(buildOrder(input, now));
+  missing.rows[0].pop();
+  missing.rows[1].pop();
+  missing.rows[1][1] = "";
+  missing.context.setupOrdersSheet();
+  assert.equal(missing.rows[1][16], "");
+  assert.equal(missing.warnings.length, 1);
+  const invalid = sheetHarness();
+  invalid.post(buildOrder(input, now));
+  invalid.rows[0].pop();
+  invalid.rows[1].pop();
+  invalid.rows[1][1] = "Unrecoverable timestamp";
+  assert.throws(() => invalid.context.setupOrdersSheet(), /timestamp is invalid/);
+  assert.equal(invalid.rows[0][16], undefined);
+  const custom = sheetHarness();
+  custom.post(buildOrder(input, now));
+  custom.rows[0][16] = "Vendor memo";
+  custom.rows[1][16] = "Keep this";
+  assert.throws(() => custom.context.setupOrdersSheet(), /Column Q is already in use/);
+  assert.equal(custom.rows[1][16], "Keep this");
 });
 
 test("Apps Script retries do not duplicate records or overwrite vendor-maintained statuses", () => {
@@ -282,6 +406,9 @@ test("Apps Script rejects unauthorized, invalid and busy requests without sheet 
     assert.equal(JSON.parse(result.getContent()).ok, false);
   }
   assert.equal(harness.post({ ...order, orderId: "bad" }).error, "INVALID_ORDER");
+  for (const createdAt of [null, "", "not-a-date", "2026-02-30T10:00:00.000Z"]) {
+    assert.equal(harness.post({ ...order, createdAt }).error, "INVALID_ORDER");
+  }
   harness.lockAvailable = false;
   assert.equal(harness.post(order).error, "BUSY");
   assert.equal(harness.openCount, 0);

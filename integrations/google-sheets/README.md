@@ -88,6 +88,36 @@ allows 10 requests per minute per domain and IP; Netlify enforcement can lag by
 up to 10 seconds. This is basic abuse protection, not customer authentication or
 a hard overall request cap. Google Apps Script and Netlify quotas still apply.
 
+## Updating an existing tracker for IST order timestamps
+
+Update Apps Script **before deploying the updated Netlify function**. The function
+requires the sheet to acknowledge the original saved timestamp, rather than
+guessing the order time from a retry or the customer's device.
+
+1. Replace Apps Script's `Code.gs` with the latest version. Keep both existing
+   script properties unchanged.
+2. Run `setupOrdersSheet`. It preserves columns A-P, including the original UTC
+   timestamp in B, statuses and the hidden payload hash. It adds
+   **Order date & time (IST)** in column Q and fills existing rows from their
+   stored UTC timestamps. It does not change the spreadsheet's time zone.
+3. If Q already contains your own custom column, setup stops without overwriting
+   that data. Move the custom column out of Q without rearranging A-P, then retry.
+   Missing historical timestamps remain blank with a warning in the execution
+   log; no dates are invented. Malformed stored timestamps require correction
+   from a reliable source before migration can finish.
+4. Choose **Deploy > Manage deployments**, edit the existing web-app deployment,
+   select **New version**, and deploy. Reusing the deployment keeps its `/exec`
+   URL and existing Netlify environment variables unchanged.
+5. Commit and push the updated source so Netlify deploys the new order function.
+   Merely saving Apps Script code does not update its deployed web app.
+6. Submit a test requirement. Column Q and the prepared WhatsApp message must
+   show the same `YYYY-MM-DD HH:mm:ss IST` timestamp. An unchanged retry must
+   preserve that original time, row and vendor-maintained status.
+
+The original UTC column remains the source of truth. The IST column is explicit,
+chronologically sortable text, independent of the sheet's display time zone.
+Previously sent WhatsApp messages are not retroactively changed.
+
 ## 5. Verify the real integration
 
 1. Open the deployed site and add two Ground Chakkar Big units plus one Flower
@@ -96,12 +126,14 @@ a hard overall request cap. Google Apps Script and Netlify quotas still apply.
    address, and agree to recording the requirement.
 3. Submit. The site should show a reference starting `SBC-` only after Google
    Sheets acknowledges the write. Verify the same ID in the sheet and WhatsApp
-   message; opening a message does not send it.
+   message; opening a message does not send it. Verify the order date/time in
+   column Q matches the IST time included in WhatsApp.
 4. Verify home delivery costs zero, the address and method are recorded, and the
    15% discounted total is correct.
 5. Repeat with store pickup and verify that no delivery date/charge is claimed.
 6. Retry unchanged details in the same open review. There must still be one row
-   for that reference. Different details create a new reference.
+   for that reference, with the original order date/time and status unchanged.
+   Different details create a new reference.
 7. Remove test rows once verification is complete.
 
 `GET /api/orders` reports whether the server environment is configured. It does
@@ -113,6 +145,10 @@ real submission above is required.
 Each row includes its ID, timestamp, customer contact/address, delivery or pickup
 choice, preferred date, item quantities/rates/amounts, subtotal, 15% discount,
 zero delivery charge, total, notes, and status.
+Column B retains the server-generated UTC creation time. Column Q displays the
+same time in IST, and WhatsApp includes it as **Order date & time**. This is the
+time the enquiry was first recorded, not the optional preferred delivery/pickup
+date, the latest retry time, or confirmation that WhatsApp was sent.
 
 The vendor updates **Status** directly in Google Sheets:
 New, Contacted, Confirmed, Preparing, Out for delivery, Ready for pickup,
@@ -120,7 +156,8 @@ Completed, or Cancelled. Status is not automatically inferred from WhatsApp.
 The vendor must confirm availability, delivery service area/timing, and the sale.
 
 Keep the first row and all required columns intact, including the hidden
-**Payload hash** column. Do not delete the hash or change an order ID. Filter or
+**Payload hash** column. Do not delete the hash, edit stored timestamps, or change
+an order ID. Filter or
 sort the entire table, including hidden columns, so rows remain aligned.
 Retries never overwrite vendor-maintained statuses.
 

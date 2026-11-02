@@ -45,7 +45,11 @@ npm.cmd run vendor:test
 
 The app uses a blue theme across the catalogue, cart, checkout and mobile controls,
 with gold accents for the festive artwork. Shared colours are defined in
-`styles.css`; the browser theme colour and favicon in `index.html` match the brand.
+`styles.css`; the browser theme colour in `index.html` matches the brand.
+The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon.
+The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
+experience, the 15% discount and delivery/pickup options. Delivery area and timing
+remain subject to shop confirmation.
 Changing the theme does not change order recording, pricing or WhatsApp messages.
 Product cards use bundled SVG illustrations matched to the cracker type, with
 specific variants for items such as rockets, sparklers, garlands and flower pots.
@@ -109,6 +113,11 @@ the server function, shared secret or spreadsheet credentials in public files.
   returning a WhatsApp message containing that reference. Failures are shown and
   keep details available for retry; no failed save is represented as success.
   Retries of unchanged details in the same review reuse the reference.
+- The order's original date and time appear in IST in the sheet's column Q and
+  the prepared WhatsApp message, using the server-generated timestamp retained
+  in column B (UTC). Retries preserve the first saved time, not the latest attempt
+  time. Existing trackers need the Apps Script timestamp upgrade before the
+  updated Netlify function is deployed; see the Google Sheets setup guide.
 - Revisions create a new reference. The vendor must confirm which reference to
   fulfil and cancel obsolete enquiries. The vendor manages status directly in
   the sheet; status does not automatically track WhatsApp messages.

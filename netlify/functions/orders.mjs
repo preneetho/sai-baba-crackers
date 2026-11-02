@@ -57,6 +57,14 @@ function settings(env) {
   }
 }
 
+function orderTime(createdAt) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  }).formatToParts(createdAt).map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} IST`;
+}
+
 export async function handleOrderRequest(request, {
   env = process.env, fetchImpl = fetch, now = () => new Date(),
 } = {}) {
@@ -128,7 +136,13 @@ export async function handleOrderRequest(request, {
     console.error("Order tracking: sheet did not acknowledge the requirement.");
     return json({ error: "Your requirement has not been acknowledged by the tracker. Keep this review open and retry, or contact the shop." }, 503);
   }
-  return json({ orderId: order.orderId, message: order.message });
+  const savedAt = typeof result.createdAt === "string" ? new Date(result.createdAt) : new Date(NaN);
+  if (!Number.isFinite(savedAt.getTime()) || savedAt.toISOString() !== result.createdAt) {
+    console.error("Order tracking: missing or invalid saved order timestamp. Check the Apps Script deployment version.");
+    return json({ error: "We could not confirm the recorded order time. Keep this review open and retry, or contact the shop." }, 503);
+  }
+  const message = order.message.replace("\n", `\nOrder date & time: ${orderTime(savedAt)}\n`);
+  return json({ orderId: order.orderId, message });
 }
 
 export default async request => handleOrderRequest(request);
