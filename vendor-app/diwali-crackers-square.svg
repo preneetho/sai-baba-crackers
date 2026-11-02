@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <title>Diwali crackers</title>
+  <desc>Centred rockets, sparklers, a flower pot and a ground chakkar, designed for a small square link thumbnail.</desc>
+  <defs>
+    <linearGradient id="gold" x2=".8" y2="1">
+      <stop stop-color="#fff0b5"/><stop offset="1" stop-color="#e99c35"/>
+    </linearGradient>
+    <linearGradient id="orange" x2=".8" y2="1">
+      <stop stop-color="#ffbb65"/><stop offset="1" stop-color="#ed722e"/>
+    </linearGradient>
+    <g id="spark" fill="#fff0b5">
+      <path d="m0-14 4 10 10 4-10 4-4 10-4-10-10-4 10-4z"/>
+    </g>
+    <g id="burst" fill="none" stroke="#edc078" stroke-linecap="round">
+      <path d="M0-57v24M0 33v24M-57 0h24M33 0h24M-40-40l17 17M23 23l17 17M-40 40l17-17M23-23l17-17" stroke-width="5"/>
+      <circle r="6" fill="#fff0b5" stroke="none"/>
+    </g>
+  </defs>
+  <rect width="800" height="800" fill="#143b73"/>
+  <circle cx="400" cy="400" r="329" fill="#204f8d"/>
+  <circle cx="400" cy="400" r="328" fill="none" stroke="#edc078" stroke-width="3" opacity=".7"/>
+  <use href="#burst" transform="translate(185 205) scale(.8)"/>
+  <use href="#burst" transform="translate(595 186)"/>
+  <use href="#spark" transform="translate(392 130)"/>
+  <use href="#spark" transform="translate(127 441) scale(.8)"/>
+  <use href="#spark" transform="translate(687 431) scale(.8)"/>
+  <g fill="#edc078">
+    <circle cx="260" cy="145" r="4"/><circle cx="492" cy="140" r="4"/>
+    <circle cx="650" cy="303" r="4"/><circle cx="130" cy="344" r="4"/>
+  </g>
+  <ellipse cx="400" cy="664" rx="236" ry="25" fill="#102c60" opacity=".7"/>
+  <g transform="translate(224 314) rotate(-17)">
+    <path d="M42 180v153" stroke="#edc078" stroke-width="10" stroke-linecap="round"/>
+    <path d="M0 0 42-91 84 0z" fill="url(#orange)"/>
+    <rect width="84" height="180" rx="8" fill="#f8fbff"/>
+    <path d="M0 29h84v36H0zM0 99h84v36H0z" fill="#5c8dce"/>
+    <path d="m0 125-27 61 27-11M84 125l27 61-27-11" fill="#edc078"/>
+    <path d="M12 167h60" stroke="#1e4f91" stroke-width="5"/>
+    <use href="#spark" transform="translate(42 82)"/>
+  </g>
+  <g transform="translate(419 285) rotate(15)">
+    <path d="M46 205v159" stroke="#edc078" stroke-width="10" stroke-linecap="round"/>
+    <path d="M0 0 46-102 92 0z" fill="url(#gold)"/>
+    <rect width="92" height="205" rx="8" fill="url(#orange)"/>
+    <path d="m0 133-30 78 30-13M92 133l30 78-30-13" fill="#edc078"/>
+    <path d="m0 29 92 35v33L0 62zM0 103l92 35v33L0 136z" fill="#fff0b5"/>
+    <path d="M15 188h62" stroke="#a64b27" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(583 547)" fill="none" stroke-linecap="round">
+    <path d="M0-10c-20-85-62-132-124-158M0-10c-2-112 12-174 40-220M0-10c28-94 66-146 113-169" stroke="#edc078" stroke-width="7"/>
+    <path d="M0-10c-43-70-82-87-135-94M0-10c43-72 79-88 118-92M0-10c-12-114-34-160-62-187" stroke="#fff0b5" stroke-width="3"/>
+    <path d="m-132-175-10-12M41-242l5-15m70 68 13-9M-145-108l-14-4M126-105l15-3" stroke="#edc078" stroke-width="4"/>
+    <use href="#spark" transform="translate(43 -224) scale(.65)"/>
+    <use href="#spark" transform="translate(-125 -164) scale(.65)"/>
+    <use href="#spark" transform="translate(114 -175) scale(.65)"/>
+    <path d="M-33 0h66l39 91q-72 32-144 0z" fill="url(#orange)" stroke="#ffdaa0" stroke-width="3"/>
+    <ellipse rx="33" ry="10" fill="#edc078" stroke="none"/>
+    <path d="M-56 58q56 20 112 0" stroke="#fff0b5" stroke-width="12"/>
+    <use href="#spark" transform="translate(0 35) scale(.9)"/>
+  </g>
+  <g transform="translate(378 594)">
+    <rect width="115" height="66" rx="9" fill="url(#gold)"/>
+    <path d="M12 22h91M12 44h91" stroke="#e99c35" stroke-width="4"/>
+    <g stroke-linecap="round">
+      <path d="M18 0 3-76M52 0l6-107M85 0l27-80" stroke="#d4e2f7" stroke-width="5"/>
+      <g stroke="#edc078" stroke-width="4">
+        <path d="M3-89v-13m-13 20-12-8m38 8 12-8M58-120v-13m-13 20-12-8m38 8 12-8M112-93v-13m-13 20-12-8m38 8 12-8"/>
+      </g>
+    </g>
+    <g fill="#fff0b5"><circle cx="3" cy="-76" r="6"/><circle cx="58" cy="-107" r="6"/><circle cx="112" cy="-80" r="6"/></g>
+  </g>
+  <g transform="translate(270 639) rotate(-12)">
+    <ellipse rx="73" ry="32" fill="#edc078"/>
+    <ellipse rx="64" ry="25" fill="#d7a254"/>
+    <path d="M42 0c0-19-48-27-71-9-23 18 4 34 29 27 23-7 22-23 3-23-14 0-18 10-7 12" fill="none" stroke="#fff0b5" stroke-width="6" stroke-linecap="round"/>
+    <path d="m59-10 17-14m5 7 15-1m-18-10 1-13" stroke="#fff0b5" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

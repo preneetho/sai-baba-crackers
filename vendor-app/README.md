@@ -58,11 +58,14 @@ band is 56 px high with a 40 px illustration; desktop artwork remains larger.
 
 ### WhatsApp link preview
 
-Link previews use the separate `diwali-crackers-preview.png` image (1200 x 630),
+Link previews use the separate `diwali-crackers-square.png` image (800 x 800),
 not the Sai Baba portrait used in the header and favicon. The editable artwork is
-`diwali-crackers-preview.svg`; the PNG is the shareable raster export. Open Graph
-and Twitter card tags are included directly in `index.html`, so link-preview
-crawlers do not need to run JavaScript. Keep the image publicly accessible.
+`diwali-crackers-square.svg`; the PNG is the shareable raster export. The square
+artwork centres the crackers and has no embedded text, keeping it recognisable
+in WhatsApp's small square thumbnails instead of cropping a wide banner.
+Open Graph and square Twitter summary-card tags are included directly in
+`index.html`, so crawlers do not need to run JavaScript. Keep the image publicly
+accessible. The older wide image is retained for previously cached image URLs.
 
 The metadata uses the deployed site's absolute HTTPS URL,
 `https://saibabacrackers.netlify.app/`. Update the metadata URLs if the domain
@@ -71,9 +74,10 @@ this image change does not require updating Apps Script or environment variables
 
 WhatsApp may cache previews independently of Netlify. After deployment, check the
 public PNG URL and try sharing a fresh URL such as
-`https://saibabacrackers.netlify.app/?share=diwali2026` if the original link still
+`https://saibabacrackers.netlify.app/?share=diwali-square-v2` if the original link still
 shows the old portrait. A fresh query can trigger a new fetch, but cache refresh
-timing is controlled by WhatsApp. Existing messages are not updated by this change.
+timing and card layout are controlled by WhatsApp. This change cannot force a
+full-width preview or update images already shown in existing messages.
 
 ## Hosting
 

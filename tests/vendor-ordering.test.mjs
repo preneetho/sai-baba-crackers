@@ -14,16 +14,16 @@ const customer = {
 };
 const today = "2026-11-02";
 
-test("social previews use the published Diwali PNG without changing the website logo", async () => {
+test("social previews use a square Diwali PNG without changing the website logo", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
   const metadata = new Map([...html.matchAll(/<meta (?:property|name)="([^"]+)" content="([^"]*)"[^>]*>/g)]
     .map(([, name, content]) => [name, content]));
   const image = new URL(metadata.get("og:image"));
-  assert.equal(image.href, "https://saibabacrackers.netlify.app/diwali-crackers-preview.png");
+  assert.equal(image.href, "https://saibabacrackers.netlify.app/diwali-crackers-square.png");
   assert.equal(metadata.get("og:url"), "https://saibabacrackers.netlify.app/");
   assert.equal(metadata.get("og:type"), "website");
   assert.equal(metadata.get("og:image:type"), "image/png");
-  assert.equal(metadata.get("twitter:card"), "summary_large_image");
+  assert.equal(metadata.get("twitter:card"), "summary");
   assert.equal(metadata.get("twitter:image"), image.href);
   assert.ok(metadata.get("og:image:alt").includes("Diwali crackers"));
   assert.equal(metadata.get("twitter:image:alt"), metadata.get("og:image:alt"));
@@ -32,8 +32,8 @@ test("social previews use the published Diwali PNG without changing the website 
   const png = await readFile(new URL(`../vendor-app${image.pathname}`, import.meta.url));
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.equal(png.toString("ascii", 12, 16), "IHDR");
-  assert.equal(png.readUInt32BE(16), 1200);
-  assert.equal(png.readUInt32BE(20), 630);
+  assert.equal(png.readUInt32BE(16), 800);
+  assert.equal(png.readUInt32BE(20), 800);
   assert.equal(metadata.get("og:image:width"), String(png.readUInt32BE(16)));
   assert.equal(metadata.get("og:image:height"), String(png.readUInt32BE(20)));
 });
