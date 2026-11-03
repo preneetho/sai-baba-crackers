@@ -18,6 +18,8 @@ const files = new Map([
   ["/sai-baba-logo.png", ["sai-baba-logo.png", "image/png"]],
   ["/diwali-crackers-preview.png", ["diwali-crackers-preview.png", "image/png"]],
   ["/diwali-crackers-square.png", ["diwali-crackers-square.png", "image/png"]],
+  ["/diwali-header.gif", ["diwali-header.gif", "image/gif"]],
+  ["/diwali-header-still.png", ["diwali-header-still.png", "image/png"]],
 ]);
 const server = createServer(async (request, response) => {
   response.setHeader("X-Content-Type-Options", "nosniff");

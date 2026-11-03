@@ -50,6 +50,13 @@ The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon
 The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
 experience, the 15% discount and delivery/pickup options. Delivery area and timing
 remain subject to shop confirmation.
+The header's bundled `diwali-header.gif` adds a subtle gold fireworks animation
+of about 39 KB. It plays once for 2.4 seconds, then rests on the matching static
+artwork rather than looping beside the text. A native `picture` source loads the
+GIF only when the browser reports no reduced-motion preference; otherwise it
+uses `diwali-header-still.png`. Both images have fixed dimensions to avoid layout
+shift, and the artwork stays decorative and faint on mobile. No external GIF
+service, animation library or new runtime dependency is used.
 Changing the theme does not change order recording, pricing or WhatsApp messages.
 Product cards use bundled SVG illustrations matched to the cracker type, with
 specific variants for items such as rockets, sparklers, garlands and flower pots.

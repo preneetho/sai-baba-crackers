@@ -14,6 +14,61 @@ const customer = {
 };
 const today = "2026-11-02";
 
+test("header fireworks are small, finite and replaced by a still image for reduced motion", async () => {
+  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  assert.match(html, /<source media="\(prefers-reduced-motion: no-preference\)" srcset="\.\/diwali-header\.gif" type="image\/gif">/);
+  assert.match(html, /<img src="\.\/diwali-header-still\.png" alt="" width="420" height="340"/);
+  const gif = await readFile(new URL("../vendor-app/diwali-header.gif", import.meta.url));
+  assert.equal(gif.toString("ascii", 0, 6), "GIF89a");
+  assert.equal(gif.readUInt16LE(6), 420);
+  assert.equal(gif.readUInt16LE(8), 340);
+  assert.ok(gif.length < 100 * 1024, "decorative GIF must stay below 100 KB");
+  let offset = 13 + ((gif[10] & 128) ? 3 * (2 ** ((gif[10] & 7) + 1)) : 0);
+  let frames = 0;
+  let duration = 0;
+  let ended = false;
+  function skipBlocks() {
+    while (true) {
+      assert.ok(offset < gif.length, "truncated GIF sub-block");
+      const length = gif[offset++];
+      if (length === 0) return;
+      offset += length;
+      assert.ok(offset <= gif.length, "truncated GIF data");
+    }
+  }
+  while (offset < gif.length) {
+    const marker = gif[offset++];
+    if (marker === 0x3b) {
+      ended = true;
+      break;
+    }
+    if (marker === 0x21) {
+      const label = gif[offset++];
+      if (label === 0xf9) {
+        assert.equal(gif[offset], 4);
+        duration += gif.readUInt16LE(offset + 2) * 10;
+      } else if (label === 0xff) {
+        const application = gif.toString("ascii", offset + 1, offset + 1 + gif[offset]);
+        assert.ok(!["NETSCAPE2.0", "ANIMEXTS1.0"].includes(application), "header GIF must not loop");
+      }
+      skipBlocks();
+    } else {
+      assert.equal(marker, 0x2c, "unexpected GIF block");
+      frames++;
+      const packed = gif[offset + 8];
+      offset += 9 + ((packed & 128) ? 3 * (2 ** ((packed & 7) + 1)) : 0);
+      offset++;
+      skipBlocks();
+    }
+  }
+  assert.ok(ended && frames > 1, "header GIF must contain an animation");
+  assert.ok(duration > 0 && duration <= 5000, "automatic animation must finish within five seconds");
+  const still = await readFile(new URL("../vendor-app/diwali-header-still.png", import.meta.url));
+  assert.deepEqual([...still.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(still.readUInt32BE(16), 420);
+  assert.equal(still.readUInt32BE(20), 340);
+});
+
 test("social previews use a square Diwali PNG without changing the website logo", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
   const metadata = new Map([...html.matchAll(/<meta (?:property|name)="([^"]+)" content="([^"]*)"[^>]*>/g)]
