@@ -144,11 +144,20 @@ the server function, shared secret or spreadsheet credentials in public files.
 - Revisions create a new reference. The vendor must confirm which reference to
   fulfil and cancel obsolete enquiries. The vendor manages status directly in
   the sheet; status does not automatically track WhatsApp messages.
-- Customer details enter the WhatsApp URL when the customer opens the prepared
-  chat. The site cannot verify that a WhatsApp message was sent or delivered.
+- Customer details are included in the prepared WhatsApp link and shared when
+  it opens. For a single-part requirement, **Save & open WhatsApp** saves to the
+  tracker first, then automatically follows the WhatsApp link in the same tab.
+  No popup permission or extra preview-button tap is required for this attempt.
+  If the browser blocks navigation, the recorded reference,
+  manual WhatsApp link, complete message and copy/download tools remain available.
+  Save or acknowledgement failures stay on the form and never launch WhatsApp.
+  Customers still press **Send** inside WhatsApp; the site cannot verify that a
+  message was sent or delivered.
 - Each encoded WhatsApp URL is capped at a conservative 1,800 characters.
   Longer requirements are split into numbered parts without truncation. All
-  parts must be sent manually. This cap is an implementation safeguard, not a
+  parts must be sent manually. Multi-part requirements retain the numbered-link
+  screen without automatically opening the first part, so later parts are not
+  lost. This cap is an implementation safeguard, not a
   guarantee across every WhatsApp client.
 - Copy and plain-text download preserve the complete requirement as fallbacks.
   Downloads and clipboard contents may contain personal details; customers

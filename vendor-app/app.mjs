@@ -271,7 +271,7 @@ function setSaving(value) {
   $("#close-checkout").disabled = value;
   $("#customer-form").setAttribute("aria-busy", String(value));
   $("#submit-requirement").textContent = value ?
-    "Saving to order tracker..." : "Save requirement & prepare WhatsApp";
+    "Saving to order tracker..." : "Save & open WhatsApp";
   $("#save-status").hidden = !value;
 }
 
@@ -364,14 +364,16 @@ $("#customer-form").addEventListener("submit", async event => {
     $("#full-message").value = fullMessage;
     $("#order-reference").textContent = `Recorded in the vendor's order sheet. Reference: ${orderId}`;
     $("#recipient").textContent = `${vendor.name} \u00b7 ${vendor.phone}`;
+    $("#message-title").textContent = messages.length === 1 ?
+      "Requirement saved" : "Send every part in WhatsApp";
     $("#handoff-instructions").textContent = messages.length === 1 ?
-      "Open the chat below, then press Send in WhatsApp. The vendor will confirm your requirement." :
+      "Opening WhatsApp automatically. Press Send there to share your requirement. If WhatsApp does not open, tap the button below." :
       `Your list needs ${messages.length} messages to keep links manageable. Open and SEND EACH numbered part in order. All products and details are included across the parts. You can also copy or download the complete requirement below.`;
     $("#message-links").replaceChildren(...messages.map((message, index) => {
       const link = element("a", "button primary wide", messages.length === 1 ?
         "Open WhatsApp chat \u2197" : `Open WhatsApp \u00b7 part ${index + 1} of ${messages.length} \u2197`);
       link.href = message.url;
-      link.target = "_blank";
+      link.target = messages.length === 1 ? "_self" : "_blank";
       link.rel = "noopener noreferrer";
       return link;
     }));
@@ -380,6 +382,14 @@ $("#customer-form").addEventListener("submit", async event => {
     $("#copy-status").textContent = "";
     $("#message-title").tabIndex = -1;
     $("#message-title").focus();
+    if (messages.length === 1) {
+      try {
+        $("#message-links a").click();
+      } catch {
+        console.warn("Automatic WhatsApp navigation was blocked by the browser.");
+        $("#handoff-instructions").textContent = "Your requirement is saved, but this browser could not open WhatsApp automatically. Tap Open WhatsApp chat below, then press Send in WhatsApp.";
+      }
+    }
   } catch (error) {
     $("#form-error").textContent = error.message;
     $("#form-error").hidden = false;

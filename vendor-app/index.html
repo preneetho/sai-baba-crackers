@@ -263,14 +263,14 @@
         <label><span id="preferred-date-label">Preferred date</span> <span class="optional">(optional)</span><input id="preferred-date" name="preferredDate" type="date"></label>
         <label class="full-width">Notes <span class="optional">(optional)</span><textarea name="notes" rows="3" maxlength="500" placeholder="Any preferences or questions for the vendor?"></textarea></label>
       </div>
-      <p class="privacy-note">Your selection is saved on this device. On submission, your name, mobile number, address and requirement are recorded in the vendor's Google Sheet. They are also sent to WhatsApp when you open the prepared chat. Contact the vendor to correct or remove a recorded requirement.</p>
+      <p class="privacy-note">Your selection is saved on this device. On submission, your name, mobile number, address and requirement are recorded in the vendor's Google Sheet. We try to open single-message requirements in WhatsApp automatically after saving. You must press Send yourself. Contact the vendor to correct or remove a recorded requirement.</p>
       <label class="consent"><input id="consent" type="checkbox" required><span>I agree to save my details and requirement in the vendor's Google Sheet and share them through WhatsApp. I understand this is not a confirmed order.</span></label>
       <p id="save-status" class="privacy-note" role="status" hidden>Saving your requirement to the vendor's order tracker. Please keep this review open.</p>
       <p id="form-error" class="error" role="alert" tabindex="-1" hidden></p>
-      <button id="submit-requirement" class="button primary wide" type="submit">Save requirement &amp; prepare WhatsApp</button>
+      <button id="submit-requirement" class="button primary wide" type="submit">Save &amp; open WhatsApp</button>
     </form>
     <section id="message-preview" aria-labelledby="message-title" hidden>
-      <h3 id="message-title">Ready for your WhatsApp chat</h3>
+      <h3 id="message-title">Requirement saved</h3>
       <p id="order-reference" class="recipient order-reference"></p>
       <p id="handoff-instructions"></p>
       <p class="recipient">Recipient: <strong id="recipient"></strong></p>
@@ -278,7 +278,7 @@
       <label class="message-label" for="full-message">Your complete requirement</label><textarea id="full-message" rows="10" readonly></textarea>
       <div class="message-tools"><button id="copy-message" class="button secondary" type="button">Copy complete message</button><button id="download-message" class="button secondary" type="button">Download .txt</button><button id="edit-details" class="text-button" type="button">Revise details</button></div>
       <p id="copy-status" role="status"></p>
-      <p class="privacy-note">Your requirement has been recorded, but WhatsApp has not been sent and the sale is not confirmed. Press Send inside WhatsApp. If a link does not work, copy the complete message into the vendor's chat. Revising recorded details creates a new reference; tell the vendor which reference to fulfil.</p>
+      <p class="privacy-note">Your requirement is recorded. Opening WhatsApp does not send the message or confirm the sale. Press Send inside WhatsApp. If a link does not work, copy the complete message into the vendor's chat. Revising recorded details creates a new reference; tell the vendor which reference to fulfil.</p>
     </section>
   </dialog>
   <noscript><div class="noscript">Enable JavaScript to build your requirement, or call the shop on +91 98492 93951.</div></noscript>
