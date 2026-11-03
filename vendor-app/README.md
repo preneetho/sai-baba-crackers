@@ -129,15 +129,20 @@ the server function, shared secret or spreadsheet credentials in public files.
 
 ## Behaviour and privacy
 
-- Selection quantities are whole **selling units**, between 1 and 99 per product.
-  A selling unit can be a box, packet, or individual piece as shown in the list.
+- Customer-facing copy uses **Cart**, **Checkout** and **Order request** throughout
+  the shopping flow, accessibility labels, recovery guidance and WhatsApp message.
+  The mobile shortcut is **View cart**, and both **Clear cart** controls use the
+  same confirmation. Search controls and search behaviour are unchanged.
+- Cart quantities are whole **packs**, between 1 and 99 per product. A pack means
+  the listed selling unit: a box, packet, or individual piece as shown on the
+  product. This wording does not change pack sizes, quantities or prices.
 - A **15% discount** applies automatically to the complete catalogue subtotal.
-  Cart and review show the subtotal, discount applied and discounted estimated
+  Cart and checkout show the subtotal, discount and discounted estimated
   total; the mobile cart and WhatsApp message use the same discounted total.
   Calculations use integer paise and round the discount once at subtotal level.
   Catalogue and individual line prices remain the original printed rates.
 - Delivery or pickup is a required choice with no preselected option. Home
-  delivery has **zero charge**, shown in the review and WhatsApp message; the
+  delivery has **zero charge**, shown as the delivery fee in checkout and WhatsApp; the
   15% discounted total is unchanged. WhatsApp includes the selected method,
   address and optional preferred delivery/pickup date. Address remains required
   for both options. No delivery radius, minimum order or delivery date guarantee
@@ -148,12 +153,12 @@ the server function, shared secret or spreadsheet credentials in public files.
   storage failures are reported. Contact details are not saved to local storage.
   Required name, mobile number and full address (10-500 characters) are recorded
   in the vendor's Google Sheet after explicit consent. Multiline addresses are
-  preserved. Closing the review clears the local form and message, not sheet rows.
+  preserved. Closing checkout clears the local form and message, not sheet rows.
 - The customer agrees to Sheets recording and WhatsApp sharing. The server
-  recalculates amounts, then records an enquiry with an `SBC-` reference before
+  recalculates amounts, then records an order request with an `SBC-` reference before
   returning a WhatsApp message containing that reference. Failures are shown and
   keep details available for retry; no failed save is represented as success.
-  Retries of unchanged details in the same review reuse the reference.
+  Retries of unchanged details in the same checkout reuse the reference.
 - The order's original date and time appear in IST in the sheet's column Q and
   the prepared WhatsApp message, using the server-generated timestamp retained
   in column B (UTC). Retries preserve the first saved time, not the latest attempt
@@ -162,11 +167,11 @@ the server function, shared secret or spreadsheet credentials in public files.
 - Revisions create a new reference. The vendor must confirm which reference to
   fulfil and cancel obsolete enquiries. The vendor manages status directly in
   the sheet; status does not automatically track WhatsApp messages.
-- **Next: Add your details** opens the review and customer-details screen.
-  Its **Send my list via WhatsApp** button has a prominent reminder to tap
-  **Send** inside WhatsApp; opening the chat alone does not send the list.
+- **Proceed to checkout** opens the order summary and customer-details screen.
+  Its **Send order request via WhatsApp** button has a prominent reminder to tap
+  **Send** inside WhatsApp; opening the chat alone does not send the order request.
   Customer details are included in the prepared WhatsApp link and loaded into
-  WhatsApp when it opens. For a single-part requirement, the button saves to the
+  WhatsApp when it opens. For a single-part order request, the button saves to the
   tracker first, then automatically follows the WhatsApp link in the same tab.
   No popup permission or extra preview-button tap is required for this attempt.
   If the browser blocks navigation, the recorded reference,
@@ -175,12 +180,12 @@ the server function, shared secret or spreadsheet credentials in public files.
   Customers still press **Send** inside WhatsApp; the site cannot verify that a
   message was sent or delivered.
 - Each encoded WhatsApp URL is capped at a conservative 1,800 characters.
-  Longer requirements are split into numbered parts without truncation. All
-  parts must be sent manually. Multi-part requirements retain the numbered-link
+  Longer order requests are split into numbered parts without truncation. All
+  parts must be sent manually. Multi-part order requests retain the numbered-link
   screen without automatically opening the first part, so later parts are not
   lost. This cap is an implementation safeguard, not a
   guarantee across every WhatsApp client.
-- Copy and plain-text download preserve the complete requirement as fallbacks.
+- Copy and plain-text download preserve the complete order request as fallbacks.
   Downloads and clipboard contents may contain personal details; customers
   control these copies. Google Sheets holds the enquiry register; the vendor
   controls sharing, corrections, retention and deletion.

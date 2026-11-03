@@ -19,9 +19,9 @@ function json(body, status = 200) {
 export function buildOrder(input, now = new Date()) {
   if (!input || typeof input !== "object" || Array.isArray(input) ||
       typeof input.requestId !== "string" || !UUID.test(input.requestId)) {
-    throw new Error("The order reference is invalid. Close the review and try again.");
+    throw new Error("The order request ID is invalid. Close checkout and try again.");
   }
-  if (input.consent !== true) throw new Error("Agree to save and share your requirement before continuing.");
+  if (input.consent !== true) throw new Error("Agree to save and share your order request before continuing.");
   if (!input.customer || typeof input.customer !== "object" || Array.isArray(input.customer)) {
     throw new Error("Customer details are required.");
   }
@@ -69,33 +69,33 @@ export async function handleOrderRequest(request, {
   env = process.env, fetchImpl = fetch, now = () => new Date(),
 } = {}) {
   if (request.method !== "GET" && request.method !== "POST") {
-    const response = json({ error: "Use POST to save a requirement." }, 405);
+    const response = json({ error: "Use POST to save an order request." }, 405);
     response.headers.set("Allow", "GET, POST");
     return response;
   }
   const connection = settings(env);
   if (!connection) {
-    return json({ error: "Order tracking is not configured yet. Contact the shop; no requirement has been recorded." }, 503);
+    return json({ error: "Order tracking is not configured yet. Contact the shop; no order request has been recorded." }, 503);
   }
   if (request.method === "GET") return json({ available: true });
   if (request.headers.get("origin") !== new URL(request.url).origin) {
-    return json({ error: "Submit your requirement from this website." }, 403);
+    return json({ error: "Submit your order request from this website." }, 403);
   }
   if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
-    return json({ error: "The requirement must be sent as JSON." }, 415);
+    return json({ error: "The order request must be sent as JSON." }, 415);
   }
   if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) {
-    return json({ error: "The requirement is too large." }, 413);
+    return json({ error: "The order request is too large." }, 413);
   }
   let input;
   try {
     const body = await request.text();
     if (Buffer.byteLength(body, "utf8") > MAX_BODY_BYTES) {
-      return json({ error: "The requirement is too large." }, 413);
+      return json({ error: "The order request is too large." }, 413);
     }
     input = JSON.parse(body);
   } catch {
-    return json({ error: "The requirement could not be read. Please retry." }, 400);
+    return json({ error: "The order request could not be read. Please retry." }, 400);
   }
   let order;
   try {
@@ -114,11 +114,11 @@ export async function handleOrderRequest(request, {
     });
   } catch {
     console.error("Order tracking: upstream request failed or timed out.");
-    return json({ error: "We could not confirm saving your requirement. Keep this review open and retry to avoid duplicate records." }, 503);
+    return json({ error: "We could not confirm saving your order request. Keep checkout open and retry to avoid duplicate records." }, 503);
   }
   if (!upstream.ok) {
     console.error(`Order tracking: upstream HTTP ${upstream.status}.`);
-    return json({ error: "The order tracker is unavailable. Keep this review open and retry." }, 503);
+    return json({ error: "The order tracker is unavailable. Keep checkout open and retry." }, 503);
   }
   let result;
   try {
@@ -127,19 +127,19 @@ export async function handleOrderRequest(request, {
     result = JSON.parse(body);
   } catch {
     console.error("Order tracking: invalid upstream acknowledgement.");
-    return json({ error: "We could not confirm the sheet update. Keep this review open and retry." }, 502);
+    return json({ error: "We could not confirm the order tracker update. Keep checkout open and retry." }, 502);
   }
   if (result?.ok !== true || result.orderId !== order.orderId) {
     if (result?.error === "CONFLICT") {
-      return json({ error: "This reference already records different details. Close the review and submit a new requirement." }, 409);
+      return json({ error: "This request ID already records different details. Close checkout and submit a new order request." }, 409);
     }
     console.error("Order tracking: sheet did not acknowledge the requirement.");
-    return json({ error: "Your requirement has not been acknowledged by the tracker. Keep this review open and retry, or contact the shop." }, 503);
+    return json({ error: "The tracker has not acknowledged your order request. Keep checkout open and retry, or contact the shop." }, 503);
   }
   const savedAt = typeof result.createdAt === "string" ? new Date(result.createdAt) : new Date(NaN);
   if (!Number.isFinite(savedAt.getTime()) || savedAt.toISOString() !== result.createdAt) {
     console.error("Order tracking: missing or invalid saved order timestamp. Check the Apps Script deployment version.");
-    return json({ error: "We could not confirm the recorded order time. Keep this review open and retry, or contact the shop." }, 503);
+    return json({ error: "We could not confirm the recorded order request time. Keep checkout open and retry, or contact the shop." }, 503);
   }
   const message = order.message.replace("\n", `\nOrder date & time: ${orderTime(savedAt)}\n`);
   return json({ orderId: order.orderId, message });

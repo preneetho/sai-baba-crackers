@@ -11,13 +11,13 @@ export const money = value => new Intl.NumberFormat("en-IN", {
 
 export function sanitizeCart(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("The saved cart is not valid. Start a new selection.");
+    throw new Error("The saved cart is not valid. Start a new cart.");
   }
   const cart = {};
   for (const [id, quantity] of Object.entries(value)) {
     if (!/^[1-9]\d*$/.test(id) || !byId.has(Number(id)) ||
         !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
-      throw new Error("The saved cart contains an invalid product or quantity. Start a new selection.");
+      throw new Error("The saved cart contains an invalid product or quantity. Start a new cart.");
     }
     cart[id] = quantity;
   }
@@ -80,29 +80,29 @@ export function validateCustomer(input, today = localDate()) {
 
 export function createRequirement(cart, input, today) {
   const lines = cartLines(cart);
-  if (!lines.length) throw new Error("Add at least one product to your requirement.");
+  if (!lines.length) throw new Error("Add at least one product to your cart.");
   const customer = validateCustomer(input, today);
   const amounts = pricing(cart);
   const delivery = customer.fulfilment === "delivery";
   const arrangement = delivery ? "delivery" : "pickup";
   return [
-    `New requirement - ${vendor.name} (${vendor.year} catalogue)`,
+    `New order request - ${vendor.name} (${vendor.year})`,
     "",
     `Customer: ${customer.name}`,
     `Mobile: +91 ${customer.phone}`,
-    `Fulfilment: ${delivery ? "Free home delivery" : "Store pickup"}`,
+    `Delivery option: ${delivery ? "Free home delivery" : "Store pickup"}`,
     `Address: ${customer.address}`,
     ...(customer.preferredDate ? [`Preferred ${arrangement} date: ${customer.preferredDate}`] : []),
     "",
-    ...lines.map(line => `#${line.id} ${line.name} | ${line.brand}\nPack: ${line.unit}\n${line.quantity} selling unit(s) x Rs.${line.price} = Rs.${line.amount}\n`),
+    ...lines.map(line => `#${line.id} ${line.name} | ${line.brand}\nPack: ${line.unit}\n${line.quantity} pack${line.quantity === 1 ? "" : "s"} x Rs.${line.price} = Rs.${line.amount}\n`),
     `Subtotal: Rs.${amounts.subtotal.toFixed(2)}`,
     `Discount applied (${DISCOUNT_PERCENT}%): -Rs.${amounts.discount.toFixed(2)}`,
-    ...(delivery ? ["Home delivery charge: Rs.0.00 (FREE)"] : []),
-    `Estimated total after discount: Rs.${amounts.total.toFixed(2)}`,
+    ...(delivery ? ["Delivery fee: Rs.0.00 (FREE)"] : []),
+    `Estimated total: Rs.${amounts.total.toFixed(2)}`,
     ...(customer.notes ? ["", `Notes: ${customer.notes}`] : []),
     "",
     `Please confirm availability, final price and ${arrangement} arrangements.`,
-    "This is an enquiry, not a confirmed order. No payment has been made.",
+    "This is an order request, not a confirmed order. No payment has been made.",
   ].join("\n");
 }
 
@@ -113,11 +113,11 @@ export function whatsappUrl(message, phone = vendor.whatsapp) {
 
 // Bound the encoded URL, not character count; Unicode can expand substantially.
 export function prepareMessages(text, phone = vendor.whatsapp, maxLength = 1800) {
-  if (!text) throw new Error("The requirement message is empty.");
+  if (!text) throw new Error("The order request message is empty.");
   if (whatsappUrl(text, phone).length <= maxLength) {
     return [{ text, url: whatsappUrl(text, phone) }];
   }
-  const prefix = (part, count) => `Requirement - part ${part} of ${count}\nPlease send all parts.\n\n`;
+  const prefix = (part, count) => `Order request - part ${part} of ${count}\nPlease send all parts.\n\n`;
   const budget = maxLength - whatsappUrl(prefix(999, 999), phone).length;
   if (budget < 20) throw new Error("The WhatsApp URL limit is too small.");
   const chunks = [];
@@ -142,7 +142,7 @@ export function prepareMessages(text, phone = vendor.whatsapp, maxLength = 1800)
     }
   }
   if (chunk) chunks.push(chunk);
-  if (chunks.length > 999) throw new Error("This requirement is too large to share. Reduce the notes or selection.");
+  if (chunks.length > 999) throw new Error("This order request is too large to share. Reduce the notes or items in your cart.");
   return chunks.map((content, index) => {
     const message = prefix(index + 1, chunks.length) + content;
     return { text: message, url: whatsappUrl(message, phone) };

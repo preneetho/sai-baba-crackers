@@ -15,9 +15,17 @@ const customer = {
 };
 const today = "2026-11-02";
 
-test("the next-step button clearly leads to customer details without implying submission", async () => {
+test("shopping, cart and checkout use familiar ecommerce labels without implying confirmation", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
-  assert.match(html, /<button id="review" class="button primary wide" type="button" disabled>Next: Add your details <span aria-hidden="true">&#8594;<\/span><\/button>/);
+  assert.match(html, /<a class="header-cart" href="#requirement">Cart /);
+  assert.match(html, /id="requirement-title">Your cart<\/h2>/);
+  assert.match(html, /id="mobile-cart"[^>]*>[\s\S]*?<span>View cart &#8594;<\/span><\/a>/);
+  assert.match(html, /<button id="review" class="button primary wide" type="button" disabled>Proceed to checkout <span aria-hidden="true">&#8594;<\/span><\/button>/);
+  assert.match(html, /id="checkout-title">Checkout<\/h2>/);
+  assert.match(html, /aria-label="Close checkout"/);
+  assert.match(html, /id="message-title">Order request saved<\/h3>/);
+  assert.match(html, /I understand this is not a confirmed order\./);
+  assert.doesNotMatch(html, />View list|Your festive list|Review your requirement|>Clear selection|>Order confirmed|>Pay now/);
 });
 
 test("the store-pickup option displays the collection address without preselecting fulfilment", async () => {
@@ -34,16 +42,17 @@ test("the store-pickup option displays the collection address without preselecti
 test("the WhatsApp action explicitly explains the customer's final Send step", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
-  assert.match(html, /id="submit-requirement"[^>]*aria-describedby="whatsapp-send-help">Send my list via WhatsApp<\/button>/);
-  assert.match(html, /id="whatsapp-send-help"[^>]*><strong>Tap Send in WhatsApp to finish\.<\/strong><br>Opening the chat alone does not send your list\./);
-  assert.match(app, /"Saving to order tracker\.\.\." : "Send my list via WhatsApp"/);
+  assert.match(html, /id="submit-requirement"[^>]*aria-describedby="whatsapp-send-help">Send order request via WhatsApp<\/button>/);
+  assert.match(html, /id="whatsapp-send-help"[^>]*><strong>Tap Send in WhatsApp to finish\.<\/strong><br>Opening the chat alone does not send your order request\./);
+  assert.match(app, /"Saving order request\.\.\." : "Send order request via WhatsApp"/);
+  assert.match(app, /"Send order request via WhatsApp \\u2197"/);
   assert.doesNotMatch(html + app, /Save &(?:amp;)? open WhatsApp|Open WhatsApp chat/);
 });
 
-test("clear selection is available above and below the selected-items list", async () => {
+test("clear cart is available above and below the cart items", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
-  assert.match(html, /<button id="clear-cart-top" class="text-button" type="button" hidden>Clear selection<\/button>/);
-  assert.match(html, /<button id="clear-cart" class="text-button" type="button" hidden>Clear selection<\/button>/);
+  assert.match(html, /<button id="clear-cart-top" class="text-button" type="button" hidden>Clear cart<\/button>/);
+  assert.match(html, /<button id="clear-cart" class="text-button" type="button" hidden>Clear cart<\/button>/);
   assert.ok(html.indexOf('id="clear-cart-top"') < html.indexOf('id="cart-items"'));
   assert.ok(html.indexOf('id="cart-items"') < html.indexOf('id="clear-cart"'));
 });
@@ -374,24 +383,24 @@ test("free home delivery and pickup retain the same 15% discounted total", () =>
   for (const fulfilment of ["delivery", "pickup"]) {
     const text = createRequirement({ 1: 2, 12: 1 }, { ...customer, fulfilment }, today);
     assert.ok(text.includes("Discount applied (15%): -Rs.55.50"));
-    assert.ok(text.includes("Estimated total after discount: Rs.314.50"));
+    assert.ok(text.includes("Estimated total: Rs.314.50"));
     assert.ok(text.includes(`Address: ${customer.address}`));
     if (fulfilment === "delivery") {
-      assert.ok(text.includes("Fulfilment: Free home delivery"));
-      assert.ok(text.includes("Home delivery charge: Rs.0.00 (FREE)"));
+      assert.ok(text.includes("Delivery option: Free home delivery"));
+      assert.ok(text.includes("Delivery fee: Rs.0.00 (FREE)"));
       assert.ok(text.includes("Preferred delivery date: 2026-11-05"));
       assert.ok(text.includes("delivery arrangements."));
       assert.ok(!text.includes("pickup"));
     } else {
-      assert.ok(text.includes("Fulfilment: Store pickup"));
+      assert.ok(text.includes("Delivery option: Store pickup"));
       assert.ok(text.includes("Preferred pickup date: 2026-11-05"));
-      assert.ok(!text.includes("delivery charge"));
+      assert.ok(!text.includes("Delivery fee"));
       assert.ok(!text.includes("delivery arrangements."));
     }
     const withoutDate = createRequirement({ 18: 1 },
       { ...customer, fulfilment, preferredDate: "" }, today);
     assert.ok(!withoutDate.includes("Preferred "));
-    assert.ok(withoutDate.includes("Estimated total after discount: Rs.21.25"));
+    assert.ok(withoutDate.includes("Estimated total: Rs.21.25"));
   }
 });
 
@@ -407,17 +416,18 @@ test("addresses retain multiline and Unicode text while normalizing line endings
 
 test("message contains every detail, line amount, pack, brand and estimated total", () => {
   const message = createRequirement({ 1: 2, 12: 1 }, customer, today);
-  for (const content of ["Ravi Kumar", "+91 9876543210", "2026-11-05",
+  for (const content of [`New order request - ${vendor.name} (${vendor.year})`, "Ravi Kumar", "+91 9876543210", "2026-11-05",
     "#1 Ground Chakkar Big | STANDARD", "Pack: 10 pcs / box",
-    "2 selling unit(s) x Rs.70 = Rs.140", "#12 Flower Pot Special",
+    "2 packs x Rs.70 = Rs.140", "1 pack x Rs.230 = Rs.230", "#12 Flower Pot Special",
     `Address: ${customer.address}`, "Subtotal: Rs.370.00", "Discount applied (15%): -Rs.55.50",
-    "Estimated total after discount: Rs.314.50", "Please confirm stock.", "not a confirmed order"]) {
+    "Estimated total: Rs.314.50", "Please confirm stock.",
+    "This is an order request, not a confirmed order. No payment has been made."]) {
     assert.ok(message.includes(content), content);
   }
   assert.throws(() => createRequirement({}, customer, today), /at least one/);
   const fractional = createRequirement({ 18: 1 }, customer, today);
   assert.ok(fractional.includes("Discount applied (15%): -Rs.3.75"));
-  assert.ok(fractional.includes("Estimated total after discount: Rs.21.25"));
+  assert.ok(fractional.includes("Estimated total: Rs.21.25"));
 });
 
 test("WhatsApp links encode customer content without permitting URL injection", () => {
@@ -443,7 +453,7 @@ function assertLosslessSplit(text, maximum = 1800) {
   const reconstructed = messages.map((message, index) => {
     assert.ok(message.url.length <= maximum, `part ${index + 1} exceeds encoded URL limit`);
     assert.equal(new URL(message.url).searchParams.get("text"), message.text);
-    const prefix = `Requirement - part ${index + 1} of ${messages.length}\nPlease send all parts.\n\n`;
+    const prefix = `Order request - part ${index + 1} of ${messages.length}\nPlease send all parts.\n\n`;
     assert.ok(message.text.startsWith(prefix));
     return message.text.slice(prefix.length);
   }).join("");

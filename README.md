@@ -1,9 +1,9 @@
 # Sai Baba Crackers Centre
 
-Mobile-friendly 2026 catalogue with 68 products, a saved selection, an automatic
+Mobile-friendly 2026 catalogue with 68 products, a saved cart, an automatic
 15% discount, free home delivery or store pickup, and a customer-reviewed
-WhatsApp enquiry including the customer's name, mobile number and address.
-Requirements are saved to the vendor's Google Sheet before WhatsApp is prepared.
+WhatsApp order request including the customer's name, mobile number and address.
+Order requests are saved to the vendor's Google Sheet before WhatsApp is prepared.
 The frontend is static; a Netlify Function securely calls the vendor's Apps Script
 web app. No customer accounts, payments or npm dependencies are required.
 

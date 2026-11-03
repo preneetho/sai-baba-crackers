@@ -24,7 +24,7 @@ function showStorageWarning(message, reset = false) {
         localStorage.removeItem(CART_KEY);
         warning.hidden = true;
       } catch {
-        showStorageWarning("This browser cannot access saved selections. Your current list works, but will not survive a refresh.");
+        showStorageWarning("This browser cannot access your saved cart. Your current cart works, but will not survive a refresh.");
       }
     });
     warning.append(" ", button);
@@ -36,14 +36,14 @@ try {
   const stored = localStorage.getItem(CART_KEY);
   if (stored) cart = sanitizeCart(JSON.parse(stored));
 } catch (error) {
-  showStorageWarning(`Your previous selection could not be restored. ${error instanceof SyntaxError ? "The saved data is unreadable." : error.message}`, true);
+  showStorageWarning(`Your saved cart could not be restored. ${error instanceof SyntaxError ? "The saved data is unreadable." : error.message}`, true);
 }
 
 function saveCart() {
   try {
     localStorage.setItem(CART_KEY, JSON.stringify(cart));
   } catch {
-    showStorageWarning("Your selection could not be saved on this device. Keep this page open or download your requirement before leaving.");
+    showStorageWarning("Your cart could not be saved on this device. Keep this page open or download your order request before leaving.");
   }
 }
 
@@ -63,7 +63,7 @@ function quantityControl(product, compact = false) {
   decrease.disabled = quantity === 0;
   decrease.dataset.direction = "decrease";
   const amount = element("span", "", String(quantity));
-  amount.setAttribute("aria-label", `${quantity} selling units`);
+  amount.setAttribute("aria-label", `${quantity} pack${quantity === 1 ? "" : "s"}`);
   const increase = element("button", "", "+");
   increase.type = "button";
   increase.disabled = quantity === MAX_QUANTITY;
@@ -83,7 +83,7 @@ function updateQuantity(id, change, fromCart) {
   saveCart();
   renderProducts();
   renderCart();
-  $("#announcement").textContent = `${products.find(product => product.id === id).name}: ${next} selling units selected. Estimated total after ${DISCOUNT_PERCENT}% discount ${money(total(cart))}.`;
+  $("#announcement").textContent = `${products.find(product => product.id === id).name}: ${next} pack${next === 1 ? "" : "s"} in your cart. Estimated total after ${DISCOUNT_PERCENT}% discount ${money(total(cart))}.`;
   const scope = fromCart ? "#cart-items" : "#products";
   const direction = change > 0 ? "increase" : "decrease";
   const active = $(`${scope} [data-id="${id}"] [data-direction="${direction}"]:not(:disabled)`) ??
@@ -150,7 +150,7 @@ function renderProducts() {
   if (sort === "low") filtered.sort((a, b) => a.price - b.price);
   if (sort === "high") filtered.sort((a, b) => b.price - a.price);
   if (sort === "name") filtered.sort((a, b) => a.name.localeCompare(b.name));
-  $("#results-count").textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"}${category === "All products" ? " to light up your celebration" : ` in ${category.toLowerCase()}`}`;
+  $("#results-count").textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"}${category === "All products" ? "" : ` in ${category.toLowerCase()}`}`;
   $("#no-results").hidden = filtered.length !== 0;
   $("#products").replaceChildren(...filtered.map(product => {
     const card = element("article", `product-card${cart[product.id] ? " in-cart" : ""}`);
@@ -165,7 +165,7 @@ function renderProducts() {
       element("p", "product-unit", product.unit));
     const bottom = element("div", "product-bottom");
     const price = element("div", "product-price");
-    price.append(element("strong", "", money(product.price)), element("span", "", "per selling unit"));
+    price.append(element("strong", "", money(product.price)), element("span", "", "per pack"));
     bottom.append(price, quantityControl(product));
     body.append(bottom);
     card.append(art, body);
@@ -178,11 +178,11 @@ function pricingSummary(withIds = false) {
   const summary = element("div", "pricing-summary");
   const rows = [
     ["Subtotal", money(amounts.subtotal), "pricing-row", "cart-subtotal"],
-    [amounts.subtotal ? `Discount applied (${DISCOUNT_PERCENT}%)` : `Discount (${DISCOUNT_PERCENT}%)`,
+    [`Discount (${DISCOUNT_PERCENT}%)`,
       `\u2212${money(amounts.discount)}`, "pricing-row discount-row", "cart-discount"],
     ...(!withIds && $("#fulfilment-delivery").checked ?
-      [["Home delivery charge", "FREE", "pricing-row discount-row", "delivery-charge"]] : []),
-    ["Estimated total after discount", money(amounts.total), "cart-total", "cart-total"],
+      [["Delivery fee", "FREE", "pricing-row discount-row", "delivery-charge"]] : []),
+    ["Estimated total", money(amounts.total), "cart-total", "cart-total"],
   ];
   for (const [label, value, className, id] of rows) {
     const row = element("div", className);
@@ -208,8 +208,8 @@ function renderCart() {
   $("#mobile-cart-label").textContent = `${units} pack${units === 1 ? "" : "s"} \u00b7 ${money(total(cart))}`;
   if (!lines.length) {
     const empty = element("div", "cart-empty");
-    empty.append(element("span", "", "\u2727"), element("h3", "", "Good things start with a list"),
-      element("p", "", "Tap + on a product to add a little sparkle to yours."));
+    empty.append(element("span", "", "\u2727"), element("h3", "", "Your cart is empty"),
+      element("p", "", "Tap + on a product to add it to your cart."));
     $("#cart-items").replaceChildren(empty);
     return;
   }
@@ -222,7 +222,7 @@ function renderCart() {
     const controls = element("div", "cart-item-controls");
     const remove = element("button", "text-button", "Remove");
     remove.type = "button";
-    remove.setAttribute("aria-label", `Remove ${line.name}, product ${line.id} from selection`);
+    remove.setAttribute("aria-label", `Remove ${line.name}, product ${line.id} from cart`);
     remove.addEventListener("click", () => updateQuantity(line.id, -line.quantity, true));
     controls.append(quantityControl(line, true), remove);
     row.append(controls);
@@ -237,9 +237,9 @@ function updateFulfilment() {
     method === "pickup" ? "Preferred pickup date" : "Preferred date";
   $("#address-label").textContent = delivery ? "Delivery address" : "Your address";
   $("#address-help").textContent = delivery ?
-    "Free home delivery to this address. The vendor will confirm service area and timing." :
-    method === "pickup" ? "Your address will be shared with the vendor. You will collect the items from the shop." :
-      "Your address and selected delivery or pickup option will be shared with the vendor.";
+    "Free home delivery to this address. The shop will confirm service area and timing." :
+    method === "pickup" ? "Your address will be shared with the shop. Collect your items from the store address shown above." :
+      "Your address and selected delivery or pickup option will be shared with the shop.";
   $("#checkout-summary .pricing-summary")?.replaceWith(pricingSummary());
 }
 
@@ -273,7 +273,7 @@ function setSaving(value) {
   $("#close-checkout").disabled = value;
   $("#customer-form").setAttribute("aria-busy", String(value));
   $("#submit-requirement").textContent = value ?
-    "Saving to order tracker..." : "Send my list via WhatsApp";
+    "Saving order request..." : "Send order request via WhatsApp";
   $("#save-status").hidden = !value;
 }
 
@@ -314,7 +314,7 @@ $("#reset-filters").addEventListener("click", () => {
   $("#search").focus();
 });
 function clearSelection() {
-  if (!window.confirm("Clear all products from your festive list?")) return;
+  if (!window.confirm("Remove all items from your cart?")) return;
   cart = {};
   saveCart();
   renderProducts();
@@ -348,35 +348,35 @@ $("#customer-form").addEventListener("submit", async event => {
         signal: AbortSignal.timeout(25000),
       });
     } catch {
-      throw new Error("We could not confirm saving your requirement. Keep this review open and retry with the same details to avoid duplicate records.");
+      throw new Error("We could not confirm saving your order request. Keep checkout open and retry with the same details to avoid duplicate records.");
     }
-    if (response.status === 429) throw new Error("Too many submissions. Wait a minute, then retry with this review open.");
+    if (response.status === 429) throw new Error("Too many attempts. Wait a minute, then retry with checkout open.");
     let result;
     try {
       result = await response.json();
     } catch {
-      throw new Error("The order tracker returned an unreadable response. Keep this review open and retry, or contact the shop.");
+      throw new Error("The order tracker returned an unreadable response. Keep checkout open and retry, or contact the shop.");
     }
     if (!response.ok) throw new Error(typeof result?.error === "string" ? result.error :
-      "We could not confirm saving your requirement. Keep this review open and retry.");
+      "We could not confirm saving your order request. Keep checkout open and retry.");
     const orderId = `SBC-${submission.requestId.toUpperCase()}`;
     if (result?.orderId !== orderId || typeof result.message !== "string" ||
         !result.message.startsWith(`Order ID: ${orderId}\n`) || result.message.length > 65536) {
-      throw new Error("The order tracker did not confirm the expected reference. Keep this review open and retry.");
+      throw new Error("The order tracker did not confirm the expected request ID. Keep checkout open and retry.");
     }
     fullMessage = result.message;
     const messages = prepareMessages(fullMessage);
     $("#full-message").value = fullMessage;
-    $("#order-reference").textContent = `Recorded in the vendor's order sheet. Reference: ${orderId}`;
+    $("#order-reference").textContent = `Order request ID: ${orderId}`;
     $("#recipient").textContent = `${vendor.name} \u00b7 ${vendor.phone}`;
     $("#message-title").textContent = messages.length === 1 ?
-      "Requirement saved" : "Send every part in WhatsApp";
+      "Order request saved" : "Send every part in WhatsApp";
     $("#handoff-instructions").textContent = messages.length === 1 ?
-      "Your list is saved. WhatsApp should open with your message. Tap Send there to share it with the shop. If it does not open, use the button below." :
-      `Your list is saved and split into ${messages.length} messages. Open each numbered part in order and tap Send in WhatsApp for every part. Opening a chat alone does not send it. All products and details are included across the parts. You can also copy or download the complete requirement below.`;
+      "Your order request is saved. WhatsApp should open with your message. Tap Send there to share it with the shop. If it does not open, use the button below. The shop will confirm your order." :
+      `Your order request is saved and split into ${messages.length} messages. Open each numbered part in order and tap Send in WhatsApp for every part. Opening a chat alone does not send it. All products and details are included across the parts. You can also copy or download the complete order request below. The shop will confirm your order.`;
     $("#message-links").replaceChildren(...messages.map((message, index) => {
       const link = element("a", "button primary wide", messages.length === 1 ?
-        "Send my list via WhatsApp \u2197" : `Send part ${index + 1} of ${messages.length} via WhatsApp \u2197`);
+        "Send order request via WhatsApp \u2197" : `Send part ${index + 1} of ${messages.length} via WhatsApp \u2197`);
       link.href = message.url;
       link.target = messages.length === 1 ? "_self" : "_blank";
       link.rel = "noopener noreferrer";
@@ -392,7 +392,7 @@ $("#customer-form").addEventListener("submit", async event => {
         $("#message-links a").click();
       } catch {
         console.warn("Automatic WhatsApp navigation was blocked by the browser.");
-        $("#handoff-instructions").textContent = "Your list is saved, but this browser could not open WhatsApp automatically. Tap Send my list via WhatsApp below, then tap Send in WhatsApp. Opening the chat alone does not send your list.";
+        $("#handoff-instructions").textContent = "Your order request is saved, but this browser could not open WhatsApp automatically. Tap Send order request via WhatsApp below, then tap Send in WhatsApp. Opening the chat alone does not send your order request. The shop will confirm your order.";
       }
     }
   } catch (error) {
@@ -411,7 +411,7 @@ $("#edit-details").addEventListener("click", () => {
 $("#copy-message").addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(fullMessage);
-    $("#copy-status").textContent = "Copied. Paste the complete requirement into the vendor's WhatsApp chat, then press Send.";
+    $("#copy-status").textContent = "Message copied. Paste the complete order request into the shop's WhatsApp chat, then tap Send.";
   } catch {
     $("#copy-status").textContent = "Clipboard access is unavailable. Select and copy the message below manually.";
     $("#full-message").focus();
@@ -422,7 +422,7 @@ $("#download-message").addEventListener("click", () => {
   const url = URL.createObjectURL(new Blob([fullMessage], { type: "text/plain;charset=utf-8" }));
   const link = element("a");
   link.href = url;
-  link.download = `sai-baba-requirement-${localDate()}.txt`;
+  link.download = `sai-baba-order-request-${localDate()}.txt`;
   document.body.append(link);
   link.click();
   link.remove();
@@ -431,7 +431,7 @@ $("#download-message").addEventListener("click", () => {
 window.addEventListener("storage", event => {
   if (event.key !== CART_KEY && event.key !== null) return;
   if ($("#checkout").open) {
-    showStorageWarning("The saved selection changed in another tab. This tab keeps its current review; check your list before sending.");
+    showStorageWarning("Your cart changed in another tab. This checkout keeps its current items; check your cart before sending an order request.");
     return;
   }
   try {
@@ -439,7 +439,7 @@ window.addEventListener("storage", event => {
     renderProducts();
     renderCart();
   } catch {
-    showStorageWarning("Another tab saved an invalid selection. This tab has kept your current list.", true);
+    showStorageWarning("Another tab saved an invalid cart. This tab has kept your current cart.", true);
   }
 });
 renderCategories();

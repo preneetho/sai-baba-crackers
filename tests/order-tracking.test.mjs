@@ -45,8 +45,8 @@ test("server recalculates catalogue amounts, ignores client totals and creates a
   assert.equal(order.items[0].price, 70);
   assert.ok(order.message.startsWith(`Order ID: ${order.orderId}\n`));
   assert.ok(order.message.includes("Free home delivery"));
-  assert.ok(order.message.includes("Home delivery charge: Rs.0.00 (FREE)"));
-  assert.ok(order.message.includes("Estimated total after discount: Rs.314.50"));
+  assert.ok(order.message.includes("Delivery fee: Rs.0.00 (FREE)"));
+  assert.ok(order.message.includes("Estimated total: Rs.314.50"));
   assert.equal(buildOrder(input, new Date("2026-11-03T10:00:00Z")).fingerprint, order.fingerprint);
   assert.notEqual(buildOrder({ ...input, customer: { ...input.customer, notes: "New notes" } }, now).fingerprint,
     order.fingerprint);
@@ -108,7 +108,7 @@ test("missing and invalid saved timestamps never produce a successful WhatsApp h
       Response.json({ ok: true, orderId: buildOrder(input, now).orderId, createdAt }));
     assert.equal(response.status, 503);
     const result = await response.json();
-    assert.ok(result.error.includes("recorded order time"));
+    assert.ok(result.error.includes("recorded order request time"));
     assert.equal(result.message, undefined);
   }
 });
