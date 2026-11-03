@@ -140,6 +140,7 @@ h2 { font-family: Georgia, "Times New Roman", serif; font-size: 27px; font-weigh
 .cart-footnote { font-size: 9px; color: var(--muted); text-align: center; margin-top: 12px; }
 .text-button { padding: 8px 0; font-size: 11px; background: transparent; border: 0; text-decoration: underline; text-underline-offset: 3px; min-height: 32px; }
 #clear-cart { display: block; margin: 4px auto; }
+#clear-cart-top { display: block; margin: 4px 0 0 auto; }
 .vendor-note { display: flex; gap: 11px; background: var(--soft); margin: 23px -8px -8px; padding: 15px 12px; border-radius: 8px; }
 .vendor-note > span { color: var(--brand); font-size: 23px; }
 .vendor-note p { font-size: 10px; color: var(--muted); line-height: 1.9; }
@@ -198,6 +199,7 @@ textarea { resize: vertical; }
 .optional { font-weight: 400; color: var(--muted); font-size: 10px; }
 .address-help { font-size: 11px; color: var(--muted); line-height: 1.7; margin-top: -8px; }
 .privacy-note { font-size: 11px; line-height: 1.8; color: var(--muted); margin: 17px 0; }
+.whatsapp-send-help { padding: 12px; margin: 17px 0; border: 1px solid var(--control-border); border-radius: 6px; background: var(--soft); color: var(--ink); font-size: 12px; line-height: 1.7; }
 .consent { display: flex; align-items: start; gap: 10px; font-size: 12px; line-height: 1.7; margin: 20px 0; }
 .consent input { accent-color: var(--brand); width: 18px; height: 18px; flex-shrink: 0; }
 .error { background: #fff0ed; color: #9a3025; font-size: 13px; padding: 12px; border: 1px solid #d49c91; border-radius: 6px; margin-bottom: 16px; }

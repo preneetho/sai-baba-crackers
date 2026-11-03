@@ -15,6 +15,39 @@ const customer = {
 };
 const today = "2026-11-02";
 
+test("the next-step button clearly leads to customer details without implying submission", async () => {
+  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  assert.match(html, /<button id="review" class="button primary wide" type="button" disabled>Next: Add your details <span aria-hidden="true">&#8594;<\/span><\/button>/);
+});
+
+test("the store-pickup option displays the collection address without preselecting fulfilment", async () => {
+  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const pickup = html.match(/<label class="fulfilment-option"><input id="fulfilment-pickup"[\s\S]*?<\/label>/)?.[0];
+  assert.ok(pickup);
+  assert.match(pickup, /value="pickup" required/);
+  assert.match(pickup, /<small>Industrial Estate, Main Road, Sanath Nagar<\/small>/);
+  assert.ok(pickup.includes(`<small>Phone: ${vendor.phone}</small>`));
+  assert.ok(pickup.indexOf("Industrial Estate, Main Road, Sanath Nagar") < pickup.indexOf("Phone:"));
+  assert.doesNotMatch(pickup, /\bchecked\b/);
+});
+
+test("the WhatsApp action explicitly explains the customer's final Send step", async () => {
+  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
+  assert.match(html, /id="submit-requirement"[^>]*aria-describedby="whatsapp-send-help">Send my list via WhatsApp<\/button>/);
+  assert.match(html, /id="whatsapp-send-help"[^>]*><strong>Tap Send in WhatsApp to finish\.<\/strong><br>Opening the chat alone does not send your list\./);
+  assert.match(app, /"Saving to order tracker\.\.\." : "Send my list via WhatsApp"/);
+  assert.doesNotMatch(html + app, /Save &(?:amp;)? open WhatsApp|Open WhatsApp chat/);
+});
+
+test("clear selection is available above and below the selected-items list", async () => {
+  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  assert.match(html, /<button id="clear-cart-top" class="text-button" type="button" hidden>Clear selection<\/button>/);
+  assert.match(html, /<button id="clear-cart" class="text-button" type="button" hidden>Clear selection<\/button>/);
+  assert.ok(html.indexOf('id="clear-cart-top"') < html.indexOf('id="cart-items"'));
+  assert.ok(html.indexOf('id="cart-items"') < html.indexOf('id="clear-cart"'));
+});
+
 test("the header uses only a lightweight static fireworks image", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
   assert.match(html, /<img class="hero-fireworks" src="\.\/diwali-fireworks\.png" alt="" width="420" height="340"/);

@@ -201,7 +201,9 @@ function renderCart() {
   $("#cart-count").textContent = lines.length;
   $("#cart-pricing").replaceChildren(pricingSummary(true));
   $("#review").disabled = lines.length === 0;
-  $("#clear-cart").hidden = lines.length === 0;
+  for (const button of document.querySelectorAll("#clear-cart, #clear-cart-top")) {
+    button.hidden = lines.length === 0;
+  }
   $("#mobile-cart").hidden = lines.length === 0;
   $("#mobile-cart-label").textContent = `${units} pack${units === 1 ? "" : "s"} \u00b7 ${money(total(cart))}`;
   if (!lines.length) {
@@ -271,7 +273,7 @@ function setSaving(value) {
   $("#close-checkout").disabled = value;
   $("#customer-form").setAttribute("aria-busy", String(value));
   $("#submit-requirement").textContent = value ?
-    "Saving to order tracker..." : "Save & open WhatsApp";
+    "Saving to order tracker..." : "Send my list via WhatsApp";
   $("#save-status").hidden = !value;
 }
 
@@ -311,14 +313,17 @@ $("#reset-filters").addEventListener("click", () => {
   renderProducts();
   $("#search").focus();
 });
-$("#clear-cart").addEventListener("click", () => {
+function clearSelection() {
   if (!window.confirm("Clear all products from your festive list?")) return;
   cart = {};
   saveCart();
   renderProducts();
   renderCart();
   $("#search").focus();
-});
+}
+for (const button of document.querySelectorAll("#clear-cart, #clear-cart-top")) {
+  button.addEventListener("click", clearSelection);
+}
 $("#customer-form").addEventListener("change", event => {
   if (event.target.name === "fulfilment") updateFulfilment();
 });
@@ -367,11 +372,11 @@ $("#customer-form").addEventListener("submit", async event => {
     $("#message-title").textContent = messages.length === 1 ?
       "Requirement saved" : "Send every part in WhatsApp";
     $("#handoff-instructions").textContent = messages.length === 1 ?
-      "Opening WhatsApp automatically. Press Send there to share your requirement. If WhatsApp does not open, tap the button below." :
-      `Your list needs ${messages.length} messages to keep links manageable. Open and SEND EACH numbered part in order. All products and details are included across the parts. You can also copy or download the complete requirement below.`;
+      "Your list is saved. WhatsApp should open with your message. Tap Send there to share it with the shop. If it does not open, use the button below." :
+      `Your list is saved and split into ${messages.length} messages. Open each numbered part in order and tap Send in WhatsApp for every part. Opening a chat alone does not send it. All products and details are included across the parts. You can also copy or download the complete requirement below.`;
     $("#message-links").replaceChildren(...messages.map((message, index) => {
       const link = element("a", "button primary wide", messages.length === 1 ?
-        "Open WhatsApp chat \u2197" : `Open WhatsApp \u00b7 part ${index + 1} of ${messages.length} \u2197`);
+        "Send my list via WhatsApp \u2197" : `Send part ${index + 1} of ${messages.length} via WhatsApp \u2197`);
       link.href = message.url;
       link.target = messages.length === 1 ? "_self" : "_blank";
       link.rel = "noopener noreferrer";
@@ -387,7 +392,7 @@ $("#customer-form").addEventListener("submit", async event => {
         $("#message-links a").click();
       } catch {
         console.warn("Automatic WhatsApp navigation was blocked by the browser.");
-        $("#handoff-instructions").textContent = "Your requirement is saved, but this browser could not open WhatsApp automatically. Tap Open WhatsApp chat below, then press Send in WhatsApp.";
+        $("#handoff-instructions").textContent = "Your list is saved, but this browser could not open WhatsApp automatically. Tap Send my list via WhatsApp below, then tap Send in WhatsApp. Opening the chat alone does not send your list.";
       }
     }
   } catch (error) {

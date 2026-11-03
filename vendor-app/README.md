@@ -35,6 +35,9 @@ npm.cmd run vendor:test
 - Confirm actual delivery and pickup arrangements and any local restrictions.
   Customers explicitly choose **free home delivery** or **store pickup**.
   The vendor confirms delivery service area, availability and timing.
+  Store pickup collects from **Industrial Estate, Main Road, Sanath Nagar**,
+  shown under the pickup option and in the contact section. The pickup option
+  also displays the primary shop phone number below the address.
 - Have the vendor confirm its licence, applicable rules for online fireworks
   enquiries/orders, age restrictions and the hosting provider's acceptable-use
   policy. This prototype is not legal clearance to trade.
@@ -68,6 +71,8 @@ border, with the selected quantity in bold. The existing quantity and selection
 announcement also identify the state without relying on colour alone. The
 highlight follows the cart across search, category filters, sorting and reloads,
 and disappears when the product's quantity returns to zero.
+Clear selection is available both above and below the selected-items list.
+Both controls use the same confirmation prompt and are hidden for an empty list.
 
 ### WhatsApp link preview
 
@@ -157,8 +162,11 @@ the server function, shared secret or spreadsheet credentials in public files.
 - Revisions create a new reference. The vendor must confirm which reference to
   fulfil and cancel obsolete enquiries. The vendor manages status directly in
   the sheet; status does not automatically track WhatsApp messages.
-- Customer details are included in the prepared WhatsApp link and shared when
-  it opens. For a single-part requirement, **Save & open WhatsApp** saves to the
+- **Next: Add your details** opens the review and customer-details screen.
+  Its **Send my list via WhatsApp** button has a prominent reminder to tap
+  **Send** inside WhatsApp; opening the chat alone does not send the list.
+  Customer details are included in the prepared WhatsApp link and loaded into
+  WhatsApp when it opens. For a single-part requirement, the button saves to the
   tracker first, then automatically follows the WhatsApp link in the same tab.
   No popup permission or extra preview-button tap is required for this attempt.
   If the browser blocks navigation, the recorded reference,

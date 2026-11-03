@@ -211,10 +211,11 @@
       <aside id="requirement" class="requirement" aria-labelledby="requirement-title">
         <div class="cart-title"><h2 id="requirement-title">Your festive list</h2><span id="cart-count" class="count-pill">0</span></div>
         <p class="cart-subtitle">A little of this. A little of that.</p>
+        <button id="clear-cart-top" class="text-button" type="button" hidden>Clear selection</button>
         <div id="cart-items"></div>
         <div id="cart-pricing"></div>
         <p class="estimate-note">Final prices and availability will be confirmed by the vendor.</p>
-        <button id="review" class="button primary wide" type="button" disabled>Review requirement <span aria-hidden="true">&#8594;</span></button>
+        <button id="review" class="button primary wide" type="button" disabled>Next: Add your details <span aria-hidden="true">&#8594;</span></button>
         <p class="cart-footnote">Free home delivery or store pickup. No payment now.</p>
         <button id="clear-cart" class="text-button" type="button" hidden>Clear selection</button>
         <div class="vendor-note"><span aria-hidden="true">&#10022;</span><p><strong>Need a hand choosing?</strong><br><a id="vendor-call" href="tel:+919849293951">Call the shop</a> for a little festive advice.</p></div>
@@ -222,7 +223,7 @@
     </div>
 
     <section id="contact" class="contact-section" aria-labelledby="contact-title">
-      <div><p class="eyebrow brand-text">YOUR NEIGHBOURHOOD FESTIVE STOP</p><h2 id="contact-title">Come for the crackers.<br>Stay for the festive spirit.</h2><p>Sai Baba Crackers Centre<br>Sanathnagar, Hyderabad</p></div>
+      <div><p class="eyebrow brand-text">YOUR NEIGHBOURHOOD FESTIVE STOP</p><h2 id="contact-title">Come for the crackers.<br>Stay for the festive spirit.</h2><p>Sai Baba Crackers Centre<br>Industrial Estate, Main Road, Sanath Nagar<br>Hyderabad</p></div>
       <div class="contact-details"><h3>Let's make your list</h3><a href="tel:+919849293951">+91 98492 93951</a><a href="tel:+919000592233">+91 90005 92233</a><p>Free home delivery or store pickup.<br>Contact the shop to confirm availability,<br>delivery area and timing.</p></div>
     </section>
     <section class="fine-print" aria-label="Important information"><p><strong>Celebrate responsibly.</strong> Follow local rules, age restrictions and product safety instructions. This site collects enquiries only; it does not confirm a sale. Free home delivery availability, service area and timing must be confirmed by the vendor.</p><p>Vendor's printed terms: goods once sold cannot be returned or exchanged; manufacturing defects are subject to the manufacturer's terms. Applicable consumer rights are not excluded.</p></section>
@@ -240,7 +241,7 @@
         <legend>How would you like to receive your items? <span aria-hidden="true">*</span></legend>
         <div class="fulfilment-grid">
           <label class="fulfilment-option"><input id="fulfilment-delivery" type="radio" name="fulfilment" value="delivery" required><span><strong>Home delivery</strong><small class="free-badge">FREE</small></span></label>
-          <label class="fulfilment-option"><input id="fulfilment-pickup" type="radio" name="fulfilment" value="pickup" required><span><strong>Store pickup</strong><small>Collect from the shop</small></span></label>
+          <label class="fulfilment-option"><input id="fulfilment-pickup" type="radio" name="fulfilment" value="pickup" required><span><strong>Store pickup</strong><small>Industrial Estate, Main Road, Sanath Nagar</small><small>Phone: +91 98492 93951</small></span></label>
         </div>
         <p class="fulfilment-help">Choose one option. Delivery area and timing will be confirmed by the vendor.</p>
       </fieldset>
@@ -256,7 +257,8 @@
       <label class="consent"><input id="consent" type="checkbox" required><span>I agree to save my details and requirement in the vendor's Google Sheet and share them through WhatsApp. I understand this is not a confirmed order.</span></label>
       <p id="save-status" class="privacy-note" role="status" hidden>Saving your requirement to the vendor's order tracker. Please keep this review open.</p>
       <p id="form-error" class="error" role="alert" tabindex="-1" hidden></p>
-      <button id="submit-requirement" class="button primary wide" type="submit">Save &amp; open WhatsApp</button>
+      <p id="whatsapp-send-help" class="whatsapp-send-help"><strong>Tap Send in WhatsApp to finish.</strong><br>Opening the chat alone does not send your list.</p>
+      <button id="submit-requirement" class="button primary wide" type="submit" aria-describedby="whatsapp-send-help">Send my list via WhatsApp</button>
     </form>
     <section id="message-preview" aria-labelledby="message-title" hidden>
       <h3 id="message-title">Requirement saved</h3>
