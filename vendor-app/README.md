@@ -50,25 +50,24 @@ The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon
 The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
 experience, the 15% discount and delivery/pickup options. Delivery area and timing
 remain subject to shop confirmation.
-The header uses an original golden-fireworks animation, not a copied Pinterest
-clip. The bundled `diwali-fireworks.mp4` is a silent, four-second H.264 Baseline
-video of about 146 KB, with `playsinline` for mobile playback. It plays once when the artwork
-enters view, then shows `diwali-fireworks-poster.png`. Play, Pause and Replay
-controls remain available if autoplay is blocked or the animation was missed.
-Scrolling away or switching tabs pauses it; it does not loop or restart on every
-scroll. Reduced-motion mode shows only the poster and does not request the video.
-The poster also works without JavaScript or when video playback fails.
-Fixed media dimensions prevent layout shift. Mobile artwork is fully visible
-in its own grid column beside the header links and metadata, rather than a faint
-absolute-positioned background. It scales down further on very narrow screens.
-The original GIF and still remain
-available at their old URLs for cached pages. No external media service,
-animation library or new runtime dependency is used.
+The header uses the bundled static `diwali-fireworks.png` image (about 41 KB).
+There is no active GIF, video, autoplay or playback control. The image works
+without JavaScript and has fixed dimensions to prevent layout shift. Mobile
+artwork is fully visible in its own grid column beside the header links and
+metadata, scaling down further on very narrow screens. Older animation assets
+and their module remain at their original URLs for previously cached pages,
+but the current page neither imports the animation module nor loads those assets.
+No external media service or new runtime dependency is used.
 Changing the theme does not change order recording, pricing or WhatsApp messages.
 Product cards use bundled SVG illustrations matched to the cracker type, with
 specific variants for items such as rockets, sparklers, garlands and flower pots.
 These are illustrative, not manufacturer product photos. On mobile, the artwork
 band is 56 px high with a 40 px illustration; desktop artwork remains larger.
+Selected product cards use a warm-gold background, gold artwork band and stronger
+border, with the selected quantity in bold. The existing quantity and selection
+announcement also identify the state without relying on colour alone. The
+highlight follows the cart across search, category filters, sorting and reloads,
+and disappears when the product's quantity returns to zero.
 
 ### WhatsApp link preview
 

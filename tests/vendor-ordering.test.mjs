@@ -15,56 +15,24 @@ const customer = {
 };
 const today = "2026-11-02";
 
-test("header video is finite, silent, mobile-compatible and ready for progressive playback", async () => {
+test("the header uses only a lightweight static fireworks image", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
-  assert.match(html, /<video id="hero-fireworks" muted playsinline preload="none" data-src="\.\/diwali-fireworks\.mp4"/);
-  assert.doesNotMatch(html, /\bloop\b|<video[^>]*\ssrc=/);
-  assert.match(html, /<img src="\.\/diwali-fireworks-poster\.png" alt="" width="420" height="340"/);
-  assert.match(html, /<button id="fireworks-toggle"[^>]*aria-controls="hero-fireworks" hidden>Play fireworks/);
+  assert.match(html, /<img class="hero-fireworks" src="\.\/diwali-fireworks\.png" alt="" width="420" height="340"/);
+  assert.doesNotMatch(html, /<video\b|fireworks-toggle|\.gif\b|\.mp4\b/);
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
-  assert.match(app, /renderCategories\(\);\s*renderProducts\(\);\s*renderCart\(\);\s*initializeFireworks\(\);\s*$/);
-  assert.equal([...app.matchAll(/initializeFireworks\(\)/g)].length, 1);
-  const mp4 = await readFile(new URL("../vendor-app/diwali-fireworks.mp4", import.meta.url));
-  assert.ok(mp4.length < 180 * 1024, "decorative video must stay below 180 KB");
-  function boxes(start, end) {
-    const result = [];
-    for (let offset = start; offset < end;) {
-      const size = mp4.readUInt32BE(offset);
-      assert.ok(size >= 8 && offset + size <= end, "invalid MP4 box");
-      result.push({ type: mp4.toString("ascii", offset + 4, offset + 8), offset, data: offset + 8, end: offset + size });
-      offset += size;
-    }
-    return result;
-  }
-  const top = boxes(0, mp4.length);
-  const movie = top.find(box => box.type === "moov");
-  assert.ok(movie.offset < top.find(box => box.type === "mdat").offset, "metadata must precede video data for mobile startup");
-  const children = boxes(movie.data, movie.end);
-  const timing = children.find(box => box.type === "mvhd");
-  assert.equal(mp4[timing.data], 0);
-  const duration = mp4.readUInt32BE(timing.data + 16) / mp4.readUInt32BE(timing.data + 12);
-  assert.equal(duration, 4);
-  const tracks = children.filter(box => box.type === "trak");
-  assert.equal(tracks.length, 1, "the decorative clip must have no audio track");
-  const track = boxes(tracks[0].data, tracks[0].end);
-  const dimensions = track.find(box => box.type === "tkhd");
-  assert.equal(mp4.readUInt32BE(dimensions.end - 8) / 65536, 420);
-  assert.equal(mp4.readUInt32BE(dimensions.end - 4) / 65536, 340);
-  const media = track.find(box => box.type === "mdia");
-  const mediaChildren = boxes(media.data, media.end);
-  const handler = mediaChildren.find(box => box.type === "hdlr");
-  assert.equal(mp4.toString("ascii", handler.data + 8, handler.data + 12), "vide");
-  const info = mediaChildren.find(box => box.type === "minf");
-  const table = boxes(info.data, info.end).find(box => box.type === "stbl");
-  const descriptions = boxes(table.data, table.end).find(box => box.type === "stsd");
-  const sample = boxes(descriptions.data + 8, descriptions.end)[0];
-  assert.equal(sample.type, "avc1", "use widely supported H.264");
-  const codec = boxes(sample.data + 78, sample.end).find(box => box.type === "avcC");
-  assert.equal(mp4[codec.data + 1], 66, "H.264 Baseline is required for mobile compatibility");
-  const poster = await readFile(new URL("../vendor-app/diwali-fireworks-poster.png", import.meta.url));
-  assert.deepEqual([...poster.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
-  assert.equal(poster.readUInt32BE(16), 420);
-  assert.equal(poster.readUInt32BE(20), 340);
+  assert.doesNotMatch(app, /initializeFireworks|hero-fireworks\.mjs/);
+  const image = await readFile(new URL("../vendor-app/diwali-fireworks.png", import.meta.url));
+  assert.ok(image.length < 60 * 1024, "header image must stay below 60 KB");
+  assert.deepEqual([...image.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(image.readUInt32BE(16), 420);
+  assert.equal(image.readUInt32BE(20), 340);
+});
+
+test("selected product cards highlight their full surface and artwork without changing card geometry", async () => {
+  const css = await readFile(new URL("../vendor-app/styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.product-card\.in-cart\s*\{[^}]*border-color: var\(--selected-border\);[^}]*background: var\(--selected-surface\);[^}]*box-shadow: inset 0 0 0 1px var\(--selected-border\);/);
+  assert.match(css, /\.product-card\.in-cart \.product-art\s*\{[^}]*background: var\(--selected-art\);/);
+  assert.match(css, /\.product-card\.in-cart \.quantity-control > span\s*\{[^}]*font-weight: 750;/);
 });
 
 function fireworksFixture(reduced = false) {
@@ -112,7 +80,7 @@ function fireworksFixture(reduced = false) {
   };
 }
 
-test("fireworks start only in view, stay muted and support pause, replay and offscreen stopping", async () => {
+test("legacy cached-page fireworks support visibility, mute, pause and replay", async () => {
   const scene = fireworksFixture();
   assert.equal(scene.video.hasAttribute("src"), false);
   scene.visible(true);
@@ -140,7 +108,7 @@ test("fireworks start only in view, stay muted and support pause, replay and off
   assert.equal(scene.video.plays, 3, "scrolling back must not repeatedly autoplay");
 });
 
-test("blocked autoplay preserves the poster and allows a user-initiated retry", async t => {
+test("legacy cached-page blocked autoplay preserves the poster and manual retry", async t => {
   const warning = t.mock.method(console, "warn", () => {});
   const scene = fireworksFixture();
   scene.video.playError = new DOMException("Autoplay blocked", "NotAllowedError");
@@ -156,7 +124,7 @@ test("blocked autoplay preserves the poster and allows a user-initiated retry", 
   assert.ok(scene.classes.has("is-playing"));
 });
 
-test("reduced motion never requests video and changing the preference stops playback", async () => {
+test("legacy cached-page reduced motion prevents video requests and stops playback", async () => {
   const scene = fireworksFixture(true);
   scene.visible(true);
   assert.equal(scene.video.plays, 0);
@@ -173,7 +141,7 @@ test("reduced motion never requests video and changing the preference stops play
   assert.equal(scene.button.hidden, true);
 });
 
-test("hidden tabs do not start playback and pending playback cannot override a stop", async () => {
+test("legacy cached-page playback respects hidden tabs and pending stops", async () => {
   const scene = fireworksFixture();
   scene.hidden(true);
   scene.visible(true);
@@ -196,7 +164,7 @@ test("hidden tabs do not start playback and pending playback cannot override a s
   assert.equal(scene.classes.has("is-playing"), false);
 });
 
-test("video decoding errors keep the still image visible and make a reload possible", async t => {
+test("legacy cached-page decoding errors preserve the poster and retry", async t => {
   const warning = t.mock.method(console, "warn", () => {});
   const scene = fireworksFixture();
   scene.visible(true);

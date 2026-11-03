@@ -23,6 +23,7 @@ const files = new Map([
   ["/diwali-header-still.png", ["diwali-header-still.png", "image/png"]],
   ["/diwali-fireworks.mp4", ["diwali-fireworks.mp4", "video/mp4"]],
   ["/diwali-fireworks-poster.png", ["diwali-fireworks-poster.png", "image/png"]],
+  ["/diwali-fireworks.png", ["diwali-fireworks.png", "image/png"]],
 ]);
 const server = createServer(async (request, response) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
