@@ -267,10 +267,18 @@
       <p class="recipient">Shop: <strong id="recipient"></strong></p>
       <p id="pdf-details" class="privacy-note" hidden><a id="pdf-link" class="button secondary" target="_blank" rel="noopener noreferrer">Download order PDF</a><span id="pdf-expiry"></span></p>
       <div id="message-links"></div>
+      <details id="whatsapp-recovery" class="whatsapp-recovery">
+        <summary>WhatsApp closed or did not open?</summary>
+        <p>Use your saved order request. There is no need to submit again. Copy the message, open the shop's chat, paste it and tap Send.</p>
+        <div class="message-tools"><button id="copy-whatsapp-message" class="button secondary" type="button">1. Copy WhatsApp message</button><a id="open-shop-chat" class="button secondary" target="_self" rel="noopener noreferrer">2. Open shop chat</a></div>
+        <p>If the chat link also closes, open WhatsApp yourself and start a chat with <strong id="recovery-phone"></strong>. Paste the copied message and tap Send.</p>
+        <p id="whatsapp-copy-status" role="status"></p>
+        <label class="message-label" for="whatsapp-message">Message to paste into WhatsApp</label><textarea id="whatsapp-message" rows="5" readonly></textarea>
+      </details>
       <label class="message-label" for="full-message">Your complete order request</label><textarea id="full-message" rows="10" readonly></textarea>
       <div class="message-tools"><button id="copy-message" class="button secondary" type="button">Copy full order request</button><button id="download-message" class="button secondary" type="button">Download order request</button><button id="edit-details" class="text-button" type="button">Edit details</button></div>
       <p id="copy-status" role="status"></p>
-      <p class="privacy-note">Your order request is saved. Opening WhatsApp does not send the message or confirm an order. Tap Send inside WhatsApp. If a link does not work, copy the complete message into the shop's chat. Changing recorded details creates a new request ID; tell the shop which request to use.</p>
+      <p class="privacy-note">Your order request is saved. Opening WhatsApp does not send the message or confirm an order. Tap Send inside WhatsApp. If WhatsApp closes or does not open, use the copy-and-open option above. Changing recorded details creates a new request ID; tell the shop which request to use.</p>
     </section>
   </dialog>
   <noscript><div class="noscript">Enable JavaScript to add items to your cart, or call the shop on +91 98492 93951.</div></noscript>

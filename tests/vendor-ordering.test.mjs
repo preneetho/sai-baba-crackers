@@ -71,6 +71,21 @@ test("long-cart totals and checkout product names can wrap on narrow screens", a
   assert.match(css, /\.review-line > span\s*\{[^}]*min-width: 0;[^}]*overflow-wrap: anywhere;/);
 });
 
+test("WhatsApp recovery reuses the prepared PDF summary and offers a phone-only chat without resubmitting", async () => {
+  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
+  assert.match(html, /id="whatsapp-recovery"[^>]*>[\s\S]*?<summary>WhatsApp closed or did not open\?<\/summary>/);
+  assert.match(html, /id="copy-whatsapp-message"[^>]*type="button"/);
+  assert.match(html, /id="open-shop-chat"[^>]*target="_self"/);
+  assert.match(html, /id="whatsapp-message"[^>]*readonly/);
+  assert.match(app, /\$\("#whatsapp-message"\)\.value = message\.text/);
+  assert.match(app, /const chatUrl = new URL\(message\.url\);\s*chatUrl\.search = "";/);
+  assert.match(app, /clipboard\.writeText\(\$\("#whatsapp-message"\)\.value\)/);
+  assert.match(app, /\$\("#whatsapp-message"\)\.select\(\)/);
+  assert.match(app, /\$\("#whatsapp-message"\)\.value = ""/);
+  assert.match(app, /without submitting again/);
+});
+
 test("clear cart is available above and below the cart items", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
   assert.match(html, /<button id="clear-cart-top" class="text-button" type="button" hidden>Clear cart<\/button>/);

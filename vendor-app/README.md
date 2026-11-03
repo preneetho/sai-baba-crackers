@@ -189,6 +189,14 @@ the server function, shared secret or spreadsheet credentials in public files.
   Save or acknowledgement failures stay on the form and never launch WhatsApp.
   Customers still press **Send** inside WhatsApp; the site cannot verify that a
   message was sent or delivered.
+- If WhatsApp immediately closes or does not open, the saved screen includes
+  **WhatsApp closed or did not open?** as an optional recovery panel. It copies
+  the exact prepared WhatsApp message: the short PDF-linked summary for long
+  orders, or the unchanged full message for short orders. **Open shop chat**
+  uses a phone-only link without prefilled text; customers paste and tap Send.
+  If that link also fails, the shop number and selectable message are available
+  for opening WhatsApp manually. Clipboard failures are explicit. These actions
+  never submit another order or replace the original automatic handoff.
 - Each encoded WhatsApp URL is capped at a conservative 1,800 characters.
   Short requests keep the complete WhatsApp message unchanged. Only requests
   exceeding that limit use one short summary instead: request ID, original IST

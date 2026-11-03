@@ -60,5 +60,10 @@ Verify the vendor's WhatsApp number, catalogue, licensing and applicable local
 rules before sharing the public URL. Opening a WhatsApp link does not send the
 message; customers must press Send in WhatsApp.
 
+If WhatsApp closes or fails to open, expand **WhatsApp closed or did not open?**
+on the saved screen. Copy the prepared message, open the phone-only shop chat,
+paste and tap Send. Long-order copies include the PDF link. This optional
+recovery does not save another order; the normal automatic handoff is unchanged.
+
 See [the app guide](vendor-app/README.md) for configuration, hosting, privacy
 and WhatsApp handoff details.

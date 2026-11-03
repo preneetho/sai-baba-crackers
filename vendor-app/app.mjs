@@ -291,6 +291,10 @@ $("#checkout").addEventListener("close", () => {
   $("#pdf-details").hidden = true;
   $("#pdf-link").removeAttribute("href");
   $("#pdf-expiry").textContent = "";
+  $("#whatsapp-recovery").open = false;
+  $("#whatsapp-message").value = "";
+  $("#whatsapp-copy-status").textContent = "";
+  $("#open-shop-chat").removeAttribute("href");
   lastReviewTrigger?.focus({ preventScroll: true });
 });
 $("#review").addEventListener("click", showReview);
@@ -383,13 +387,21 @@ $("#customer-form").addEventListener("submit", async event => {
       }).format(new Date(pdf.expiresAt));
       $("#pdf-expiry").textContent = ` Link expires ${expiry} IST. Anyone with the link can open it.`;
     }
+    $("#whatsapp-recovery").open = false;
+    $("#whatsapp-message").value = message.text;
+    $("#whatsapp-copy-status").textContent = "";
+    const chatUrl = new URL(message.url);
+    chatUrl.search = "";
+    $("#open-shop-chat").href = chatUrl.href;
+    $("#recovery-phone").textContent = vendor.phone;
     $("#full-message").value = fullMessage;
     $("#order-reference").textContent = `Order request ID: ${orderId}`;
     $("#recipient").textContent = `${vendor.name} \u00b7 ${vendor.phone}`;
     $("#message-title").textContent = "Order request saved";
     $("#handoff-instructions").textContent = message.isSummary ?
-      "Your complete order request is saved. WhatsApp will open with one short summary, your request ID and a PDF link valid for 7 days. The PDF contains every item and your customer details; the shop also has the full record in its Google Sheet. Tap Send in WhatsApp. Your complete order request is also available below. The shop will confirm your order." :
+      "Your complete order request is saved. WhatsApp should open with one short summary, your request ID and a PDF link valid for 7 days. The PDF contains every item and your customer details; the shop also has the full record in its Google Sheet. Tap Send in WhatsApp. Your complete order request is also available below. The shop will confirm your order." :
       "Your order request is saved. WhatsApp should open with your message. Tap Send there to share it with the shop. If it does not open, use the button below. The shop will confirm your order.";
+    $("#handoff-instructions").textContent += " If WhatsApp closes or does not open, use the copy-and-open option below without submitting again.";
     const link = element("a", "button primary wide", "Send order request via WhatsApp \u2197");
     link.href = message.url;
     link.target = "_self";
@@ -404,6 +416,7 @@ $("#customer-form").addEventListener("submit", async event => {
       link.click();
     } catch {
       console.warn("Automatic WhatsApp navigation was blocked by the browser.");
+      $("#whatsapp-recovery").open = true;
       $("#handoff-instructions").textContent += " This browser could not open WhatsApp automatically. Tap Send order request via WhatsApp below, then tap Send in WhatsApp. Opening the chat alone does not send your order request.";
     }
   } catch (error) {
@@ -427,6 +440,16 @@ $("#copy-message").addEventListener("click", async () => {
     $("#copy-status").textContent = "Clipboard access is unavailable. Select and copy the message below manually.";
     $("#full-message").focus();
     $("#full-message").select();
+  }
+});
+$("#copy-whatsapp-message").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText($("#whatsapp-message").value);
+    $("#whatsapp-copy-status").textContent = "Message copied. Open the shop's chat, paste the message, then tap Send.";
+  } catch {
+    $("#whatsapp-copy-status").textContent = "Clipboard access is unavailable. Select and copy the WhatsApp message below, then paste it into the shop's chat and tap Send.";
+    $("#whatsapp-message").focus();
+    $("#whatsapp-message").select();
   }
 });
 $("#download-message").addEventListener("click", () => {
