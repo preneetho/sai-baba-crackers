@@ -2,8 +2,11 @@
 
 Mobile-friendly 2026 catalogue with 68 products, a saved cart, an automatic
 15% discount, free home delivery or store pickup, and a customer-reviewed
-WhatsApp order request including the customer's name, mobile number and address.
+order request including the customer's name, mobile number and address.
 Order requests are saved to the vendor's Google Sheet before WhatsApp is prepared.
+Short orders share the complete WhatsApp message. Long orders send one short
+summary with the request ID; all items and customer details remain in the
+shop's Google Sheet and in the complete request available on the page.
 The frontend is static; a Netlify Function securely calls the vendor's Apps Script
 web app. No customer accounts, payments or npm dependencies are required.
 
@@ -38,4 +41,4 @@ rules before sharing the public URL. Opening a WhatsApp link does not send the
 message; customers must press Send in WhatsApp.
 
 See [the app guide](vendor-app/README.md) for configuration, hosting, privacy
-and message-splitting details.
+and WhatsApp handoff details.

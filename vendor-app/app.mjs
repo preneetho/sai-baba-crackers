@@ -1,5 +1,5 @@
 import { products, categories, vendor } from "./catalog.mjs";
-import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, total, money, localDate, validateCustomer, prepareMessages } from "./order.mjs";
+import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, total, money, localDate, validateCustomer, prepareOrderMessage } from "./order.mjs";
 
 const $ = selector => document.querySelector(selector);
 let cart = {};
@@ -361,39 +361,35 @@ $("#customer-form").addEventListener("submit", async event => {
       "We could not confirm saving your order request. Keep checkout open and retry.");
     const orderId = `SBC-${submission.requestId.toUpperCase()}`;
     if (result?.orderId !== orderId || typeof result.message !== "string" ||
-        !result.message.startsWith(`Order ID: ${orderId}\n`) || result.message.length > 65536) {
+        !result.message.startsWith(`Order ID: ${orderId}\n`) || result.message.length > 65536 ||
+        (result.summary !== undefined && (typeof result.summary !== "string" ||
+          !result.summary.startsWith(`Order ID: ${orderId}\n`) || result.summary.length > 65536))) {
       throw new Error("The order tracker did not confirm the expected request ID. Keep checkout open and retry.");
     }
     fullMessage = result.message;
-    const messages = prepareMessages(fullMessage);
+    const message = prepareOrderMessage(fullMessage, result.summary);
     $("#full-message").value = fullMessage;
     $("#order-reference").textContent = `Order request ID: ${orderId}`;
     $("#recipient").textContent = `${vendor.name} \u00b7 ${vendor.phone}`;
-    $("#message-title").textContent = messages.length === 1 ?
-      "Order request saved" : "Send every part in WhatsApp";
-    $("#handoff-instructions").textContent = messages.length === 1 ?
-      "Your order request is saved. WhatsApp should open with your message. Tap Send there to share it with the shop. If it does not open, use the button below. The shop will confirm your order." :
-      `Your order request is saved and split into ${messages.length} messages. Open each numbered part in order and tap Send in WhatsApp for every part. Opening a chat alone does not send it. All products and details are included across the parts. You can also copy or download the complete order request below. The shop will confirm your order.`;
-    $("#message-links").replaceChildren(...messages.map((message, index) => {
-      const link = element("a", "button primary wide", messages.length === 1 ?
-        "Send order request via WhatsApp \u2197" : `Send part ${index + 1} of ${messages.length} via WhatsApp \u2197`);
-      link.href = message.url;
-      link.target = messages.length === 1 ? "_self" : "_blank";
-      link.rel = "noopener noreferrer";
-      return link;
-    }));
+    $("#message-title").textContent = "Order request saved";
+    $("#handoff-instructions").textContent = message.isSummary ?
+      "Your complete order request is saved. WhatsApp will open with one short summary and your request ID. The shop can find every item and your customer details in its Google Sheet using that ID. Tap Send in WhatsApp. Your complete order request is also available below. The shop will confirm your order." :
+      "Your order request is saved. WhatsApp should open with your message. Tap Send there to share it with the shop. If it does not open, use the button below. The shop will confirm your order.";
+    const link = element("a", "button primary wide", "Send order request via WhatsApp \u2197");
+    link.href = message.url;
+    link.target = "_self";
+    link.rel = "noopener noreferrer";
+    $("#message-links").replaceChildren(link);
     $("#customer-form").hidden = true;
     $("#message-preview").hidden = false;
     $("#copy-status").textContent = "";
     $("#message-title").tabIndex = -1;
     $("#message-title").focus();
-    if (messages.length === 1) {
-      try {
-        $("#message-links a").click();
-      } catch {
-        console.warn("Automatic WhatsApp navigation was blocked by the browser.");
-        $("#handoff-instructions").textContent = "Your order request is saved, but this browser could not open WhatsApp automatically. Tap Send order request via WhatsApp below, then tap Send in WhatsApp. Opening the chat alone does not send your order request. The shop will confirm your order.";
-      }
+    try {
+      link.click();
+    } catch {
+      console.warn("Automatic WhatsApp navigation was blocked by the browser.");
+      $("#handoff-instructions").textContent += " This browser could not open WhatsApp automatically. Tap Send order request via WhatsApp below, then tap Send in WhatsApp. Opening the chat alone does not send your order request.";
     }
   } catch (error) {
     $("#form-error").textContent = error.message;

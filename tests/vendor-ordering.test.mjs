@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { products, categories, vendor } from "../vendor-app/catalog.mjs";
 import {
   sanitizeCart, cartLines, pricing, total, money, validateCustomer, createRequirement,
-  whatsappUrl, prepareMessages, localDate,
+  whatsappUrl, prepareMessages, prepareOrderMessage, MAX_WHATSAPP_URL_LENGTH, localDate,
 } from "../vendor-app/order.mjs";
 import { initializeFireworks } from "../vendor-app/hero-fireworks.mjs";
 
@@ -47,6 +47,26 @@ test("the WhatsApp action explicitly explains the customer's final Send step", a
   assert.match(app, /"Saving order request\.\.\." : "Send order request via WhatsApp"/);
   assert.match(app, /"Send order request via WhatsApp \\u2197"/);
   assert.doesNotMatch(html + app, /Save &(?:amp;)? open WhatsApp|Open WhatsApp chat/);
+});
+
+test("the active checkout uses one WhatsApp message and retains the complete request for copy/download", async () => {
+  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
+  assert.match(app, /prepareOrderMessage\(fullMessage, result\.summary\)/);
+  assert.match(app, /link\.target = "_self"/);
+  assert.match(app, /replaceChildren\(link\)/);
+  assert.match(app, /one short summary and your request ID/);
+  assert.doesNotMatch(app, /prepareMessages|Send part|Send every part|split into|"_blank"/);
+  assert.match(app, /\$\("#full-message"\)\.value = fullMessage/);
+  assert.match(app, /clipboard\.writeText\(fullMessage\)/);
+  assert.match(html, /For long orders, this is a short summary with your request ID/);
+  assert.match(html, /id="copy-message"[^>]*>Copy full order request<\/button>/);
+});
+
+test("long-cart totals and checkout product names can wrap on narrow screens", async () => {
+  const css = await readFile(new URL("../vendor-app/styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.cart-total\s*\{[^}]*flex-wrap: wrap;/);
+  assert.match(css, /\.review-line > span\s*\{[^}]*min-width: 0;[^}]*overflow-wrap: anywhere;/);
 });
 
 test("clear cart is available above and below the cart items", async () => {
@@ -447,6 +467,39 @@ test("short requirements use one unmodified message", () => {
   assert.equal(result[0].text, message);
 });
 
+test("single-message checkout keeps short requests unchanged and switches only above the encoded URL limit", () => {
+  const text = "x".repeat(MAX_WHATSAPP_URL_LENGTH - whatsappUrl("").length);
+  const summary = "Order request summary";
+  const atLimit = prepareOrderMessage(text, summary);
+  assert.equal(atLimit.isSummary, false);
+  assert.equal(atLimit.text, text);
+  assert.equal(atLimit.url.length, MAX_WHATSAPP_URL_LENGTH);
+  const aboveLimit = prepareOrderMessage(text + "x", summary);
+  assert.equal(aboveLimit.isSummary, true);
+  assert.equal(aboveLimit.text, summary);
+  assert.equal(new URL(aboveLimit.url).searchParams.get("text"), summary);
+  assert.ok(aboveLimit.url.length <= MAX_WHATSAPP_URL_LENGTH);
+  const withApostrophe = text.slice(0, -1) + "'";
+  assert.equal(whatsappUrl(withApostrophe).length, MAX_WHATSAPP_URL_LENGTH);
+  assert.ok(new URL(whatsappUrl(withApostrophe)).href.length > MAX_WHATSAPP_URL_LENGTH);
+  assert.equal(prepareOrderMessage(withApostrophe, summary).isSummary, true);
+  const short = createRequirement({ 1: 1 }, customer, today);
+  assert.equal(prepareOrderMessage(short).text, short);
+});
+
+test("Unicode uses the encoded link budget and long orders never silently split or lose a missing summary", () => {
+  const text = "🎉".repeat(200);
+  assert.ok(text.length < MAX_WHATSAPP_URL_LENGTH);
+  assert.ok(whatsappUrl(text).length > MAX_WHATSAPP_URL_LENGTH);
+  const summary = "Order ID: SBC-123\nCustomer: రవి";
+  assert.equal(prepareOrderMessage(text, summary).text, summary);
+  for (const invalid of [undefined, null, "", 42, {}]) {
+    assert.throws(() => prepareOrderMessage(text, invalid), /did not provide a WhatsApp summary/);
+  }
+  assert.throws(() => prepareOrderMessage(text, "x".repeat(2000)), /summary is too long/);
+  assert.throws(() => prepareOrderMessage(""), /empty/);
+});
+
 function assertLosslessSplit(text, maximum = 1800) {
   const messages = prepareMessages(text, vendor.whatsapp, maximum);
   assert.ok(messages.length > 1);
@@ -460,7 +513,7 @@ function assertLosslessSplit(text, maximum = 1800) {
   assert.equal(reconstructed, text);
 }
 
-test("a basket containing all 68 products preserves both fulfilment options when split", () => {
+test("the legacy splitter preserves all 68 products and both fulfilment options for cached pages", () => {
   const cart = Object.fromEntries(products.map(product => [product.id, 99]));
   for (const fulfilment of ["delivery", "pickup"]) {
     const text = createRequirement(cart, { ...customer, fulfilment }, today);
@@ -470,7 +523,7 @@ test("a basket containing all 68 products preserves both fulfilment options when
   }
 });
 
-test("Unicode customer details, long notes and huge individual lines split losslessly", () => {
+test("the legacy splitter retains Unicode customer details, long notes and huge individual lines losslessly", () => {
   const text = createRequirement({ 1: 2 }, {
     ...customer, name: "రవి కుమార్", address: "హైదరాబాద్ 500018\n".repeat(25),
     notes: "దీపావళి 🎉 ".repeat(35),

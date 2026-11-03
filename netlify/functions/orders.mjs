@@ -65,6 +65,24 @@ function orderTime(createdAt) {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} IST`;
 }
 
+function orderSummary(order, savedAt) {
+  const packs = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  return [
+    `Order ID: ${order.orderId}`,
+    `Order date & time: ${orderTime(savedAt)}`,
+    "Order request summary",
+    `Customer: ${order.customer.name}`,
+    `Mobile: +91 ${order.customer.phone}`,
+    `Items: ${order.items.length} product${order.items.length === 1 ? "" : "s"} (${packs} pack${packs === 1 ? "" : "s"})`,
+    `Delivery option: ${order.customer.fulfilment === "delivery" ? "Free home delivery" : "Store pickup"}`,
+    `Estimated total: Rs.${order.amounts.total.toFixed(2)}`,
+    "",
+    "Full item list and customer details are saved in the shop's Google Sheet under this ID.",
+    "Please confirm stock, final price and arrangements.",
+    "Request only, not a confirmed order. No payment made.",
+  ].join("\n");
+}
+
 export async function handleOrderRequest(request, {
   env = process.env, fetchImpl = fetch, now = () => new Date(),
 } = {}) {
@@ -142,7 +160,7 @@ export async function handleOrderRequest(request, {
     return json({ error: "We could not confirm the recorded order request time. Keep checkout open and retry, or contact the shop." }, 503);
   }
   const message = order.message.replace("\n", `\nOrder date & time: ${orderTime(savedAt)}\n`);
-  return json({ orderId: order.orderId, message });
+  return json({ orderId: order.orderId, message, summary: orderSummary(order, savedAt) });
 }
 
 export default async request => handleOrderRequest(request);

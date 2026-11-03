@@ -3,6 +3,7 @@ import { products, vendor } from "./catalog.mjs";
 export const MAX_QUANTITY = 99;
 export const CART_KEY = "sai-baba-cart-v1";
 export const DISCOUNT_PERCENT = 15;
+export const MAX_WHATSAPP_URL_LENGTH = 1800;
 const byId = new Map(products.map(product => [product.id, product]));
 export const money = value => new Intl.NumberFormat("en-IN", {
   style: "currency", currency: "INR",
@@ -111,8 +112,22 @@ export function whatsappUrl(message, phone = vendor.whatsapp) {
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
+export function prepareOrderMessage(text, summary, phone = vendor.whatsapp, maxLength = MAX_WHATSAPP_URL_LENGTH) {
+  if (typeof text !== "string" || !text) throw new Error("The order request message is empty.");
+  const fullUrl = new URL(whatsappUrl(text, phone)).href;
+  if (fullUrl.length <= maxLength) return { text, url: fullUrl, isSummary: false };
+  if (typeof summary !== "string" || !summary) {
+    throw new Error("The order tracker did not provide a WhatsApp summary. Keep checkout open and retry, or contact the shop.");
+  }
+  const url = new URL(whatsappUrl(summary, phone)).href;
+  if (url.length > maxLength) {
+    throw new Error("The order summary is too long to open in WhatsApp. Keep checkout open and contact the shop.");
+  }
+  return { text: summary, url, isSummary: true };
+}
+
 // Bound the encoded URL, not character count; Unicode can expand substantially.
-export function prepareMessages(text, phone = vendor.whatsapp, maxLength = 1800) {
+export function prepareMessages(text, phone = vendor.whatsapp, maxLength = MAX_WHATSAPP_URL_LENGTH) {
   if (!text) throw new Error("The order request message is empty.");
   if (whatsappUrl(text, phone).length <= maxLength) {
     return [{ text, url: whatsappUrl(text, phone) }];

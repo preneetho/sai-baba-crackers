@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { buildOrder, handleOrderRequest, config } from "../netlify/functions/orders.mjs";
+import { products } from "../vendor-app/catalog.mjs";
+import { prepareOrderMessage, whatsappUrl, MAX_WHATSAPP_URL_LENGTH } from "../vendor-app/order.mjs";
 
 const now = new Date("2026-11-02T10:00:00.000Z");
 const input = {
@@ -78,8 +80,76 @@ test("Google Sheet acknowledgement is required before exposing WhatsApp message"
   const body = await response.json();
   assert.equal(body.orderId, recorded.orderId);
   assert.equal(body.message, recorded.message.replace("\n", "\nOrder date & time: 2026-11-02 15:30:00 IST\n"));
+  assert.ok(body.summary.startsWith(`Order ID: ${recorded.orderId}\n`));
+  assert.ok(body.summary.includes("Order date & time: 2026-11-02 15:30:00 IST"));
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.ok(!JSON.stringify(body).includes(env.ORDER_TRACKING_SECRET));
+});
+
+test("long orders send one bounded server-generated summary while retaining every saved item and customer detail", async () => {
+  for (const fulfilment of ["delivery", "pickup"]) {
+    const payload = {
+      ...input, cart: Object.fromEntries(products.map(product => [product.id, 99])),
+      total: 0, summary: "Do not trust client summaries",
+      customer: {
+        ...input.customer, fulfilment, name: String.fromCharCode(0x800).repeat(80),
+        address: "A".repeat(500), notes: "N".repeat(500),
+      },
+    };
+    let recorded;
+    const response = await handle(request(payload), async (_, options) => {
+      recorded = JSON.parse(options.body).order;
+      return Response.json({ ok: true, orderId: recorded.orderId, createdAt: recorded.createdAt });
+    });
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(recorded.items.length, 68);
+    assert.equal(recorded.customer.address, payload.customer.address);
+    assert.equal(recorded.customer.notes, payload.customer.notes);
+    assert.equal(result.message, recorded.message.replace("\n", "\nOrder date & time: 2026-11-02 15:30:00 IST\n"));
+    for (const product of products) assert.ok(result.message.includes(`#${product.id} ${product.name}`));
+    for (const content of [
+      `Order ID: ${recorded.orderId}`, `Customer: ${payload.customer.name}`,
+      "Mobile: +91 9876543210", "Items: 68 products (6732 packs)",
+      `Delivery option: ${fulfilment === "delivery" ? "Free home delivery" : "Store pickup"}`,
+      `Estimated total: Rs.${recorded.amounts.total.toFixed(2)}`,
+      "shop's Google Sheet under this ID", "not a confirmed order", "No payment made.",
+    ]) assert.ok(result.summary.includes(content), content);
+    assert.ok(!result.summary.includes(payload.summary));
+    assert.ok(!result.summary.includes(payload.customer.address));
+    assert.ok(!result.summary.includes(payload.customer.notes));
+    assert.ok(!result.summary.includes("#1 Ground Chakkar Big"));
+    assert.ok(whatsappUrl(result.summary).length <= MAX_WHATSAPP_URL_LENGTH,
+      `summary must fit even with the longest Unicode name: ${whatsappUrl(result.summary).length}`);
+    const prepared = prepareOrderMessage(result.message, result.summary);
+    assert.equal(prepared.isSummary, true);
+    assert.equal(prepared.text, result.summary);
+    assert.ok(prepared.url.length <= MAX_WHATSAPP_URL_LENGTH);
+    assert.equal(new URL(prepared.url).searchParams.get("text"), result.summary);
+  }
+});
+
+test("short acknowledged orders retain the full WhatsApp text instead of the summary", async () => {
+  const response = await handle(request({ ...input, cart: { 1: 1 }, customer: { ...input.customer, notes: "" } }));
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  const prepared = prepareOrderMessage(result.message, result.summary);
+  assert.equal(prepared.isSummary, false);
+  assert.equal(prepared.text, result.message);
+  assert.ok(prepared.text.includes("#1 Ground Chakkar Big"));
+});
+
+test("summary and full message retain the original acknowledged timestamp on retry", async () => {
+  const later = new Date("2026-11-03T10:00:00.000Z");
+  const response = await handle(request(), async () =>
+    Response.json({ ok: true, orderId: buildOrder(input, now).orderId, createdAt: now.toISOString() }),
+  { now: () => later });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  for (const text of [result.message, result.summary]) {
+    assert.ok(text.includes("Order date & time: 2026-11-02 15:30:00 IST"));
+    assert.ok(!text.includes("2026-11-03"));
+  }
 });
 
 test("endpoint rejects wrong origin, wrong content type, malformed and oversized bodies", async () => {
@@ -110,6 +180,7 @@ test("missing and invalid saved timestamps never produce a successful WhatsApp h
     const result = await response.json();
     assert.ok(result.error.includes("recorded order request time"));
     assert.equal(result.message, undefined);
+    assert.equal(result.summary, undefined);
   }
 });
 
@@ -145,6 +216,7 @@ test("timeouts, failed writes, conflicts and invalid acknowledgements never repo
     const result = await response.json();
     assert.ok(result.error);
     assert.equal(result.message, undefined);
+    assert.equal(result.summary, undefined);
     assert.equal(result.orderId, undefined);
   }
 });
@@ -326,7 +398,9 @@ test("IST dates remain correct at midnight, month and year boundaries", async ()
       return Response.json(harness.post(body.order, body.secret));
     }, { now: () => new Date(instant) });
     assert.equal(response.status, 200);
-    assert.ok((await response.json()).message.includes(`Order date & time: ${expected}`));
+    const result = await response.json();
+    assert.ok(result.message.includes(`Order date & time: ${expected}`));
+    assert.ok(result.summary.includes(`Order date & time: ${expected}`));
     assert.equal(harness.rows[1][16], "'" + expected);
   }
 });

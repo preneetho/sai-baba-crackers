@@ -123,7 +123,7 @@ h2 { font-family: Georgia, "Times New Roman", serif; font-size: 27px; font-weigh
 .cart-empty > span { color: var(--brand); font-size: 44px; display: block; margin-bottom: 16px; }
 .cart-empty h3 { font-size: 12px; font-weight: 600; }
 .cart-empty p { font-size: 11px; line-height: 1.9; color: var(--muted); margin-top: 9px; }
-.cart-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 17px; font-size: 12px; }
+.cart-total { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 17px; font-size: 12px; }
 .cart-total > strong { font-size: 22px; font-weight: 650; white-space: nowrap; }
 .pricing-summary { display: grid; gap: 12px; }
 .pricing-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; line-height: 1.7; }
@@ -178,6 +178,7 @@ body:has(dialog[open]) { overflow: hidden; }
 .icon-button { min-width: 40px; min-height: 40px; border: 1px solid var(--line); background: white; font-size: 24px; border-radius: 50%; }
 .review-lines { border: 1px solid var(--line); border-radius: 9px; padding: 15px; margin-bottom: 24px; }
 .review-line { display: flex; justify-content: space-between; gap: 18px; font-size: 12px; line-height: 1.7; padding: 7px 0; }
+.review-line > span { min-width: 0; overflow-wrap: anywhere; }
 .review-line strong { white-space: nowrap; }
 .review-lines .pricing-summary { margin-top: 16px; }
 dialog h3 { font-size: 17px; font-weight: 600; margin-bottom: 15px; }
