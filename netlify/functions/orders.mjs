@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, validateCustomer, createRequirement } from "../../vendor-app/order.mjs";
+import { DISCOUNT_PERCENT, MAX_WHATSAPP_URL_LENGTH, sanitizeCart, cartLines, pricing, validateCustomer, createRequirement, whatsappUrl } from "../../vendor-app/order.mjs";
+import { saveOrderPdf } from "../lib/order-pdfs.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_BODY_BYTES = 16384;
@@ -65,9 +66,9 @@ function orderTime(createdAt) {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} IST`;
 }
 
-function orderSummary(order, savedAt) {
+function orderSummary(order, savedAt, pdf) {
   const packs = order.items.reduce((sum, item) => sum + item.quantity, 0);
-  return [
+  const lines = [
     `Order ID: ${order.orderId}`,
     `Order date & time: ${orderTime(savedAt)}`,
     "Order request summary",
@@ -77,14 +78,23 @@ function orderSummary(order, savedAt) {
     `Delivery option: ${order.customer.fulfilment === "delivery" ? "Free home delivery" : "Store pickup"}`,
     `Estimated total: Rs.${order.amounts.total.toFixed(2)}`,
     "",
-    "Full item list and customer details are saved in the shop's Google Sheet under this ID.",
-    "Please confirm stock, final price and arrangements.",
+    ...(pdf ? [
+      `Full order PDF (expires ${orderTime(new Date(pdf.expiresAt))}): ${pdf.url}`,
+      "All details are in the PDF and the shop's Google Sheet.",
+    ] : [
+      "Full item list and customer details are saved in the shop's Google Sheet under this ID.",
+      "Please confirm stock, final price and arrangements.",
+    ]),
     "Request only, not a confirmed order. No payment made.",
-  ].join("\n");
+  ];
+  if (pdf && new URL(whatsappUrl(lines.join("\n"))).href.length > MAX_WHATSAPP_URL_LENGTH) {
+    lines.splice(3, 1);
+  }
+  return lines.join("\n");
 }
 
 export async function handleOrderRequest(request, {
-  env = process.env, fetchImpl = fetch, now = () => new Date(),
+  env = process.env, fetchImpl = fetch, now = () => new Date(), savePdf = saveOrderPdf,
 } = {}) {
   if (request.method !== "GET" && request.method !== "POST") {
     const response = json({ error: "Use POST to save an order request." }, 405);
@@ -160,7 +170,20 @@ export async function handleOrderRequest(request, {
     return json({ error: "We could not confirm the recorded order request time. Keep checkout open and retry, or contact the shop." }, 503);
   }
   const message = order.message.replace("\n", `\nOrder date & time: ${orderTime(savedAt)}\n`);
-  return json({ orderId: order.orderId, message, summary: orderSummary(order, savedAt) });
+  let pdf;
+  if (input.pdfConsent === true && new URL(whatsappUrl(message)).href.length > MAX_WHATSAPP_URL_LENGTH) {
+    try {
+      pdf = await savePdf({ order, message, savedAt, origin: new URL(request.url).origin, secret: connection.secret });
+    } catch (error) {
+      console.error("Order PDF generation or storage failed after the order was recorded.");
+      const detail = error.code === "PDF_UNSUPPORTED_TEXT" ?
+        "Some characters could not be displayed in the PDF. Contact the shop with this ID; your complete details are still saved." :
+        error.code === "PDF_EXPIRED" ? "Its seven-day PDF link has expired. Contact the shop with this ID." :
+          "The PDF could not be prepared. Keep checkout open and retry with the same details.";
+      return json({ error: `Your order request ${order.orderId} is saved. ${detail}` }, 503);
+    }
+  }
+  return json({ orderId: order.orderId, message, summary: orderSummary(order, savedAt, pdf), ...(pdf ? { pdf } : {}) });
 }
 
 export default async request => handleOrderRequest(request);

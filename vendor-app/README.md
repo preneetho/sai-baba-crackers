@@ -2,14 +2,16 @@
 
 A standalone, mobile-friendly enquiry app with a static frontend, a Netlify
 order-recording function and a Google Apps Script integration. No frontend
-framework, npm dependencies, customer accounts, payments, analytics or automatic
+framework, frontend npm dependencies, customer accounts, payments, analytics or automatic
 WhatsApp messaging. The existing Product Memory Graph application is unchanged.
+Server-only dependencies generate PDFs and store them in private Netlify Blobs.
 
 ## Run
 
 From the repository root, using Node.js 22.5 or later:
 
 ```powershell
+npm.cmd ci --prefix netlify
 npm.cmd run vendor:dev
 ```
 
@@ -101,21 +103,27 @@ full-width preview or update images already shown in existing messages.
 
 ### Netlify
 
-The repository's `netlify.toml` selects `vendor-app` as the base directory,
-publishes that directory directly and requires no build command. Server functions
-live outside the published files in `../netlify/functions`. The configuration
+The repository's `netlify.toml` uses the repository root as the base directory,
+publishes only `vendor-app`, and runs `npm ci --omit=dev --prefix netlify`.
+Server functions live outside the published files in `netlify/functions`. The configuration
 also sets security headers and the JavaScript content type for `.mjs` files.
 Builds are not skipped when only the functions outside the base directory change.
 
 In Netlify, choose **Add new project > Import an existing project > GitHub**,
 authorize only the vendor app repository and select its `main` branch.
-Use the checked-in settings: base directory `vendor-app`, publish directory `.`
-(relative to the base), and an empty build command. Set
+Use the checked-in settings: base directory `.`, publish directory `vendor-app`,
+build command `npm ci --omit=dev --prefix netlify`, and Node.js 22. Remove
+old dashboard overrides that still use `vendor-app` as the base. Set
 `GOOGLE_SHEETS_WEBHOOK_URL` and `ORDER_TRACKING_SECRET` in Netlify's Functions
 environment. Follow the [Google Sheets setup guide](../integrations/google-sheets/README.md)
 before publishing, then verify the generated HTTPS URL on a real phone.
 Subsequent pushes to `main` trigger a new deployment once the GitHub integration
 is connected.
+
+Deployed Netlify Functions automatically receive the private Blobs connection.
+No new public bucket, API key or Apps Script change is needed for PDF links.
+The hourly cleanup runs on the published deployment, not deploy previews.
+Storage and function usage depend on the site's Netlify plan and limits.
 
 Static drag-and-drop deployment does not deploy the required order-recording
 function. Use the GitHub-connected deployment with the root `netlify.toml`.
@@ -123,7 +131,8 @@ function. Use the GitHub-connected deployment with the root `netlify.toml`.
 ### Other static hosts
 
 The catalogue can be previewed as static files, but submission now requires the
-Netlify `/api/orders` function. Another host needs an equivalent server endpoint;
+Netlify `/api/orders` and `/api/order-pdf` functions, private PDF storage and
+expiry cleanup. Another host needs equivalent server endpoints and retention controls;
 uploading only `vendor-app` will not provide working order recording. Never put
 the server function, shared secret or spreadsheet credentials in public files.
 
@@ -154,7 +163,8 @@ the server function, shared secret or spreadsheet credentials in public files.
   Required name, mobile number and full address (10-500 characters) are recorded
   in the vendor's Google Sheet after explicit consent. Multiline addresses are
   preserved. Closing checkout clears the local form and message, not sheet rows.
-- The customer agrees to Sheets recording and WhatsApp sharing. The server
+- The customer agrees to Sheets recording, WhatsApp sharing and temporary PDF
+  storage for long orders. The server
   recalculates amounts, then records an order request with an `SBC-` reference before
   returning a WhatsApp message containing that reference. Failures are shown and
   keep details available for retry; no failed save is represented as success.
@@ -182,9 +192,11 @@ the server function, shared secret or spreadsheet credentials in public files.
 - Each encoded WhatsApp URL is capped at a conservative 1,800 characters.
   Short requests keep the complete WhatsApp message unchanged. Only requests
   exceeding that limit use one short summary instead: request ID, original IST
-  date/time, customer name/mobile, product/pack counts, delivery/pickup choice and
-  the server-calculated estimated total. The summary tells the shop to look up
-  all items, address and notes in its Google Sheet using the request ID.
+  date/time, customer mobile, product/pack counts, delivery/pickup choice,
+  the server-calculated estimated total and a link to the complete order PDF.
+  Customer name is included when it fits the URL budget; the PDF and Sheet
+  always retain the complete name. The vendor can also look up all items,
+  address and notes in its Google Sheet using the request ID.
   No order data is removed from the sheet or the complete message available on
   the page. Summary data is generated by the server only after acknowledgement;
   no Apps Script or spreadsheet migration is needed for this change.
@@ -192,6 +204,24 @@ the server function, shared secret or spreadsheet credentials in public files.
   `prepareMessages` export remains compatible with cached older pages.
   The URL cap is an implementation safeguard, not a guarantee across every
   WhatsApp client.
+- Only long orders with explicit PDF consent create a PDF, after Sheets confirms
+  the save. PDFs contain all line items, customer details, notes and totals.
+  Private Netlify Blobs storage uses an unguessable bearer link: **anyone with
+  the link can open it**, including someone to whom it is forwarded. Links expire
+  exactly seven days after the original saved time; retries do not extend expiry.
+  Expired access is denied immediately, and an hourly job removes expired files.
+  Already downloaded copies cannot be revoked. Short orders do not create PDFs.
+  Older cached clients without PDF consent retain their previous summary behavior.
+- If PDF generation or storage fails after Sheets saves the order, the app
+  explicitly reports that the order was saved and retains its reference for
+  retry. It does not open WhatsApp with a missing PDF. Retrying unchanged details
+  reuses the saved reference and the same PDF link, without duplicating sheet
+  rows. After the seven-day window, a new request is needed for a new PDF.
+- PDFs embed the bundled Noto Sans, Telugu, Devanagari, Arabic and Emoji fonts.
+  Unsupported characters produce an explicit error rather than being dropped.
+  Fonts and their SIL Open Font Licences are under `netlify/assets/fonts`;
+  `SOURCES.json` records the pinned upstream revision. These server assets are
+  bundled with the order function, not published as customer-facing static files.
 - Copy and plain-text download preserve the complete order request as fallbacks.
   Downloads and clipboard contents may contain personal details; customers
   control these copies. Google Sheets holds the enquiry register; the vendor

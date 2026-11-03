@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
 import { handleOrderRequest } from "../netlify/functions/orders.mjs";
+import { handlePdfRequest } from "../netlify/functions/order-pdf.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -37,14 +38,16 @@ const server = createServer(async (request, response) => {
     response.end("Invalid URL");
     return;
   }
-  if (pathname === "/api/orders") {
+  if (pathname === "/api/orders" || pathname === "/api/order-pdf") {
     try {
       const init = { method: request.method, headers: request.headers };
       if (request.method !== "GET" && request.method !== "HEAD") {
         init.body = Readable.toWeb(request);
         init.duplex = "half";
       }
-      const result = await handleOrderRequest(new Request(`http://127.0.0.1:${port}/api/orders`, init));
+      const url = new URL(request.url, `http://127.0.0.1:${port}`);
+      const handler = pathname === "/api/orders" ? handleOrderRequest : handlePdfRequest;
+      const result = await handler(new Request(url, init));
       response.writeHead(result.status, Object.fromEntries(result.headers));
       response.end(Buffer.from(await result.arrayBuffer()));
     } catch {

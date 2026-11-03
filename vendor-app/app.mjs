@@ -1,5 +1,5 @@
 import { products, categories, vendor } from "./catalog.mjs";
-import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, total, money, localDate, validateCustomer, prepareOrderMessage } from "./order.mjs";
+import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, total, money, localDate, validateCustomer, prepareOrderMessage, validatePdfLink } from "./order.mjs";
 
 const $ = selector => document.querySelector(selector);
 let cart = {};
@@ -288,6 +288,9 @@ $("#checkout").addEventListener("close", () => {
   fullMessage = "";
   submission = null;
   $("#order-reference").textContent = "";
+  $("#pdf-details").hidden = true;
+  $("#pdf-link").removeAttribute("href");
+  $("#pdf-expiry").textContent = "";
   lastReviewTrigger?.focus({ preventScroll: true });
 });
 $("#review").addEventListener("click", showReview);
@@ -344,7 +347,7 @@ $("#customer-form").addEventListener("submit", async event => {
       response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId: submission.requestId, cart: selection, customer, consent: true }),
+        body: JSON.stringify({ requestId: submission.requestId, cart: selection, customer, consent: true, pdfConsent: true }),
         signal: AbortSignal.timeout(25000),
       });
     } catch {
@@ -368,12 +371,24 @@ $("#customer-form").addEventListener("submit", async event => {
     }
     fullMessage = result.message;
     const message = prepareOrderMessage(fullMessage, result.summary);
+    const pdf = message.isSummary ? validatePdfLink(result.pdf, window.location.origin) : null;
+    if (pdf && !message.text.includes(pdf.url)) {
+      throw new Error("Your order request is saved, but its WhatsApp summary is missing the PDF link. Keep checkout open and retry.");
+    }
+    $("#pdf-details").hidden = !pdf;
+    if (pdf) {
+      $("#pdf-link").href = pdf.url;
+      const expiry = new Intl.DateTimeFormat("en-IN", {
+        timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short",
+      }).format(new Date(pdf.expiresAt));
+      $("#pdf-expiry").textContent = ` Link expires ${expiry} IST. Anyone with the link can open it.`;
+    }
     $("#full-message").value = fullMessage;
     $("#order-reference").textContent = `Order request ID: ${orderId}`;
     $("#recipient").textContent = `${vendor.name} \u00b7 ${vendor.phone}`;
     $("#message-title").textContent = "Order request saved";
     $("#handoff-instructions").textContent = message.isSummary ?
-      "Your complete order request is saved. WhatsApp will open with one short summary and your request ID. The shop can find every item and your customer details in its Google Sheet using that ID. Tap Send in WhatsApp. Your complete order request is also available below. The shop will confirm your order." :
+      "Your complete order request is saved. WhatsApp will open with one short summary, your request ID and a PDF link valid for 7 days. The PDF contains every item and your customer details; the shop also has the full record in its Google Sheet. Tap Send in WhatsApp. Your complete order request is also available below. The shop will confirm your order." :
       "Your order request is saved. WhatsApp should open with your message. Tap Send there to share it with the shop. If it does not open, use the button below. The shop will confirm your order.";
     const link = element("a", "button primary wide", "Send order request via WhatsApp \u2197");
     link.href = message.url;

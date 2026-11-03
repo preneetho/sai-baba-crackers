@@ -1,0 +1,16 @@
+{
+  "name": "sai-baba-order-functions",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "11.1.6",
+    "fontkit": "2.0.4",
+    "pdfkit": "0.20.2"
+  },
+  "devDependencies": {
+    "@netlify/zip-it-and-ship-it": "16.5.1"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

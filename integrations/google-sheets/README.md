@@ -78,12 +78,16 @@ Do not add secrets to `netlify.toml` or the public `vendor-app` directory.
 Commit all updated source directories, including `netlify`, `integrations`,
 `scripts`, `tests`, `vendor-app`, and the root `netlify.toml` and `package.json`.
 
-The configuration keeps the base at `vendor-app`, publishes `.`, and deploys
-functions from `../netlify/functions`. No build command or npm dependencies are
-needed. Use a Git-connected deployment, not a static drag-and-drop upload.
+The configuration uses the repository root (`.`) as the base, publishes
+`vendor-app`, deploys functions from `netlify/functions`, and installs server
+dependencies with `npm ci --omit=dev --prefix netlify` using Node.js 22.
+Remove old dashboard overrides that still use `vendor-app` as the base.
+Use a Git-connected deployment, not a static drag-and-drop upload.
 Trigger a new deployment after adding or changing environment variables.
 
-Check the deploy log for the `orders` function and its rate-limit rule. The rule
+Check the deploy log for `orders`, `order-pdf` and the hourly
+`expire-order-pdfs` function. The latter runs only on the published deployment.
+The `orders` rate-limit rule
 allows 10 requests per minute per domain and IP; Netlify enforcement can lag by
 up to 10 seconds. This is basic abuse protection, not customer authentication or
 a hard overall request cap. Google Apps Script and Netlify quotas still apply.
@@ -175,3 +179,10 @@ for this small vendor workflow, not an authenticated order-management database.
 The vendor owns access control, retention, corrections and deletion of customer
 records. The site clears contact details from the review when closed, but this
 does not delete previously saved spreadsheet rows or copies in WhatsApp.
+Consented long orders also have a complete PDF in private Netlify Blobs storage.
+Its unguessable link is included in the WhatsApp summary; anyone who has or
+receives the link can open it. Links expire seven days after the original saved
+time, with immediate download-time enforcement and hourly file cleanup.
+Downloaded copies cannot be revoked. PDF links use the existing server secret
+and Netlify's automatic Blobs connection; no Sheet columns or Apps Script
+changes are needed. Netlify storage and function usage depend on the site's plan.

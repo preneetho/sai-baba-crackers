@@ -126,6 +126,26 @@ export function prepareOrderMessage(text, summary, phone = vendor.whatsapp, maxL
   return { text: summary, url, isSummary: true };
 }
 
+export function validatePdfLink(pdf, origin) {
+  const error = "Your order request is saved, but its PDF link could not be confirmed. Keep checkout open and retry.";
+  if (!pdf || typeof pdf.url !== "string" || typeof pdf.expiresAt !== "string") throw new Error(error);
+  let url;
+  try {
+    url = new URL(pdf.url);
+  } catch {
+    throw new Error(error);
+  }
+  const expiry = new Date(pdf.expiresAt);
+  const token = url.searchParams.get("token") ?? "";
+  if (url.origin !== origin || url.username || url.password || url.hash || url.pathname !== "/api/order-pdf" ||
+      [...url.searchParams].length !== 1 || !/^\d{8}\.[A-Za-z0-9_-]{43}$/.test(token) ||
+      !Number.isFinite(expiry.getTime()) || expiry.toISOString() !== pdf.expiresAt ||
+      token.slice(0, 8) !== pdf.expiresAt.slice(0, 10).replaceAll("-", "")) {
+    throw new Error(error);
+  }
+  return { url: url.href, expiresAt: pdf.expiresAt };
+}
+
 // Bound the encoded URL, not character count; Unicode can expand substantially.
 export function prepareMessages(text, phone = vendor.whatsapp, maxLength = MAX_WHATSAPP_URL_LENGTH) {
   if (!text) throw new Error("The order request message is empty.");

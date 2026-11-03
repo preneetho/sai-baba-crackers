@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/google/fonts",
+  "revision": "2fe1e8c6b137fb13041a7cfca6fdcd8a910ea4dc",
+  "license": "SIL Open Font License 1.1; see the individual OFL files",
+  "fonts": [
+    { "file": "NotoSans.ttf", "source": "ofl/notosans/NotoSans[wdth,wght].ttf", "license": "NotoSans-OFL.txt" },
+    { "file": "NotoSansTelugu.ttf", "source": "ofl/notosanstelugu/NotoSansTelugu[wdth,wght].ttf", "license": "NotoSansTelugu-OFL.txt" },
+    { "file": "NotoSansDevanagari.ttf", "source": "ofl/notosansdevanagari/NotoSansDevanagari[wdth,wght].ttf", "license": "NotoSansDevanagari-OFL.txt" },
+    { "file": "NotoSansArabic.ttf", "source": "ofl/notosansarabic/NotoSansArabic[wdth,wght].ttf", "license": "NotoSansArabic-OFL.txt" },
+    { "file": "NotoEmoji.ttf", "source": "ofl/notoemoji/NotoEmoji[wght].ttf", "license": "NotoEmoji-OFL.txt" }
+  ]
+}

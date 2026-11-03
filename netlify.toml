@@ -1,15 +1,19 @@
 [build]
-  base = "vendor-app"
-  publish = "."
-  command = ""
+  base = "."
+  publish = "vendor-app"
+  command = "npm ci --omit=dev --prefix netlify"
   ignore = "exit 1"
 
 [build.environment]
   NODE_VERSION = "22"
 
 [functions]
-  directory = "../netlify/functions"
+  directory = "netlify/functions"
   node_bundler = "esbuild"
+  external_node_modules = ["pdfkit", "fontkit", "@netlify/blobs"]
+
+[functions.orders]
+  included_files = ["netlify/assets/fonts/**"]
 
 [[headers]]
   for = "/*"
