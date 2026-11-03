@@ -6,6 +6,7 @@ import {
   sanitizeCart, cartLines, pricing, total, money, validateCustomer, createRequirement,
   whatsappUrl, prepareMessages, localDate,
 } from "../vendor-app/order.mjs";
+import { initializeFireworks } from "../vendor-app/hero-fireworks.mjs";
 
 const customer = {
   name: "Ravi Kumar", phone: "9876543210",
@@ -14,10 +15,203 @@ const customer = {
 };
 const today = "2026-11-02";
 
-test("header fireworks are small, finite and replaced by a still image for reduced motion", async () => {
+test("header video is finite, silent, mobile-compatible and ready for progressive playback", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
-  assert.match(html, /<source media="\(prefers-reduced-motion: no-preference\)" srcset="\.\/diwali-header\.gif" type="image\/gif">/);
-  assert.match(html, /<img src="\.\/diwali-header-still\.png" alt="" width="420" height="340"/);
+  assert.match(html, /<video id="hero-fireworks" muted playsinline preload="none" data-src="\.\/diwali-fireworks\.mp4"/);
+  assert.doesNotMatch(html, /\bloop\b|<video[^>]*\ssrc=/);
+  assert.match(html, /<img src="\.\/diwali-fireworks-poster\.png" alt="" width="420" height="340"/);
+  assert.match(html, /<button id="fireworks-toggle"[^>]*aria-controls="hero-fireworks" hidden>Play fireworks/);
+  const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
+  assert.match(app, /renderCategories\(\);\s*renderProducts\(\);\s*renderCart\(\);\s*initializeFireworks\(\);\s*$/);
+  assert.equal([...app.matchAll(/initializeFireworks\(\)/g)].length, 1);
+  const mp4 = await readFile(new URL("../vendor-app/diwali-fireworks.mp4", import.meta.url));
+  assert.ok(mp4.length < 180 * 1024, "decorative video must stay below 180 KB");
+  function boxes(start, end) {
+    const result = [];
+    for (let offset = start; offset < end;) {
+      const size = mp4.readUInt32BE(offset);
+      assert.ok(size >= 8 && offset + size <= end, "invalid MP4 box");
+      result.push({ type: mp4.toString("ascii", offset + 4, offset + 8), offset, data: offset + 8, end: offset + size });
+      offset += size;
+    }
+    return result;
+  }
+  const top = boxes(0, mp4.length);
+  const movie = top.find(box => box.type === "moov");
+  assert.ok(movie.offset < top.find(box => box.type === "mdat").offset, "metadata must precede video data for mobile startup");
+  const children = boxes(movie.data, movie.end);
+  const timing = children.find(box => box.type === "mvhd");
+  assert.equal(mp4[timing.data], 0);
+  const duration = mp4.readUInt32BE(timing.data + 16) / mp4.readUInt32BE(timing.data + 12);
+  assert.equal(duration, 4);
+  const tracks = children.filter(box => box.type === "trak");
+  assert.equal(tracks.length, 1, "the decorative clip must have no audio track");
+  const track = boxes(tracks[0].data, tracks[0].end);
+  const dimensions = track.find(box => box.type === "tkhd");
+  assert.equal(mp4.readUInt32BE(dimensions.end - 8) / 65536, 420);
+  assert.equal(mp4.readUInt32BE(dimensions.end - 4) / 65536, 340);
+  const media = track.find(box => box.type === "mdia");
+  const mediaChildren = boxes(media.data, media.end);
+  const handler = mediaChildren.find(box => box.type === "hdlr");
+  assert.equal(mp4.toString("ascii", handler.data + 8, handler.data + 12), "vide");
+  const info = mediaChildren.find(box => box.type === "minf");
+  const table = boxes(info.data, info.end).find(box => box.type === "stbl");
+  const descriptions = boxes(table.data, table.end).find(box => box.type === "stsd");
+  const sample = boxes(descriptions.data + 8, descriptions.end)[0];
+  assert.equal(sample.type, "avc1", "use widely supported H.264");
+  const codec = boxes(sample.data + 78, sample.end).find(box => box.type === "avcC");
+  assert.equal(mp4[codec.data + 1], 66, "H.264 Baseline is required for mobile compatibility");
+  const poster = await readFile(new URL("../vendor-app/diwali-fireworks-poster.png", import.meta.url));
+  assert.deepEqual([...poster.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(poster.readUInt32BE(16), 420);
+  assert.equal(poster.readUInt32BE(20), 340);
+});
+
+function fireworksFixture(reduced = false) {
+  const classes = new Set();
+  const frame = { classList: { add: name => classes.add(name), remove: name => classes.delete(name) } };
+  const attributes = new Map();
+  const video = Object.assign(new EventTarget(), {
+    parentElement: frame, dataset: { src: "./diwali-fireworks.mp4" },
+    paused: true, ended: false, muted: false, currentTime: 0, error: null,
+    plays: 0, loads: 0, playError: null,
+    hasAttribute: name => attributes.has(name),
+    removeAttribute: name => attributes.delete(name),
+    pause() { this.paused = true; this.dispatchEvent(new Event("pause")); },
+    load() { this.loads++; },
+    async play() {
+      this.plays++;
+      if (this.playError) throw this.playError;
+      this.paused = false;
+      this.ended = false;
+      this.dispatchEvent(new Event("playing"));
+    },
+  });
+  Object.defineProperty(video, "src", { set: value => attributes.set("src", value) });
+  const button = Object.assign(new EventTarget(), { hidden: true, textContent: "Play fireworks" });
+  const motion = Object.assign(new EventTarget(), { matches: reduced });
+  let intersection;
+  const root = Object.assign(new EventTarget(), {
+    hidden: false,
+    querySelector: selector => selector === "#hero-fireworks" ? video : button,
+    defaultView: {
+      matchMedia: () => motion,
+      IntersectionObserver: class {
+        constructor(callback) { intersection = callback; }
+        observe(element) { assert.equal(element, frame); }
+      },
+    },
+  });
+  initializeFireworks(root);
+  return {
+    video, button, motion, root, classes,
+    visible(value) { intersection([{ isIntersecting: value, intersectionRatio: value ? 1 : 0 }]); },
+    click() { button.dispatchEvent(new Event("click")); },
+    reduced(value) { motion.matches = value; motion.dispatchEvent(new Event("change")); },
+    hidden(value) { root.hidden = value; root.dispatchEvent(new Event("visibilitychange")); },
+  };
+}
+
+test("fireworks start only in view, stay muted and support pause, replay and offscreen stopping", async () => {
+  const scene = fireworksFixture();
+  assert.equal(scene.video.hasAttribute("src"), false);
+  scene.visible(true);
+  await Promise.resolve();
+  assert.equal(scene.video.plays, 1);
+  assert.equal(scene.video.muted, true);
+  assert.equal(scene.button.textContent, "Pause fireworks");
+  assert.ok(scene.classes.has("is-playing"));
+  scene.click();
+  assert.equal(scene.video.paused, true);
+  assert.equal(scene.classes.has("is-playing"), false);
+  scene.click();
+  assert.equal(scene.video.plays, 2);
+  scene.video.currentTime = 4;
+  scene.video.ended = true;
+  scene.video.paused = true;
+  scene.video.dispatchEvent(new Event("ended"));
+  assert.equal(scene.button.textContent, "Replay fireworks");
+  scene.click();
+  assert.equal(scene.video.currentTime, 0);
+  assert.equal(scene.video.plays, 3);
+  scene.visible(false);
+  assert.equal(scene.video.paused, true);
+  scene.visible(true);
+  assert.equal(scene.video.plays, 3, "scrolling back must not repeatedly autoplay");
+});
+
+test("blocked autoplay preserves the poster and allows a user-initiated retry", async t => {
+  const warning = t.mock.method(console, "warn", () => {});
+  const scene = fireworksFixture();
+  scene.video.playError = new DOMException("Autoplay blocked", "NotAllowedError");
+  scene.visible(true);
+  await Promise.resolve();
+  assert.equal(scene.classes.has("is-playing"), false);
+  assert.equal(scene.button.textContent, "Play fireworks");
+  assert.equal(warning.mock.callCount(), 1);
+  scene.video.playError = null;
+  scene.click();
+  await Promise.resolve();
+  assert.equal(scene.video.plays, 2);
+  assert.ok(scene.classes.has("is-playing"));
+});
+
+test("reduced motion never requests video and changing the preference stops playback", async () => {
+  const scene = fireworksFixture(true);
+  scene.visible(true);
+  assert.equal(scene.video.plays, 0);
+  assert.equal(scene.video.hasAttribute("src"), false);
+  assert.equal(scene.button.hidden, true);
+  scene.reduced(false);
+  await Promise.resolve();
+  assert.equal(scene.video.plays, 1);
+  scene.reduced(true);
+  assert.equal(scene.video.paused, true);
+  assert.equal(scene.video.hasAttribute("src"), false);
+  assert.equal(scene.video.loads, 1);
+  assert.equal(scene.classes.has("is-playing"), false);
+  assert.equal(scene.button.hidden, true);
+});
+
+test("hidden tabs do not start playback and pending playback cannot override a stop", async () => {
+  const scene = fireworksFixture();
+  scene.hidden(true);
+  scene.visible(true);
+  assert.equal(scene.video.plays, 0);
+  scene.hidden(false);
+  assert.equal(scene.video.plays, 1);
+  scene.hidden(true);
+  assert.equal(scene.video.paused, true);
+  scene.hidden(false);
+  assert.equal(scene.video.plays, 1);
+  let finish;
+  scene.video.play = () => new Promise(resolve => { finish = resolve; });
+  scene.click();
+  scene.visible(false);
+  scene.video.paused = false;
+  scene.video.dispatchEvent(new Event("playing"));
+  finish();
+  await Promise.resolve();
+  assert.equal(scene.video.paused, true);
+  assert.equal(scene.classes.has("is-playing"), false);
+});
+
+test("video decoding errors keep the still image visible and make a reload possible", async t => {
+  const warning = t.mock.method(console, "warn", () => {});
+  const scene = fireworksFixture();
+  scene.visible(true);
+  scene.video.error = { code: 3 };
+  scene.video.dispatchEvent(new Event("error"));
+  assert.equal(scene.video.paused, true);
+  assert.equal(scene.classes.has("is-playing"), false);
+  assert.equal(warning.mock.callCount(), 1);
+  scene.click();
+  await Promise.resolve();
+  assert.equal(scene.video.loads, 1);
+  assert.equal(scene.video.plays, 2);
+});
+
+test("legacy GIF URLs retain a small finite animation and matching fallback", async () => {
   const gif = await readFile(new URL("../vendor-app/diwali-header.gif", import.meta.url));
   assert.equal(gif.toString("ascii", 0, 6), "GIF89a");
   assert.equal(gif.readUInt16LE(6), 420);

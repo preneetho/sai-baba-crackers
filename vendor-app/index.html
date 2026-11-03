@@ -181,11 +181,12 @@
         <a class="hero-link" href="#catalogue">Build your festive list <span aria-hidden="true">&#8595;</span></a>
         <div class="hero-meta"><span>2026 COLLECTION</span><span>Sanathnagar, Hyderabad</span></div>
       </div>
-      <div class="hero-art" aria-hidden="true">
-        <picture class="hero-fireworks">
-          <source media="(prefers-reduced-motion: no-preference)" srcset="./diwali-header.gif" type="image/gif">
-          <img src="./diwali-header-still.png" alt="" width="420" height="340" decoding="async" fetchpriority="low">
-        </picture>
+      <div class="hero-art">
+        <div class="hero-fireworks" aria-hidden="true">
+          <img src="./diwali-fireworks-poster.png" alt="" width="420" height="340" decoding="async">
+          <video id="hero-fireworks" muted playsinline preload="none" data-src="./diwali-fireworks.mp4" width="420" height="340" disablepictureinpicture tabindex="-1"></video>
+        </div>
+        <button id="fireworks-toggle" class="fireworks-toggle" type="button" aria-controls="hero-fireworks" hidden>Play fireworks</button>
         <span class="art-caption">LET THE GOOD TIMES GLOW</span>
       </div>
     </section>

@@ -15,11 +15,14 @@ const files = new Map([
   ["/app.mjs", ["app.mjs", "text/javascript; charset=utf-8"]],
   ["/catalog.mjs", ["catalog.mjs", "text/javascript; charset=utf-8"]],
   ["/order.mjs", ["order.mjs", "text/javascript; charset=utf-8"]],
+  ["/hero-fireworks.mjs", ["hero-fireworks.mjs", "text/javascript; charset=utf-8"]],
   ["/sai-baba-logo.png", ["sai-baba-logo.png", "image/png"]],
   ["/diwali-crackers-preview.png", ["diwali-crackers-preview.png", "image/png"]],
   ["/diwali-crackers-square.png", ["diwali-crackers-square.png", "image/png"]],
   ["/diwali-header.gif", ["diwali-header.gif", "image/gif"]],
   ["/diwali-header-still.png", ["diwali-header-still.png", "image/png"]],
+  ["/diwali-fireworks.mp4", ["diwali-fireworks.mp4", "video/mp4"]],
+  ["/diwali-fireworks-poster.png", ["diwali-fireworks-poster.png", "image/png"]],
 ]);
 const server = createServer(async (request, response) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
@@ -63,6 +66,24 @@ const server = createServer(async (request, response) => {
   }
   try {
     const body = await readFile(fileURLToPath(new URL(`../vendor-app/${file[0]}`, import.meta.url)));
+    if (file[1] === "video/mp4") {
+      response.setHeader("Accept-Ranges", "bytes");
+      if (request.method === "GET" && request.headers.range) {
+        const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range);
+        const start = range?.[1] ? Number(range[1]) : Math.max(0, body.length - Number(range?.[2]));
+        const end = range?.[1] && range[2] ? Math.min(Number(range[2]), body.length - 1) : body.length - 1;
+        if (!range || !(range[1] || range[2]) || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end) {
+          response.writeHead(416, { "Content-Range": `bytes */${body.length}` });
+          response.end("Requested video range is unavailable");
+          return;
+        }
+        const partial = body.subarray(start, end + 1);
+        response.writeHead(206, { "Content-Type": file[1], "Content-Length": partial.length, "Content-Range": `bytes ${start}-${end}/${body.length}` });
+        response.end(partial);
+        return;
+      }
+    }
+    response.setHeader("Content-Length", body.length);
     response.writeHead(200, { "Content-Type": file[1] });
     response.end(request.method === "HEAD" ? undefined : body);
   } catch (error) {

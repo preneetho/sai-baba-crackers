@@ -1,5 +1,6 @@
 import { products, categories, vendor } from "./catalog.mjs";
 import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, total, money, localDate, validateCustomer, prepareMessages } from "./order.mjs";
+import { initializeFireworks } from "./hero-fireworks.mjs";
 
 const $ = selector => document.querySelector(selector);
 let cart = {};
@@ -440,3 +441,4 @@ window.addEventListener("storage", event => {
 renderCategories();
 renderProducts();
 renderCart();
+initializeFireworks();
