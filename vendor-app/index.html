@@ -23,6 +23,7 @@
   <title>Sai Baba Crackers Centre | Diwali 2026</title>
   <link rel="icon" type="image/png" href="./sai-baba-logo.png">
   <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./auth-callback.mjs"></script>
   <script type="module" src="./app.mjs"></script>
 </head>
 <body>
@@ -253,7 +254,7 @@
         <label><span id="preferred-date-label">Preferred date</span> <span class="optional">(optional)</span><input id="preferred-date" name="preferredDate" type="date"></label>
         <label class="full-width">Order notes <span class="optional">(optional)</span><textarea name="notes" rows="3" maxlength="500" placeholder="Any preferences or questions for the shop?"></textarea></label>
       </div>
-      <p class="privacy-note">Your cart is saved on this device. Your details and complete order request are recorded in the shop's Google Sheet before WhatsApp opens. For long orders, a PDF is also stored privately on Netlify and its link is included in one WhatsApp summary. Anyone with the link can open it for 7 days. Expired PDFs are deleted on access or by hourly cleanup; the Google Sheet remains the shop's order record. You must tap Send in WhatsApp yourself. Contact the shop to correct or remove a recorded order request.</p>
+      <p class="privacy-note">Anonymous, cookie-free session counts help us understand visits and checkout progress. No customer details are collected in telemetry; browser Do Not Track and Global Privacy Control are respected. Your cart is saved on this device. Your details and complete order request are recorded in the shop's Google Sheet before WhatsApp opens. For long orders, a PDF is also stored privately on Netlify and its link is included in one WhatsApp summary. Anyone with the link can open it for 7 days. Expired PDFs are deleted on access or by hourly cleanup; the Google Sheet remains the shop's order record. You must tap Send in WhatsApp yourself. Contact the shop to correct or remove a recorded order request.</p>
       <label class="consent"><input id="consent" type="checkbox" required><span>I agree to save my details and order request in the shop's Google Sheet, store a temporary PDF on Netlify for long orders, and share the order or PDF link through WhatsApp. I understand this is not a confirmed order.</span></label>
       <p id="save-status" class="privacy-note" role="status" hidden>Saving your order request. Please keep checkout open.</p>
       <p id="form-error" class="error" role="alert" tabindex="-1" hidden></p>
