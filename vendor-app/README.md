@@ -237,3 +237,35 @@ the server function, shared secret or spreadsheet credentials in public files.
 - A confirmed sale, availability, final prices and delivery/pickup arrangements
   are handled directly by the vendor. No selection is automatically cleared
   after opening WhatsApp.
+
+## Private telemetry dashboard
+
+Open `/telemetry` for anonymous session counts, an ordering funnel and a daily UTC
+breakdown over 7, 30 or 90 days. Data starts at deployment, with no historical
+backfill. Each stage counts once per anonymous browser-tab session (up to 30
+minutes). The funnel follows visiting sessions in the chosen window, requiring
+cart addition before checkout and checkout before a saved acknowledgement.
+Saved requests reflect the browser receiving a valid order acknowledgement;
+they are not confirmed sales, delivered WhatsApp messages or a replacement for
+the Google Sheet order register. Blocked requests and privacy preferences may
+reduce counts. The collector stores only a random event ID, random session ID,
+stage and server timestamp in Netlify Database, and respects Do Not Track and
+Global Privacy Control. No customer fields or request URLs are stored.
+
+Identity provides owner login, logout, invitation acceptance and password resets.
+There is no signup UI and new accounts receive no telemetry privileges.
+For the first owner, invite your own email under the project's Identity settings,
+then assign **only that account** the `telemetry-owner` role. Accept the invitation
+and set a password using the email link. All reads require this server-controlled
+role; ordinary authenticated accounts cannot read telemetry. Invitations and reset
+links landing at the catalogue root are forwarded to the dashboard. Public users
+can load the login page but cannot access the data. Public collection is
+same-origin, validated and rate-limited; counts are observational and can include
+bots or fabricated events, so they must not be used as financial records.
+
+The schema lives in `db/schema.ts`, with generated migrations in
+`netlify/database/migrations`. Database dependencies and the matching Drizzle migration CLI are installed at the
+repository root so automatic migration generation resolves compatible versions.
+Other server packages remain under `netlify` like the existing order functions.
+Netlify runs migration generation automatically during deployment.
+Netlify applies migrations during deploy; do not apply them manually.
