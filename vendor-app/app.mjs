@@ -1,3 +1,4 @@
+import { track } from "./telemetry-client.mjs";
 import { products, categories, vendor } from "./catalog.mjs";
 import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, total, money, localDate, validateCustomer, prepareOrderMessage, validatePdfLink } from "./order.mjs";
 
@@ -80,6 +81,7 @@ function updateQuantity(id, change, fromCart) {
   const next = Math.max(0, Math.min(MAX_QUANTITY, previous + change));
   if (next === 0) delete cart[id];
   else cart[id] = next;
+  if (next > previous) track("cart");
   saveCart();
   renderProducts();
   renderCart();
@@ -260,6 +262,8 @@ function showReview() {
   $("#preferred-date").min = localDate();
   updateFulfilment();
   $("#checkout").showModal();
+  if (cartLines(cart).length) track("cart");
+  track("checkout");
 }
 
 function closeReview() {
@@ -373,6 +377,7 @@ $("#customer-form").addEventListener("submit", async event => {
           !result.summary.startsWith(`Order ID: ${orderId}\n`) || result.summary.length > 65536))) {
       throw new Error("The order tracker did not confirm the expected request ID. Keep checkout open and retry.");
     }
+    track("saved");
     fullMessage = result.message;
     const message = prepareOrderMessage(fullMessage, result.summary);
     const pdf = message.isSummary ? validatePdfLink(result.pdf, window.location.origin) : null;

@@ -1,7 +1,7 @@
 [build]
   base = "."
   publish = "vendor-app"
-  command = "npm ci --omit=dev --prefix netlify"
+  command = "npm ci --omit=dev && npm ci --omit=dev --prefix netlify"
   ignore = "exit 1"
 
 [build.environment]
