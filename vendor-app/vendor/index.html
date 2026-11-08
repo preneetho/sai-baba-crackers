@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#1e4f91">
+  <title>Vendor dashboard | Sai Baba Crackers Centre</title>
+  <link rel="icon" href="/sai-baba-logo.png">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/vendor.css">
+  <script type="module" src="/vendor.mjs"></script>
+</head>
+<body class="vendor-page">
+  <a class="skip-link" href="#vendor-main">Skip to dashboard</a>
+  <header class="vendor-header">
+    <a class="vendor-brand" href="/" aria-label="Sai Baba Crackers Centre storefront">
+      <img class="brand-mark" src="/sai-baba-logo.png" width="45" height="45" alt="">
+      <span>Sai Baba Crackers Centre<small>Vendor dashboard</small></span>
+    </a>
+    <div id="account" hidden><span id="account-email"></span><button id="sign-out" type="button">Sign out</button></div>
+  </header>
+  <main id="vendor-main" class="vendor-main">
+    <section id="access-panel" class="vendor-panel access-panel" aria-labelledby="access-title">
+      <p class="eyebrow brand-text">Private shop workspace</p>
+      <h1 id="access-title">Manage order requests</h1>
+      <p>View customer requests and update their progress. Only approved vendor Google accounts can access this dashboard.</p>
+      <p id="access-message" class="vendor-notice" role="status">Checking vendor access...</p>
+      <a id="google-sign-in" class="vendor-primary" href="/api/vendor-auth/login" hidden>Sign in with Google</a>
+      <button id="access-retry" type="button" hidden>Retry access check</button>
+      <p class="vendor-muted">Customer shopping and WhatsApp submission do not require a Google account.</p>
+      <noscript><p class="vendor-notice">Enable JavaScript to use the vendor dashboard.</p></noscript>
+    </section>
+    <section id="dashboard" hidden aria-labelledby="dashboard-title">
+      <div class="vendor-heading">
+        <div><p class="eyebrow brand-text">Order register</p><h1 id="dashboard-title">Order requests</h1></div>
+        <button id="refresh-orders" type="button">Refresh requests</button>
+      </div>
+      <p class="vendor-muted">Requests are not confirmed sales. Status updates do not send a WhatsApp message or notify customers.</p>
+      <form id="filter-form" class="vendor-panel vendor-filters">
+        <label>Search by name, phone or request ID<input id="order-search" type="search" maxlength="80" autocomplete="off" placeholder="For example, a mobile number"></label>
+        <label>Status<select id="status-filter"><option value="">All statuses</option></select></label>
+        <button class="vendor-primary" type="submit">Apply filters</button>
+        <button id="clear-filters" type="button">Clear filters</button>
+      </form>
+      <p class="vendor-muted">Counts and estimated value below match the applied filters.</p>
+      <div id="order-stats" class="vendor-stats" hidden>
+        <div class="vendor-panel"><span>New requests</span><strong id="stat-new">0</strong></div>
+        <div class="vendor-panel"><span>In progress</span><strong id="stat-active">0</strong></div>
+        <div class="vendor-panel"><span>Completed</span><strong id="stat-completed">0</strong></div>
+        <div class="vendor-panel"><span>Estimated request value</span><strong id="stat-value">Rs.0.00</strong><small>Excludes cancelled requests; not revenue</small></div>
+      </div>
+      <p id="list-message" class="vendor-notice" role="status" aria-live="polite"></p>
+      <button id="retry-orders" type="button" hidden>Retry loading requests</button>
+      <div id="order-list" class="vendor-order-list" aria-label="Order requests" aria-busy="false"></div>
+      <div id="pagination" class="vendor-pagination" hidden>
+        <button id="previous-page" type="button">Previous page</button>
+        <span id="page-label"></span>
+        <button id="next-page" type="button">Next page</button>
+      </div>
+      <p id="last-refreshed" class="vendor-muted"></p>
+      <p id="account-message" class="vendor-notice" role="status"></p>
+    </section>
+  </main>
+  <dialog id="order-dialog" class="vendor-dialog" aria-labelledby="detail-title">
+    <div class="vendor-heading"><h2 id="detail-title">Request details</h2><button id="close-details" type="button">Close</button></div>
+    <p id="detail-message" class="vendor-notice" role="status"></p>
+    <button id="reload-detail" type="button" hidden>Reload request from Sheet</button>
+    <div id="detail-content" hidden>
+      <p id="detail-id" class="vendor-request-id"></p>
+      <p id="detail-time" class="vendor-muted"></p>
+      <dl id="detail-customer" class="vendor-detail-fields"></dl>
+      <h3>Requested items</h3><pre id="detail-items" class="vendor-items"></pre>
+      <dl id="detail-amounts" class="vendor-detail-fields"></dl>
+      <p class="vendor-muted">Listed quantities are selling packs/units. Stock, final price and arrangements need shop confirmation.</p>
+      <form id="status-form" class="vendor-status-form">
+        <label>Request status<select id="detail-status" required></select></label>
+        <button id="save-status" class="vendor-primary" type="submit">Save status</button>
+      </form>
+    </div>
+  </dialog>
+</body>
+</html>

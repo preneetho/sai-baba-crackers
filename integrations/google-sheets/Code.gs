@@ -103,6 +103,104 @@ function text_(value) {
   return "'" + String(value == null ? "" : value);
 }
 
+function dashboardText_(value) {
+  return String(value == null ? "" : value).replace(/^'/, "");
+}
+
+function dashboardOrder_(row, full) {
+  var order = {
+    orderId: row[0], createdAt: createdAt_(row[1]), status: row[2],
+    name: dashboardText_(row[3]), phone: dashboardText_(row[4]),
+    fulfilment: row[6], total: row[13]
+  };
+  if (!/^SBC-[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/.test(order.orderId) ||
+      ORDER_STATUSES.indexOf(order.status) < 0 || typeof order.fulfilment !== "string" ||
+      typeof order.total !== "number" || !isFinite(order.total) || order.total < 0) {
+    throw new Error("Invalid stored order");
+  }
+  if (full) {
+    order.address = dashboardText_(row[5]);
+    order.preferredDate = dashboardText_(row[7]);
+    order.items = dashboardText_(row[8]);
+    order.subtotal = row[9];
+    order.discountPercent = row[10];
+    order.discount = row[11];
+    order.deliveryCharge = row[12];
+    order.notes = dashboardText_(row[14]);
+    [order.subtotal, order.discountPercent, order.discount, order.deliveryCharge].forEach(function (amount) {
+      if (typeof amount !== "number" || !isFinite(amount) || amount < 0) throw new Error("Invalid stored amount");
+    });
+  }
+  return order;
+}
+
+function dashboardAction_(input) {
+  var list = input.action === "vendor-list";
+  var detail = input.action === "vendor-detail";
+  var update = input.action === "vendor-status";
+  if ((!list && !detail && !update) ||
+      (!list && !/^SBC-[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/.test(input.orderId || "")) ||
+      (update && (ORDER_STATUSES.indexOf(input.status) < 0 || ORDER_STATUSES.indexOf(input.expectedStatus) < 0)) ||
+      (list && (typeof input.query !== "string" || input.query.length > 80 ||
+        /[\u0000-\u001f\u007f]/.test(input.query) ||
+        (input.status !== "" && ORDER_STATUSES.indexOf(input.status) < 0) ||
+        !Number.isInteger(input.page) || input.page < 1 || input.page > 400))) {
+    return reply_({ ok: false, error: "INVALID_REQUEST" });
+  }
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return reply_({ ok: false, error: "BUSY" });
+  try {
+    var sheet = orderSheet_();
+    var count = sheet.getLastRow() - 1;
+    if (!list) {
+      var existing = count > 0 ? sheet.getRange(2, 1, count, 1).createTextFinder(input.orderId)
+        .matchEntireCell(true).useRegularExpression(false).findNext() : null;
+      if (!existing) return reply_({ ok: false, error: "NOT_FOUND" });
+      var rowNumber = existing.getRow();
+      var row = sheet.getRange(rowNumber, 1, 1, 17).getValues()[0];
+      if (update) {
+        if (row[2] !== input.expectedStatus) return reply_({ ok: false, error: "STATUS_CONFLICT" });
+        dashboardOrder_(row, true);
+        sheet.getRange(rowNumber, 3).setValue(input.status);
+        SpreadsheetApp.flush();
+        row[2] = input.status;
+      }
+      return reply_({ ok: true, order: dashboardOrder_(row, true) });
+    }
+    if (count > 10000) return reply_({ ok: false, error: "REGISTER_TOO_LARGE" });
+    var query = input.query.toLowerCase();
+    var phoneQuery = query.replace(/[+\s()-]/g, "");
+    var orders = count > 0 ? sheet.getRange(2, 1, count, 17).getValues()
+      .filter(function (row) { return row[0] !== ""; })
+      .map(function (row) { return dashboardOrder_(row, false); })
+      .filter(function (order) {
+        var matches = !query || order.orderId.toLowerCase().indexOf(query) >= 0 ||
+          order.name.toLowerCase().indexOf(query) >= 0 ||
+          (phoneQuery && order.phone.replace(/[+\s()-]/g, "").indexOf(phoneQuery) >= 0);
+        return matches && (!input.status || order.status === input.status);
+      }) : [];
+    orders.sort(function (a, b) {
+      return b.createdAt.localeCompare(a.createdAt) || b.orderId.localeCompare(a.orderId);
+    });
+    var stats = { requestValue: 0 };
+    ORDER_STATUSES.forEach(function (status) { stats[status] = 0; });
+    orders.forEach(function (order) {
+      stats[order.status]++;
+      if (typeof order.total !== "number" || !isFinite(order.total) || order.total < 0) throw new Error("Invalid stored total");
+      if (order.status !== "Cancelled") stats.requestValue += order.total;
+    });
+    stats.requestValue = Math.round(stats.requestValue * 100) / 100;
+    var start = (input.page - 1) * 25;
+    return reply_({ ok: true, orders: orders.slice(start, start + 25), total: orders.length,
+      page: input.page, stats: stats });
+  } catch (error) {
+    console.error("Vendor Sheet operation failed. Check permissions, column layout and stored values.");
+    return reply_({ ok: false, error: "DASHBOARD_FAILED" });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function doPost(event) {
   var input;
   try {
@@ -120,6 +218,7 @@ function doPost(event) {
   if (!secret || secret.length < 32 || input.secret !== secret) {
     return reply_({ ok: false, error: "UNAUTHORIZED" });
   }
+  if (input.action) return dashboardAction_(input);
   var order = input.order;
   if (!order || !/^SBC-[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/.test(order.orderId) ||
       !/^[0-9a-f]{64}$/.test(order.fingerprint) || !order.customer ||

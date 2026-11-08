@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DISCOUNT_PERCENT, MAX_WHATSAPP_URL_LENGTH, sanitizeCart, cartLines, pricing, validateCustomer, createRequirement, whatsappUrl } from "../../vendor-app/order.mjs";
 import { saveOrderPdf } from "../lib/order-pdfs.mjs";
+import { sheetSettings } from "../lib/sheets.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_BODY_BYTES = 16384;
@@ -41,21 +42,6 @@ export function buildOrder(input, now = new Date()) {
     customer, items, amounts,
     message: `Order ID: ${orderId}\n${message}`,
   };
-}
-
-function settings(env) {
-  const url = env.GOOGLE_SHEETS_WEBHOOK_URL;
-  const secret = env.ORDER_TRACKING_SECRET;
-  if (typeof url !== "string" || typeof secret !== "string" || secret.length < 32) return null;
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:" || parsed.hostname !== "script.google.com" ||
-        parsed.port || parsed.username || parsed.password || parsed.search || parsed.hash ||
-        !/^\/macros\/s\/[a-zA-Z0-9_-]+\/exec$/.test(parsed.pathname)) return null;
-    return { url, secret };
-  } catch {
-    return null;
-  }
 }
 
 function orderTime(createdAt) {
@@ -101,7 +87,7 @@ export async function handleOrderRequest(request, {
     response.headers.set("Allow", "GET, POST");
     return response;
   }
-  const connection = settings(env);
+  const connection = sheetSettings(env);
   if (!connection) {
     return json({ error: "Order tracking is not configured yet. Contact the shop; no order request has been recorded." }, 503);
   }

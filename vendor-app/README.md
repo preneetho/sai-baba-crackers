@@ -5,6 +5,10 @@ order-recording function and a Google Apps Script integration. No frontend
 framework, frontend npm dependencies, customer accounts, payments, analytics or automatic
 WhatsApp messaging. The existing Product Memory Graph application is unchanged.
 Server-only dependencies generate PDFs and store them in private Netlify Blobs.
+The separate `/vendor/` dashboard uses approved vendor Google sign-in to view
+requests and update the existing Sheet statuses. Customers do not need accounts.
+See the [vendor dashboard setup](../integrations/google-sheets/VENDOR-DASHBOARD.md)
+for OAuth, the approved-email list and deployment steps.
 
 ## Run
 

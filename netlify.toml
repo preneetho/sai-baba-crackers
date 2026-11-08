@@ -27,3 +27,9 @@
   for = "/*.mjs"
   [headers.values]
     Content-Type = "text/javascript; charset=utf-8"
+
+[[headers]]
+  for = "/vendor/*"
+  [headers.values]
+    Cache-Control = "no-store"
+    X-Robots-Tag = "noindex, nofollow, noarchive"

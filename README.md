@@ -67,3 +67,18 @@ recovery does not save another order; the normal automatic handoff is unchanged.
 
 See [the app guide](vendor-app/README.md) for configuration, hosting, privacy
 and WhatsApp handoff details.
+
+## Private vendor dashboard
+
+The `/vendor/` page uses Google sign-in restricted to approved vendor email
+addresses. It supports request search, status filters, 25-request pages,
+full customer/item details, estimated request counts/value and conflict-safe
+status updates in the existing Google Sheet. It does not send customer
+notifications or treat requests as paid sales.
+
+Before using it, follow the
+[vendor dashboard setup](integrations/google-sheets/VENDOR-DASHBOARD.md):
+update the existing Apps Script web-app deployment, create a Google OAuth
+web client, add the five vendor environment settings in Netlify, and
+commit/push this source. The page reports unavailable access until configured.
+The storefront and customer WhatsApp flow do not require Google sign-in.

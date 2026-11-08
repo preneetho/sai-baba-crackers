@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
 import { handleOrderRequest } from "../netlify/functions/orders.mjs";
 import { handlePdfRequest } from "../netlify/functions/order-pdf.mjs";
+import { handleVendorAuth } from "../netlify/functions/vendor-auth.mjs";
+import { handleVendorOrders } from "../netlify/functions/vendor-orders.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -12,6 +14,12 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 const files = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
   ["/index.html", ["index.html", "text/html; charset=utf-8"]],
+  ["/vendor", ["vendor/index.html", "text/html; charset=utf-8"]],
+  ["/vendor/", ["vendor/index.html", "text/html; charset=utf-8"]],
+  ["/vendor/index.html", ["vendor/index.html", "text/html; charset=utf-8"]],
+  ["/vendor.css", ["vendor.css", "text/css; charset=utf-8"]],
+  ["/vendor.mjs", ["vendor.mjs", "text/javascript; charset=utf-8"]],
+  ["/vendor-model.mjs", ["vendor-model.mjs", "text/javascript; charset=utf-8"]],
   ["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
   ["/app.mjs", ["app.mjs", "text/javascript; charset=utf-8"]],
   ["/catalog.mjs", ["catalog.mjs", "text/javascript; charset=utf-8"]],
@@ -38,7 +46,8 @@ const server = createServer(async (request, response) => {
     response.end("Invalid URL");
     return;
   }
-  if (pathname === "/api/orders" || pathname === "/api/order-pdf") {
+  if (pathname === "/api/orders" || pathname === "/api/order-pdf" ||
+      pathname === "/api/vendor-orders" || pathname.startsWith("/api/vendor-auth/")) {
     try {
       const init = { method: request.method, headers: request.headers };
       if (request.method !== "GET" && request.method !== "HEAD") {
@@ -46,9 +55,14 @@ const server = createServer(async (request, response) => {
         init.duplex = "half";
       }
       const url = new URL(request.url, `http://127.0.0.1:${port}`);
-      const handler = pathname === "/api/orders" ? handleOrderRequest : handlePdfRequest;
+      const handler = pathname === "/api/orders" ? handleOrderRequest :
+        pathname === "/api/order-pdf" ? handlePdfRequest :
+          pathname === "/api/vendor-orders" ? handleVendorOrders : handleVendorAuth;
       const result = await handler(new Request(url, init));
-      response.writeHead(result.status, Object.fromEntries(result.headers));
+      const headers = Object.fromEntries(result.headers);
+      const cookies = result.headers.getSetCookie();
+      if (cookies.length) headers["set-cookie"] = cookies;
+      response.writeHead(result.status, headers);
       response.end(Buffer.from(await result.arrayBuffer()));
     } catch {
       console.error("Local order endpoint could not process the request.");

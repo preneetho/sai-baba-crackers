@@ -49,7 +49,8 @@ Choose **Deploy > New deployment > Web app**:
 - **Execute as:** the vendor/owner account.
 - **Who has access:** Anyone. This exposes only the script endpoint; the
   spreadsheet itself remains Restricted. The script rejects requests without
-  the private shared secret and provides no order-reading endpoint.
+  the private shared secret. Dashboard read/status actions also require that
+  server-only secret; the public website cannot call them directly.
 
 Deploy and copy the **Web app URL**, which must have this form:
 
@@ -63,6 +64,11 @@ integration; do not make the spreadsheet public.
 
 When changing script code later, update the deployment to a **new version**.
 Saving code alone does not update the deployed web app.
+
+For the authenticated vendor dashboard, also follow the
+[vendor dashboard setup](VENDOR-DASHBOARD.md). It requires the latest Apps Script
+deployment plus Google OAuth credentials and an exact approved-email list in
+Netlify. The public customer submission endpoint does not expose Sheet records.
 
 ## 4. Configure Netlify and deploy the code
 
@@ -87,6 +93,7 @@ Trigger a new deployment after adding or changing environment variables.
 
 Check the deploy log for `orders`, `order-pdf` and the hourly
 `expire-order-pdfs` function. The latter runs only on the published deployment.
+The vendor dashboard additionally deploys `vendor-auth` and `vendor-orders`.
 The `orders` rate-limit rule
 allows 10 requests per minute per domain and IP; Netlify enforcement can lag by
 up to 10 seconds. This is basic abuse protection, not customer authentication or
