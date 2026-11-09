@@ -1,6 +1,7 @@
 import { track } from "./telemetry-client.mjs";
 import { vendor } from "./catalog.mjs";
 import { validCatalogue } from "./catalogue-model.mjs";
+import { mediaUrl } from "./media-model.mjs";
 import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, total as getTotal, money, localDate, validateCustomer, prepareOrderMessage, validatePdfLink } from "./order.mjs";
 
 const $ = selector => document.querySelector(selector);
@@ -21,6 +22,10 @@ let fullMessage = "";
 let lastReviewTrigger = null;
 let submission = null;
 let saving = false;
+let galleryProduct = null;
+let galleryIndex = 0;
+let galleryTrigger = null;
+let galleryVideo = null;
 const warning = $("#storage-warning");
 
 function showStorageWarning(message, reset = false) {
@@ -180,11 +185,30 @@ function renderProducts() {
   $("#products").replaceChildren(...filtered.map(product => {
     const card = element("article", `product-card${cart[product.id] ? " in-cart" : ""}`);
     card.dataset.id = product.id;
-    const art = element("div", `product-art art-${categories.indexOf(product.category) % 4}`);
-    art.setAttribute("aria-hidden", "true");
-    art.append(element("span", "product-number", `NO. ${String(product.id).padStart(2, "0")}`),
-      productIllustration(product),
-      element("span", "art-category", product.category));
+    const hasMedia = Boolean(product.media?.length);
+    const art = element(hasMedia ? "button" : "div", `product-art art-${categories.indexOf(product.category) % 4}${hasMedia ? " media-cover" : ""}`);
+    if (hasMedia) {
+      art.type = "button";
+      art.dataset.mediaProduct = String(product.id);
+      art.setAttribute("aria-label", `View photos, video and credits for ${product.name}`);
+      const cover = element("img", "product-cover");
+      cover.src = mediaUrl(product.media[0]);
+      cover.alt = "";
+      cover.loading = "lazy";
+      cover.decoding = "async";
+      cover.addEventListener("error", () => {
+        caption.textContent = "Preview unavailable - open media";
+        art.replaceChildren(productIllustration(product), caption);
+      }, { once: true });
+      const caption = element("span", "media-cover-caption", "View media & credits");
+      art.append(cover, caption);
+      art.addEventListener("click", () => openMedia(product, art));
+    } else {
+      art.setAttribute("aria-hidden", "true");
+      art.append(element("span", "product-number", `NO. ${String(product.id).padStart(2, "0")}`),
+        productIllustration(product),
+        element("span", "art-category", product.category));
+    }
     const body = element("div", "product-body");
     body.append(element("p", "product-brand", product.brand), element("h3", "", product.name),
       element("p", "product-unit", product.unit));
@@ -197,6 +221,89 @@ function renderProducts() {
     return card;
   }));
 }
+
+function stopGalleryVideo() {
+  if (!galleryVideo) return;
+  galleryVideo.pause();
+  galleryVideo.removeAttribute("src");
+  galleryVideo.load();
+  galleryVideo = null;
+}
+
+function openMedia(product, trigger) {
+  galleryProduct = product;
+  galleryIndex = 0;
+  galleryTrigger = trigger;
+  $("#product-media-title").textContent = product.name;
+  renderMedia();
+  $("#product-media-dialog").showModal();
+}
+
+function renderMedia() {
+  stopGalleryVideo();
+  const asset = galleryProduct.media[galleryIndex];
+  $("#product-media-stage").replaceChildren();
+  $("#product-media-credit").textContent = asset.credit ? `Credit / license: ${asset.credit}` : "";
+  $("#product-media-description").textContent = asset.alt;
+  const status = $("#product-media-status");
+  const retry = $("#retry-product-media");
+  retry.hidden = true;
+  const node = element(asset.resourceType === "image" ? "img" : "video", "gallery-asset");
+  node.addEventListener("error", () => {
+    status.textContent = "This media could not be loaded. Retry, choose another item, or close this preview to keep shopping.";
+    retry.hidden = false;
+  });
+  if (asset.resourceType === "image") {
+    status.textContent = "Loading photo...";
+    node.alt = asset.alt;
+    node.addEventListener("load", () => { status.textContent = ""; });
+    node.src = mediaUrl(asset, "full");
+  } else {
+    status.textContent = "Press play to load the video. No video plays automatically.";
+    node.controls = true;
+    node.preload = "none";
+    node.playsInline = true;
+    node.poster = mediaUrl(asset);
+    node.setAttribute("aria-label", asset.alt);
+    node.addEventListener("playing", () => { status.textContent = ""; });
+    node.addEventListener("waiting", () => { status.textContent = "Loading video..."; });
+    node.src = mediaUrl(asset, "play");
+    galleryVideo = node;
+  }
+  $("#product-media-stage").append(node);
+  $("#product-media-position").textContent = `${galleryIndex + 1} of ${galleryProduct.media.length}`;
+  $("#previous-product-media").disabled = galleryIndex === 0;
+  $("#next-product-media").disabled = galleryIndex === galleryProduct.media.length - 1;
+}
+
+function stepMedia(delta) {
+  if (!galleryProduct) return;
+  const next = galleryIndex + delta;
+  if (next < 0 || next >= galleryProduct.media.length) return;
+  galleryIndex = next;
+  renderMedia();
+  $("#product-media-position").focus();
+}
+
+$("#close-product-media").addEventListener("click", () => $("#product-media-dialog").close());
+$("#retry-product-media").addEventListener("click", () => { if (galleryProduct) renderMedia(); });
+$("#previous-product-media").addEventListener("click", () => stepMedia(-1));
+$("#next-product-media").addEventListener("click", () => stepMedia(1));
+$("#product-media-dialog").addEventListener("keydown", event => {
+  if (event.target.tagName === "VIDEO") return;
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    event.preventDefault();
+    stepMedia(event.key === "ArrowLeft" ? -1 : 1);
+  }
+});
+$("#product-media-dialog").addEventListener("close", () => {
+  stopGalleryVideo();
+  $("#product-media-stage").replaceChildren();
+  galleryProduct = null;
+  if (galleryTrigger?.isConnected) galleryTrigger.focus({ preventScroll: true });
+  else $("#catalogue-title").focus({ preventScroll: true });
+  galleryTrigger = null;
+});
 
 function pricingSummary(withIds = false) {
   const amounts = pricing(cart);
@@ -511,6 +618,7 @@ window.addEventListener("storage", event => {
 });
 async function loadCatalogue() {
   if (catalogueLoading || saving || $("#checkout").open) return;
+  if ($("#product-media-dialog").open) $("#product-media-dialog").close();
   if (catalogue) retainedCart = JSON.stringify({ year: catalogue.year, revision: catalogue.revision, cart });
   catalogueLoading = true;
   $("#reload-catalogue").disabled = true;

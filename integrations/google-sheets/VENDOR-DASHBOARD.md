@@ -158,6 +158,47 @@ Old Sheet orders are not automatically copied or combined with database orders.
 - The permanent Sheet remains vendor-controlled. This feature does not change
   its retention rules or the separate seven-day PDF links.
 
+## Cloudinary product media
+
+Product media requires `ORDER_BACKEND=netlify-db` and the yearly catalogue;
+it is not supported by the Sheets-only catalogue. Follow the
+[product-media setup and retention guide](../../README.md#product-photos-and-videos-cloudinary)
+for all four Cloudinary variables and the signed `sai_baba_products` preset.
+Publish source and Functions together through the Git-connected deployment.
+The `vendor-media` Function must be included; existing Netlify variables alone
+do not add the application integration.
+
+In **Manage yearly price lists**, select the year, expand **Photos & video**
+for a saved product and upload one file at a time. Limits are 3 photos
+(JPG/PNG/WebP, 5 MB each) and 1 video (MP4/WebM/MOV, 20 MB, 30 seconds).
+Review the description/credit, choose the cover/order, then **Save price list**.
+Uploading is a draft change; saving an inactive year does not activate it.
+New products must be saved before uploading. Failed uploads retain other edits.
+Do not navigate away while a file is being uploaded or verified.
+
+Files are public in Cloudinary, so do not upload private information. Publish
+only media you own or may license; provide required creator, source and license
+credit, and label generic examples honestly. Removing media never deletes a
+file referenced by another year or older revision. Rejected/abandoned uploads
+may still use Cloudinary storage; check references before deleting them there.
+
+- **Cloudinary is not configured:** Check all four values in production
+  Functions scope, confirm they belong to the same product environment,
+  then redeploy.
+- **Cloudinary rejected the upload:** Confirm Signed preset mode, formats,
+  file-size constraints, account quota and key permissions. Do not switch to
+  an unsigned preset.
+- **Verification not confirmed:** Confirm the key can read resources through
+  the Admin API, its quota is available, and the video is within 30 seconds.
+  Inspect the Media Library before retrying; a transfer may have succeeded
+  even though attachment verification failed.
+- **Price list changed:** Reload the saved list and review edits before
+  authorizing another upload. A pending upload never overwrites a newer list.
+- **Customer media unavailable:** Check CDN access and whether someone deleted
+  or overwrote the Cloudinary asset. Images need `res.cloudinary.com`, uploads
+  need `api.cloudinary.com`, and local video inspection needs `blob:` media
+  in the checked-in CSP. Do not relax script or frame restrictions.
+
 ## Local preview and troubleshooting
 
 Without configuration, the page reports that vendor sign-in is unavailable and

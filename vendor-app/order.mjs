@@ -27,9 +27,10 @@ export function sanitizeCart(value, catalogue = products) {
 
 export function cartLines(cart, catalogue = products) {
   const byId = new Map(catalogue.map(product => [product.id, product]));
-  return Object.entries(sanitizeCart(cart, catalogue)).map(([id, quantity]) => ({
-    ...byId.get(Number(id)), quantity, amount: Math.round(byId.get(Number(id)).price * 100) * quantity / 100,
-  }));
+  return Object.entries(sanitizeCart(cart, catalogue)).map(([id, quantity]) => {
+    const { media, ...product } = byId.get(Number(id));
+    return { ...product, quantity, amount: Math.round(product.price * 100) * quantity / 100 };
+  });
 }
 
 export function pricing(cart, catalogue = products) {

@@ -1,5 +1,5 @@
 import { products, vendor } from "../../vendor-app/catalog.mjs";
-import { validCatalogue } from "../../vendor-app/catalogue-model.mjs";
+import { validCatalogue, catalogueProducts } from "../../vendor-app/catalogue-model.mjs";
 import { orderBackend } from "../lib/order-backend.mjs";
 
 export async function handleCatalogue(request, {
@@ -18,7 +18,7 @@ export async function handleCatalogue(request, {
     const catalogue = backend.name === "netlify-db" ? await (await databaseFactory()).activeCatalogue() :
       { year: vendor.year, revision: 0, products };
     if (!validCatalogue(catalogue)) throw new Error("Invalid catalogue response.");
-    return respond(catalogue);
+    return respond({ year: catalogue.year, revision: catalogue.revision, products: catalogueProducts(catalogue.products, true) });
   } catch {
     console.error("Active catalogue could not be loaded. Check database availability and migrations.");
     return respond({ error: "The price list is unavailable. Retry loading it or contact the shop." }, 503);

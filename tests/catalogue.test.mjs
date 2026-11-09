@@ -10,6 +10,7 @@ import { handleOrderRequest, buildOrder } from "../netlify/functions/orders.mjs"
 import { createSession, unseal, vendorSettings } from "../netlify/lib/vendor-auth.mjs";
 import { products } from "../vendor-app/catalog.mjs";
 import { validCatalogue, catalogueProducts } from "../vendor-app/catalogue-model.mjs";
+import { mediaProof } from "../netlify/lib/product-media.mjs";
 
 const engine = new PGlite();
 const database = createOrderDatabase(drizzle({ client: engine }));
@@ -23,6 +24,12 @@ const env = {
   VENDOR_SESSION_SECRET: "synthetic-session-secret-".repeat(3),
 };
 const settings = vendorSettings(env);
+const cloudEnv = { ...env, CLOUDINARY_CLOUD_NAME: "synthetic-cloud", CLOUDINARY_API_KEY: "123456789012345",
+  CLOUDINARY_API_SECRET: "synthetic-cloud-secret-only", CLOUDINARY_UPLOAD_PRESET: "sai_baba_products" };
+const mediaAsset = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
+  resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
+  duration: 0, alt: "Synthetic product photo", credit: "Synthetic credit" };
+mediaAsset.proof = mediaProof(mediaAsset, settings.secret);
 const cookie = createSession({ sub: "synthetic-owner", email: "owner@example.com" }, settings, now.getTime());
 const csrf = unseal(cookie, "session", settings, now.getTime()).csrf;
 const options = { env, databaseFactory: async () => database, now: () => now.getTime() };
@@ -79,6 +86,77 @@ test("tracked migration seeds every original 2026 product, pack, category and pr
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.deepEqual(await response.json(), base);
   assert.equal((await handleCatalogue(request("/api/catalogue?year=2025"), options)).status, 400);
+});
+
+test("verified product media is revision-bound, copied across years and excluded from public proofs and order snapshots", async () => {
+  const rows = catalogueProducts(products);
+  rows[0].media = [{ ...mediaAsset }];
+  const response = await handleVendorCatalogue(request("/api/vendor-catalogue", {
+    action: "save", year: 2026, expectedRevision: 1, products: rows,
+  }), { ...options, env: cloudEnv });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).catalogue.products[0].media[0].proof, mediaAsset.proof);
+  const publicMedia = (await (await publicList()).json()).products[0].media[0];
+  assert.equal(publicMedia.proof, undefined);
+  assert.equal(publicMedia.credit, mediaAsset.credit);
+  assert.equal((await database.catalogueVersion(2026, 1)).products[0].media, undefined);
+  await database.priceLists({ action: "create", year: 2027, sourceYear: 2026, expectedRevision: 2 }, "owner@example.com");
+  assert.deepEqual((await database.catalogueVersion(2027, 1)).products[0].media, [mediaAsset]);
+  rows[0].media = [];
+  await save(2026, 2, rows);
+  assert.equal((await database.activeCatalogue()).products[0].media, undefined);
+  assert.deepEqual((await database.catalogueVersion(2026, 2)).products[0].media, [mediaAsset]);
+  assert.deepEqual((await database.catalogueVersion(2027, 1)).products[0].media, [mediaAsset]);
+  const withMedia = { ...base, products: catalogueProducts(products) };
+  withMedia.products[0].media = [mediaAsset];
+  assert.deepEqual(buildOrder(payload(), now, withMedia), buildOrder(payload(), now, base));
+});
+
+test("catalogue rejects forged media but preserves trusted saved assets after vendor-secret rotation", async () => {
+  const rows = catalogueProducts(products);
+  rows[0].media = [{ ...mediaAsset, version: mediaAsset.version + 1 }];
+  assert.equal((await handleVendorCatalogue(request("/api/vendor-catalogue", {
+    action: "save", year: 2026, expectedRevision: 1, products: rows,
+  }), { ...options, env: cloudEnv })).status, 400);
+  rows[0].media = [{ ...mediaAsset }];
+  await save(2026, 1, rows);
+  const rotatedEnv = { ...cloudEnv, VENDOR_SESSION_SECRET: "rotated-synthetic-session-".repeat(3) };
+  const rotatedSettings = vendorSettings(rotatedEnv);
+  const rotatedCookie = createSession({ sub: "synthetic-owner", email: "owner@example.com" }, rotatedSettings, now.getTime());
+  const rotatedCsrf = unseal(rotatedCookie, "session", rotatedSettings, now.getTime()).csrf;
+  const body = { action: "save", year: 2026, expectedRevision: 2, products: rows };
+  const rotatedRequest = value => new Request(origin + "/api/vendor-catalogue", {
+    method: "POST", headers: { Origin: origin, "Content-Type": "application/json",
+      Cookie: `${rotatedSettings.sessionCookie}=${rotatedCookie}`, "X-Vendor-CSRF": rotatedCsrf }, body: JSON.stringify(value),
+  });
+  rows[0].media[0].credit = "Updated legal credit";
+  const response = await handleVendorCatalogue(rotatedRequest(body), { ...options, env: rotatedEnv });
+  assert.equal(response.status, 200);
+  const stored = (await response.json()).catalogue.products[0].media[0];
+  assert.equal(stored.proof, mediaProof(stored, rotatedSettings.secret));
+  assert.equal(stored.credit, "Updated legal credit");
+  rows[0].media[0].bytes++;
+  assert.equal((await handleVendorCatalogue(rotatedRequest({ ...body, expectedRevision: 3 }), { ...options, env: rotatedEnv })).status, 400);
+});
+
+test("all 200 products with maximum multilingual media descriptions fit the bounded catalogue request", async () => {
+  const text = "\u0800";
+  const rows = Array.from({ length: 200 }, (_, index) => ({
+    ...products[0], id: index + 1, name: text.repeat(120), brand: text.repeat(120),
+    unit: text.repeat(120), category: text.repeat(120),
+    media: Array.from({ length: 4 }, (_, position) => {
+      const asset = { ...mediaAsset, publicId: mediaAsset.publicId.slice(0, -1) + position,
+        resourceType: position === 3 ? "video" : "image", format: position === 3 ? "mp4" : "jpg",
+        duration: position === 3 ? 30 : 0, alt: text.repeat(240), credit: text.repeat(1200) };
+      return { ...asset, proof: mediaProof(asset, settings.secret) };
+    }),
+  }));
+  const body = { action: "save", year: 2026, expectedRevision: 1, products: rows };
+  const bytes = Buffer.byteLength(JSON.stringify(body));
+  assert.ok(bytes > 3500000 && bytes < 5000000, `Maximum body is ${bytes} bytes`);
+  assert.equal((await handleVendorCatalogue(request("/api/vendor-catalogue", body), { ...options, env: cloudEnv })).status, 200);
+  assert.equal((await database.activeCatalogue()).products[199].media.length, 4);
+  assert.equal((await handleVendorCatalogue(request("/api/vendor-catalogue", { padding: "x".repeat(5000001) }), options)).status, 413);
 });
 
 test("copying and editing another year never changes the active catalogue until explicit activation", async () => {

@@ -129,6 +129,76 @@ Database failures show an explicit error, never a fallback to static prices.
 The explicitly selected Sheets backend continues using the original static
 2026 list and does not support vendor yearly-price editing.
 
+## Product photos and videos (Cloudinary)
+
+The database catalogue supports up to **3 photos and 1 video per product**.
+Photos must be JPG, PNG or WebP, up to 5 MB each. Videos must be MP4, WebM or
+MOV, up to 20 MB and 30 seconds; MP4 is the most widely supported choice.
+The vendor uploads directly to Cloudinary using a server-signed authorization.
+The server checks Cloudinary's actual asset metadata before issuing an
+attachment proof; the database stores references and credits, not file bytes.
+No new package or database migration is needed beyond the annual catalogue.
+
+Add these **production Functions-scoped** Netlify variables, then publish the
+updated source using the normal Git-connected deployment:
+
+| Variable | Value |
+|---|---|
+| `CLOUDINARY_CLOUD_NAME` | Product environment's cloud name |
+| `CLOUDINARY_API_KEY` | API key from that same environment |
+| `CLOUDINARY_API_SECRET` | Its API secret, stored only in Netlify |
+| `CLOUDINARY_UPLOAD_PRESET` | `sai_baba_products`, a **signed** upload preset |
+
+Use the Image and Video API product. Configure the signed preset with
+overwrite disabled, an optional asset folder `sai-baba-crackers/products`,
+and no folder/path prepended to the supplied public ID. Where supported,
+also configure preset file-size/format restrictions. App upload authorizations
+use a unique public ID and refuse overwrite. The API key must support signed
+uploads and server-side Admin API resource lookup. Never use an unsigned
+preset or put the API secret in source, a browser or chat.
+
+At `/vendor/`, open **Manage yearly price lists**, choose the year, and expand
+**Photos & video** under a product:
+
+1. Save a newly added product before uploading. Choose a file and select
+   **Upload selected file**. Only approved signed-in vendors can authorize it.
+2. Review the description, supply credits/license/source URLs when required,
+   and clearly label illustrative media that is not the exact product.
+   Include essential visual/audio information in the description.
+3. Use **Use as cover**, **Move earlier/later**, or **Remove media** as needed.
+   The first item is the cover; a video cover uses a still poster.
+4. Choose **Save price list**. Uploading alone does not publish a catalogue
+   change. Saving the active year makes changes visible to customers;
+   inactive years remain unpublished.
+
+Customers get lazy optimized cover images and a keyboard-accessible gallery
+with descriptions and credits. Video loads on play, never automatically.
+Without media, existing category/name icons remain. Preview errors offer retry
+or the icon fallback without blocking quantity controls or checkout.
+
+**Retention and privacy:** Files use public Cloudinary delivery, even before
+their draft is saved. Upload only permitted product media, never customer data
+or private information. Copying a year reuses asset references; later edits
+are independent. Removal detaches a reference from the new revision, not from
+older revisions, and never deletes Cloudinary assets. Abandoned/rejected
+uploads may remain in the Media Library and consume quota. Before manual
+cleanup, check all yearly lists and historical revisions; deleting or
+overwriting an asset there can break older catalogues. Provider account
+quotas, transformations, traffic and file limits still apply. The 30-second
+and size limits are checked before attachment, not a guarantee that a rejected
+direct upload consumed no provider storage.
+
+Rotate vendor credentials when necessary. New-session authorization and upload
+tickets use `VENDOR_SESSION_SECRET`; previously saved assets remain editable
+after rotation because the server trusts their persisted immutable metadata.
+Unsaved attachment proofs from the old secret must be uploaded again after
+sign-in. Media/proofs never enter order snapshots, totals, PDFs or WhatsApp.
+As with price edits, **any saved catalogue revision, including media-only
+changes, invalidates an older cart** and requires the customer to reselect items.
+After deployment, verify one permitted photo and short video with the actual
+Cloudinary environment; synthetic local tests do not verify its credentials,
+preset, billing limits or production deployment.
+
 ## Netlify Database development
 
 The database backend is implemented but **not enabled automatically**.

@@ -200,7 +200,7 @@
     <div class="shop-layout">
       <section id="catalogue" class="catalogue" aria-labelledby="catalogue-title">
         <div class="section-heading">
-          <div><p class="eyebrow brand-text">THE DIWALI COLLECTION</p><h2 id="catalogue-title">Shop crackers</h2></div>
+          <div><p class="eyebrow brand-text">THE DIWALI COLLECTION</p><h2 id="catalogue-title" tabindex="-1">Shop crackers</h2></div>
           <span class="catalogue-year"><span data-catalogue-year>Current</span> price list</span>
         </div>
         <label class="search-box"><span aria-hidden="true">&#9906;</span><span class="sr-only">Search products, brands or product numbers</span><input id="search" type="search" placeholder="Search sparklers, flower pots, brands..." maxlength="100"><kbd aria-hidden="true">SEARCH</kbd></label>
@@ -235,6 +235,15 @@
   <a id="mobile-cart" class="mobile-cart" href="#requirement" hidden><span id="mobile-cart-label"></span><span>View cart &#8594;</span></a>
   <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
 
+  <dialog id="product-media-dialog" aria-labelledby="product-media-title">
+    <div class="dialog-heading"><h2 id="product-media-title">Product media</h2><button id="close-product-media" class="icon-button" type="button" aria-label="Close product media" autofocus>&times;</button></div>
+    <div id="product-media-stage" class="product-media-stage"></div>
+    <p id="product-media-description"></p>
+    <p id="product-media-credit" class="product-media-credit"></p>
+    <p id="product-media-status" role="status" aria-live="polite"></p>
+    <button id="retry-product-media" class="button secondary" type="button" hidden>Retry media</button>
+    <div class="media-navigation"><button id="previous-product-media" class="button secondary" type="button" aria-label="Previous product media">Previous</button><span id="product-media-position" tabindex="-1" aria-live="polite"></span><button id="next-product-media" class="button secondary" type="button" aria-label="Next product media">Next</button></div>
+  </dialog>
   <dialog id="checkout" aria-labelledby="checkout-title">
     <div class="dialog-heading"><div><p class="eyebrow brand-text">COMPLETE YOUR ORDER REQUEST</p><h2 id="checkout-title">Checkout</h2></div><button id="close-checkout" class="icon-button" type="button" aria-label="Close checkout">&times;</button></div>
     <div id="checkout-summary"></div>

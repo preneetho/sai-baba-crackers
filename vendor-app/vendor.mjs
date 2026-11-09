@@ -1,5 +1,7 @@
 import { ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary } from "./vendor-model.mjs";
 import { validCatalogue, validYear, catalogueProducts } from "./catalogue-model.mjs";
+import { validMedia, MEDIA_LIMITS, mediaUrl } from "./media-model.mjs";
+import { inspectMediaFile, transferMedia } from "./media-upload.mjs";
 
 const $ = id => document.getElementById(id);
 const money = value => `Rs.${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -32,6 +34,9 @@ let activePriceYear = null;
 let priceDirty = false;
 let priceBusy = false;
 let priceNeedsReload = false;
+let mediaController;
+let savedProductIds = new Set();
+const openMediaProducts = new Set();
 
 function notice(id, message, error = false) {
   $(id).textContent = message;
@@ -104,6 +109,10 @@ function setImportBusy(value) {
 
 function clearPrices() {
   priceVersion++;
+  mediaController?.abort();
+  stopPriceMedia();
+  savedProductIds.clear();
+  openMediaProducts.clear();
   priceList = null;
   activePriceYear = null;
   priceDirty = false;
@@ -118,10 +127,18 @@ function clearPrices() {
   setPriceBusy(false);
 }
 
+function stopPriceMedia() {
+  for (const video of $("price-products").querySelectorAll("video")) {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  }
+}
+
 function setPriceBusy(value) {
   priceBusy = value;
   $("price-panel").setAttribute("aria-busy", String(value));
-  for (const control of $("price-panel").querySelectorAll("button, input, select")) {
+  for (const control of $("price-panel").querySelectorAll("button, input, select, textarea")) {
     control.disabled = value || priceNeedsReload;
   }
   $("close-prices").disabled = value;
@@ -135,6 +152,7 @@ function setPriceBusy(value) {
 }
 
 function renderPriceProducts() {
+  stopPriceMedia();
   $("price-products").replaceChildren(...priceList.products.map(product => {
     const row = element("fieldset", undefined, "vendor-panel vendor-price-product");
     row.append(element("legend", `Product #${product.id}`));
@@ -148,6 +166,7 @@ function renderPriceProducts() {
       if (key === "price") { input.min = "0"; input.max = "100000"; input.step = "0.01"; }
       else input.maxLength = 120;
       input.addEventListener("input", () => {
+        if (priceBusy || priceNeedsReload) return;
         product[key] = key === "price" ? (input.value === "" ? NaN : Number(input.value)) : input.value;
         priceDirty = true;
         setPriceBusy(false);
@@ -158,6 +177,7 @@ function renderPriceProducts() {
     const remove = element("button", `Remove product #${product.id}`);
     remove.type = "button";
     remove.addEventListener("click", () => {
+      if (priceBusy || priceNeedsReload) return;
       if (priceList.products.length === 1) {
         notice("price-message", "Keep at least one product in the price list.", true);
         return;
@@ -169,9 +189,152 @@ function renderPriceProducts() {
       setPriceBusy(false);
       $("add-price-product").focus();
     });
-    row.append(remove);
+    row.append(remove, renderProductMedia(product));
     return row;
   }));
+}
+
+function renderProductMedia(product) {
+  const details = element("details", undefined, "vendor-product-media");
+  details.id = `media-product-${product.id}`;
+  details.tabIndex = -1;
+  details.open = openMediaProducts.has(product.id);
+  details.addEventListener("toggle", () => {
+    if (details.open) openMediaProducts.add(product.id);
+    else openMediaProducts.delete(product.id);
+  });
+  const media = product.media ?? [];
+  details.append(element("summary", `Photos & video (${media.length}/4)`));
+  details.append(element("p", "Upload up to 3 photos (5 MB each) and 1 video (20 MB, 30 seconds). Upload only media you own or have permission to publish. Add any required credits and label generic examples.", "vendor-muted"));
+  const list = element("div", undefined, "vendor-media-list");
+  media.forEach((asset, index) => {
+    const item = element("div", undefined, "vendor-media-item");
+    const preview = element(asset.resourceType === "image" ? "img" : "video");
+    if (asset.resourceType === "image") {
+      preview.src = mediaUrl(asset);
+      preview.alt = asset.alt;
+      preview.loading = "lazy";
+    } else {
+      preview.controls = true;
+      preview.preload = "none";
+      preview.playsInline = true;
+      preview.poster = mediaUrl(asset);
+      preview.src = mediaUrl(asset, "play");
+      preview.setAttribute("aria-label", asset.alt);
+    }
+    const failure = element("p", "", "vendor-notice");
+    failure.setAttribute("role", "status");
+    preview.addEventListener("error", () => { failure.textContent = "Preview unavailable. The saved reference is retained; check Cloudinary before removing it."; });
+    item.append(element("p", `${index === 0 ? "Cover - " : ""}${asset.resourceType === "image" ? "Photo" : "Video"} ${index + 1}`), preview, failure);
+    for (const [key, title, max] of [["alt", "Description / illustrative-example label", 240], ["credit", "Credit and license (required if not your own)", 1200]]) {
+      const label = element("label", title);
+      const input = element(key === "credit" ? "textarea" : "input");
+      input.value = asset[key];
+      input.maxLength = max;
+      if (key === "alt") input.required = true;
+      else input.rows = 3;
+      input.addEventListener("input", () => {
+        if (priceBusy || priceNeedsReload) return;
+        asset[key] = input.value; priceDirty = true; setPriceBusy(false);
+      });
+      label.append(input);
+      item.append(label);
+    }
+    const actions = element("div", undefined, "vendor-actions");
+    for (const [title, next] of [["Use as cover", 0], ["Move earlier", index - 1], ["Move later", index + 1]]) {
+      if (next === index || next < 0 || next >= media.length) continue;
+      const button = element("button", title);
+      button.type = "button";
+      button.addEventListener("click", () => {
+        if (priceBusy || priceNeedsReload) return;
+        const [moved] = media.splice(index, 1);
+        media.splice(next, 0, moved);
+        priceDirty = true;
+        renderPriceProducts();
+        setPriceBusy(false);
+        $(`media-product-${product.id}`).focus({ preventScroll: true });
+      });
+      actions.append(button);
+    }
+    const remove = element("button", "Remove media");
+    remove.type = "button";
+    remove.addEventListener("click", () => {
+      if (priceBusy || priceNeedsReload || !window.confirm("Remove this media from this year's listing? The original file and older catalogues will be kept.")) return;
+      product.media = media.filter((_, position) => position !== index);
+      priceDirty = true;
+      renderPriceProducts();
+      setPriceBusy(false);
+      $(`media-product-${product.id}`).focus({ preventScroll: true });
+    });
+    actions.append(remove);
+    item.append(actions);
+    list.append(item);
+  });
+  details.append(list);
+  if (!savedProductIds.has(product.id)) {
+    details.append(element("p", "Save this new product before uploading its media.", "vendor-muted"));
+  } else {
+    const label = element("label", "Choose one photo or video");
+    const file = element("input");
+    file.type = "file";
+    file.accept = ".jpg,.jpeg,.png,.webp,.mp4,.webm,.mov";
+    label.append(file);
+    const upload = element("button", "Upload selected file");
+    upload.type = "button";
+    upload.addEventListener("click", () => uploadProductMedia(product, file));
+    details.append(label, upload);
+  }
+  details.append(element("p", "The first item is the cover. Uploads and media edits are not published until you choose Save price list. Removed or abandoned uploads remain in Cloudinary; do not delete files used by older yearly lists.", "vendor-muted"));
+  return details;
+}
+
+async function uploadProductMedia(product, input) {
+  if (!session || priceBusy || priceNeedsReload || !priceList) return;
+  const file = input.files[0];
+  if (!file) { notice("price-message", "Choose a photo or video first.", true); return; }
+  const version = priceVersion;
+  mediaController = new AbortController();
+  const signal = AbortSignal.any([mediaController.signal, AbortSignal.timeout(150000)]);
+  setPriceBusy(true);
+  notice("price-message", "Checking the selected media...");
+  try {
+    const resourceType = await inspectMediaFile(file);
+    if (version !== priceVersion || !session) return;
+    const count = (product.media ?? []).filter(asset => asset.resourceType === resourceType).length;
+    if (count >= (resourceType === "image" ? MEDIA_LIMITS.images : MEDIA_LIMITS.videos)) {
+      throw new Error(`This product already has the maximum ${resourceType === "image" ? "3 photos" : "1 video"}. Remove an item before uploading another.`);
+    }
+    const post = body => api("/api/vendor-media", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Vendor-CSRF": session.csrf },
+      signal, body: JSON.stringify(body),
+    });
+    const authorization = await post({ action: "sign", year: priceList.year, revision: priceList.revision,
+      productId: product.id, resourceType, bytes: file.size });
+    if (version !== priceVersion || !session) return;
+    if (authorization.resourceType !== resourceType) throw new Error("The upload type could not be verified.");
+    notice("price-message", `Uploading ${resourceType === "image" ? "photo" : "video"} for product #${product.id}. Keep this page open...`);
+    await transferMedia(file, authorization, { signal });
+    if (version !== priceVersion || !session) return;
+    notice("price-message", "Verifying the uploaded file with Cloudinary...");
+    const result = await post({ action: "verify", ticket: authorization.ticket });
+    if (version !== priceVersion || !session) return;
+    if (!validMedia(result.media) || !result.media.proof || result.media.cloudName !== authorization.cloudName ||
+        result.media.publicId !== authorization.params.public_id || result.media.resourceType !== resourceType) {
+      throw new Error("The uploaded media acknowledgement could not be verified.");
+    }
+    product.media = [...(product.media ?? []), result.media];
+    priceDirty = true;
+    openMediaProducts.add(product.id);
+    renderPriceProducts();
+    $(`media-product-${product.id}`).focus({ preventScroll: true });
+    notice("price-message", `Media added to product #${product.id}'s draft. Review its description and credits, then choose Save price list to publish.`);
+  } catch (error) {
+    if (version !== priceVersion || !session) return;
+    if (error.status === 409) priceNeedsReload = true;
+    notice("price-message", `${error.message} Your existing edits and saved list are unchanged. If a transfer started, check Cloudinary's Media Library before retrying.`, true);
+  } finally {
+    if (version === priceVersion) setPriceBusy(false);
+  }
 }
 
 function acceptPrices(result, expectedYear) {
@@ -182,6 +345,7 @@ function acceptPrices(result, expectedYear) {
     throw new Error("The price-list acknowledgement could not be verified. Reload before editing.");
   }
   priceList = { ...result.catalogue, products: catalogueProducts(result.catalogue.products) };
+  savedProductIds = new Set(priceList.products.map(product => product.id));
   activePriceYear = result.activeYear;
   priceDirty = false;
   priceNeedsReload = false;
@@ -560,9 +724,10 @@ $("price-form").addEventListener("submit", event => {
   if (!priceList || !priceDirty) return;
   const products = priceList.products.map(product => ({
     ...product, ...Object.fromEntries(["name", "brand", "unit", "category"].map(key => [key, product[key].trim()])),
+    ...(product.media ? { media: product.media.map(asset => ({ ...asset, alt: asset.alt.trim(), credit: asset.credit.trim() })) } : {}),
   }));
   if (!validCatalogue({ ...priceList, products })) {
-    notice("price-message", "Complete every product field. Use unique positive IDs and prices from Rs.0 to Rs.100,000 with at most two decimals.", true);
+    notice("price-message", "Complete every product field and media description. Use at most 3 photos and 1 video, unique positive IDs and prices from Rs.0 to Rs.100,000 with at most two decimals.", true);
     return;
   }
   if (activePriceYear === priceList.year &&

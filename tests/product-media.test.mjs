@@ -1,0 +1,183 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { handleVendorMedia } from "../netlify/functions/vendor-media.mjs";
+import { vendorSettings, createSession, unseal } from "../netlify/lib/vendor-auth.mjs";
+import { cloudinarySettings, uploadSignature, mediaProof, verifiedMedia } from "../netlify/lib/product-media.mjs";
+import { validMedia, validProductMedia, mediaUrl, MEDIA_LIMITS } from "../vendor-app/media-model.mjs";
+import { inspectMediaFile, transferMedia } from "../vendor-app/media-upload.mjs";
+import { products } from "../vendor-app/catalog.mjs";
+import { catalogueProducts } from "../vendor-app/catalogue-model.mjs";
+import { cartLines } from "../vendor-app/order.mjs";
+
+const now = Date.parse("2026-11-09T12:00:00Z");
+const env = {
+  ORDER_BACKEND: "netlify-db", ORDER_PDF_SECRET: "synthetic-pdf-".repeat(4),
+  VENDOR_APP_ORIGIN: "https://vendor.example", VENDOR_ALLOWED_EMAILS: "owner@example.com",
+  VENDOR_GOOGLE_CLIENT_ID: "synthetic-client", VENDOR_GOOGLE_CLIENT_SECRET: "synthetic-secret",
+  VENDOR_SESSION_SECRET: "synthetic-session-".repeat(4),
+  CLOUDINARY_CLOUD_NAME: "synthetic-cloud", CLOUDINARY_API_KEY: "123456789012345",
+  CLOUDINARY_API_SECRET: "synthetic-cloud-secret-only", CLOUDINARY_UPLOAD_PRESET: "sai_baba_products",
+};
+const settings = vendorSettings(env);
+const cloud = cloudinarySettings(env);
+const cookie = createSession({ sub: "synthetic-owner", email: "owner@example.com" }, settings, now);
+const csrf = unseal(cookie, "session", settings, now).csrf;
+const asset = { cloudName: cloud.cloudName, publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
+  resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
+  duration: 0, alt: "Synthetic product photo", credit: "Synthetic test credit" };
+const signInput = { action: "sign", year: 2026, revision: 1, productId: 1, resourceType: "image", bytes: 1000 };
+const request = (body, headers = {}) => new Request(`${env.VENDOR_APP_ORIGIN}/api/vendor-media`, {
+  method: "POST", headers: { Origin: env.VENDOR_APP_ORIGIN, "Content-Type": "application/json",
+    Cookie: `${settings.sessionCookie}=${cookie}`, "X-Vendor-CSRF": csrf, ...headers }, body: JSON.stringify(body),
+});
+const database = { priceLists: async () => ({ catalogue: { year: 2026, revision: 1, products: [products[0]] } }) };
+const options = { env, now: () => now, databaseFactory: async () => database };
+const sign = async () => (await (await handleVendorMedia(request(signInput), options)).json());
+function resource(authorization, overrides = {}) {
+  return { public_id: authorization.params.public_id, resource_type: authorization.resourceType,
+    type: "upload", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480, ...overrides };
+}
+
+test("media model bounds, canonical delivery URLs and allowlisting exclude arbitrary URLs and order snapshots", () => {
+  assert.equal(validMedia(asset), true);
+  assert.equal(validMedia({ ...asset, publicId: "https://untrusted.example/tracker" }), false);
+  assert.equal(validMedia({ ...asset, format: "svg" }), false);
+  assert.equal(validMedia({ ...asset, bytes: MEDIA_LIMITS.imageBytes + 1 }), false);
+  assert.equal(validMedia({ ...asset, bytes: MEDIA_LIMITS.imageBytes }), true);
+  const video = { ...asset, resourceType: "video", format: "mp4", bytes: MEDIA_LIMITS.videoBytes, duration: 30 };
+  assert.equal(validMedia(video), true);
+  assert.equal(validMedia({ ...video, duration: 30.001 }), false);
+  assert.equal(validMedia({ ...video, duration: Number.NaN }), false);
+  assert.equal(validProductMedia([asset, asset]), false);
+  assert.equal(validProductMedia(Array.from({ length: 4 }, (_, i) => ({ ...asset, publicId: asset.publicId.slice(0, -1) + i }))), false);
+  const proof = mediaProof(asset, settings.secret);
+  assert.equal(verifiedMedia({ ...asset, proof }, cloud, settings.secret), true);
+  assert.equal(verifiedMedia({ ...asset, proof, bytes: 1001 }, cloud, settings.secret), false);
+  assert.equal(verifiedMedia({ ...asset, proof, alt: "Updated caption", credit: "Updated attribution" }, cloud, settings.secret), true);
+  assert.equal(verifiedMedia({ ...asset, proof, cloudName: "another-cloud" }, cloud, settings.secret), false);
+  assert.match(mediaUrl(asset), /^https:\/\/res\.cloudinary\.com\/synthetic-cloud\/image\/upload\/c_limit,w_640,h_400,q_auto,f_auto\/v1234567890\//);
+  assert.match(mediaUrl(video), /so_0.*f_jpg.*\.jpg$/);
+  assert.match(mediaUrl(video, "play"), /f_mp4.*\.mp4$/);
+  const rows = catalogueProducts([{ ...products[0], media: [{ ...asset, proof, untrustedUrl: "private" }] }], true);
+  assert.equal(rows[0].media[0].proof, undefined);
+  assert.equal(rows[0].media[0].untrustedUrl, undefined);
+  assert.deepEqual(cartLines({ 1: 2 }, rows), cartLines({ 1: 2 }, [products[0]]));
+});
+
+test("signed upload authorization fixes namespace, formats, overwrite and preset without exposing a secret", async () => {
+  const authorization = await sign();
+  assert.equal(authorization.params.upload_preset, env.CLOUDINARY_UPLOAD_PRESET);
+  assert.equal(authorization.params.overwrite, "false");
+  assert.equal(authorization.params.allowed_formats, "jpg,jpeg,png,webp");
+  assert.match(authorization.params.public_id, /^sai-baba-crackers\/products\/[a-f0-9-]{36}$/);
+  const params = authorization.params;
+  const expected = `allowed_formats=${params.allowed_formats}&overwrite=false&public_id=${params.public_id}&timestamp=${Math.floor(now / 1000)}&type=upload&upload_preset=sai_baba_products`;
+  assert.equal(authorization.signature, createHash("sha256").update(expected + env.CLOUDINARY_API_SECRET).digest("hex"));
+  assert.equal(authorization.signature, uploadSignature(params, env.CLOUDINARY_API_SECRET));
+  assert.equal(JSON.stringify(authorization).includes(env.CLOUDINARY_API_SECRET), false);
+  assert.equal(JSON.stringify(authorization).includes(env.VENDOR_SESSION_SECRET), false);
+  assert.equal(authorization.params.public_id === (await sign()).params.public_id, false);
+});
+
+test("upload authorization denies missing login, CSRF, configuration, changed revisions and unsaved products", async () => {
+  let opened = 0;
+  const guarded = { ...options, databaseFactory: async () => { opened++; return database; } };
+  assert.equal((await handleVendorMedia(request(signInput, { Cookie: "" }), guarded)).status, 401);
+  assert.equal((await handleVendorMedia(request(signInput, { "X-Vendor-CSRF": "wrong" }), guarded)).status, 403);
+  assert.equal((await handleVendorMedia(request(signInput, { Origin: "https://another.example" }), guarded)).status, 403);
+  assert.equal(opened, 0);
+  assert.equal((await handleVendorMedia(request(signInput), { ...options, env: { ...env, CLOUDINARY_API_SECRET: "" } })).status, 503);
+  for (const change of [{ revision: 2 }, { productId: 99 }]) {
+    assert.equal((await handleVendorMedia(request({ ...signInput, ...change }), options)).status, 409);
+  }
+  for (const change of [{ bytes: MEDIA_LIMITS.imageBytes + 1 }, { resourceType: "raw" }, { year: 1999 }]) {
+    assert.equal((await handleVendorMedia(request({ ...signInput, ...change }), options)).status, 400);
+  }
+  assert.equal((await handleVendorMedia(request({ action: "sign", text: "x".repeat(8193) }), options)).status, 413);
+});
+
+test("verification reads actual authenticated Cloudinary metadata, not client-supplied size or duration", async () => {
+  const authorization = await sign();
+  let lookedUp = 0;
+  const response = await handleVendorMedia(request({ action: "verify", ticket: authorization.ticket, bytes: 1 }), {
+    ...options, fetchImpl: async (url, init) => {
+      lookedUp++;
+      assert.equal(url, `https://api.cloudinary.com/v1_1/${cloud.cloudName}/resources/image/upload/${encodeURIComponent(authorization.params.public_id)}`);
+      assert.equal(init.redirect, "error");
+      assert.equal(init.headers.Authorization, `Basic ${Buffer.from(`${cloud.apiKey}:${cloud.apiSecret}`).toString("base64")}`);
+      return Response.json(resource(authorization));
+    },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(lookedUp, 1);
+  const result = await response.json();
+  assert.equal(result.media.bytes, 1000);
+  assert.equal(verifiedMedia(result.media, cloud, settings.secret), true);
+  assert.equal(response.headers.get("cache-control"), "private, no-store, max-age=0");
+  for (const invalid of [{ bytes: MEDIA_LIMITS.imageBytes + 1 }, { public_id: asset.publicId },
+    { resource_type: "raw" }, { type: "authenticated" }, { format: "svg" }, { width: 0 }]) {
+    const failure = await handleVendorMedia(request({ action: "verify", ticket: authorization.ticket }), {
+      ...options, fetchImpl: async () => Response.json(resource(authorization, invalid)),
+    });
+    assert.equal(failure.status, 400);
+    assert.equal((await failure.json()).media, undefined);
+  }
+  const videoAuthorization = await (await handleVendorMedia(request({ ...signInput, resourceType: "video" }), options)).json();
+  for (const duration of [30, 30.01]) {
+    const videoResponse = await handleVendorMedia(request({ action: "verify", ticket: videoAuthorization.ticket }), {
+      ...options, fetchImpl: async () => Response.json(resource(videoAuthorization, { format: "mp4", duration })),
+    });
+    assert.equal(videoResponse.status, duration === 30 ? 200 : 400);
+  }
+});
+
+test("expired, tampered, other-session tickets and Cloudinary failures never attach media", async () => {
+  const authorization = await sign();
+  const otherCookie = createSession({ sub: "synthetic-owner", email: "owner@example.com" }, settings, now);
+  const otherCsrf = unseal(otherCookie, "session", settings, now).csrf;
+  const noFetch = { ...options, fetchImpl: () => { throw new Error("Verification must not run"); } };
+  assert.equal((await handleVendorMedia(request({ action: "verify", ticket: authorization.ticket + "x" }), noFetch)).status, 400);
+  assert.equal((await handleVendorMedia(request({ action: "verify", ticket: authorization.ticket }),
+    { ...noFetch, now: () => now + 16 * 60000 })).status, 400);
+  assert.equal((await handleVendorMedia(request({ action: "verify", ticket: authorization.ticket }, {
+    Cookie: `${settings.sessionCookie}=${otherCookie}`, "X-Vendor-CSRF": otherCsrf,
+  }), noFetch)).status, 400);
+  for (const fetchImpl of [async () => new Response("quota", { status: 429 }),
+    async () => { throw new Error("Synthetic timeout"); }, async () => new Response("not JSON")]) {
+    const response = await handleVendorMedia(request({ action: "verify", ticket: authorization.ticket }), { ...options, fetchImpl });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).media, undefined);
+  }
+});
+
+test("browser transfer uses only the signed Cloudinary endpoint and direct multipart bytes without vendor cookies", async () => {
+  await assert.rejects(inspectMediaFile({ name: "untrusted.svg", type: "image/svg+xml", size: 10 }), /Choose a JPG/);
+  await assert.rejects(inspectMediaFile({ name: "large.jpg", type: "image/jpeg", size: MEDIA_LIMITS.imageBytes + 1 }), /5 MB/);
+  assert.equal(await inspectMediaFile({ name: "photo.JPG", type: "", size: MEDIA_LIMITS.imageBytes }), "image");
+  const authorization = await sign();
+  const file = new File(["synthetic bytes"], "photo.jpg", { type: "image/jpeg" });
+  await transferMedia(file, authorization, { fetchImpl: async (url, init) => {
+    assert.equal(url, `https://api.cloudinary.com/v1_1/${cloud.cloudName}/image/upload`);
+    assert.equal(init.credentials, "omit");
+    assert.equal(init.body.get("file").name, "photo.jpg");
+    assert.equal(init.body.get("signature"), authorization.signature);
+    assert.equal(init.body.has("api_secret"), false);
+    return new Response("{}");
+  } });
+  await assert.rejects(transferMedia(file, { ...authorization, cloudName: "untrusted.example/path" }), /authorization/);
+  await assert.rejects(transferMedia(file, authorization, { fetchImpl: async () => new Response("quota", { status: 400 }) }), /rejected/);
+});
+
+test("production CSP permits only the required media providers, local metadata blobs and first-party scripts", async () => {
+  const config = await readFile(new URL("../netlify.toml", import.meta.url), "utf8");
+  const policy = /Content-Security-Policy = "([^"]+)"/.exec(config)?.[1];
+  assert.ok(policy);
+  const directives = Object.fromEntries(policy.split(";").map(value => value.trim().split(/\s+/)).map(([key, ...sources]) => [key, sources]));
+  assert.deepEqual(directives["script-src"], ["'self'"]);
+  assert.deepEqual(directives["img-src"], ["'self'", "data:", "https://res.cloudinary.com"]);
+  assert.deepEqual(directives["media-src"], ["'self'", "blob:", "https://res.cloudinary.com"]);
+  assert.deepEqual(directives["connect-src"], ["'self'", "https://api.cloudinary.com"]);
+  assert.deepEqual(directives["frame-ancestors"], ["'none'"]);
+});

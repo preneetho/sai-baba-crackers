@@ -4,6 +4,7 @@ import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 import { vendor, products } from "../vendor-app/catalog.mjs";
 import { validCatalogue } from "../vendor-app/catalogue-model.mjs";
+import { mediaUrl } from "../vendor-app/media-model.mjs";
 import * as order from "../vendor-app/order.mjs";
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -38,7 +39,7 @@ async function harness({ stored, unavailableStorage = false, price = 70 } = {}) 
     ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "DISCOUNT_PERCENT", "money", "localDate", "validateCustomer",
       "prepareOrderMessage", "validatePdfLink"].map(key => [key, order[key]])),
     checkCart: order.sanitizeCart, getLines: order.cartLines, getPricing: order.pricing, getTotal: order.total,
-    vendor, validCatalogue, track() {}, URL, AbortSignal, console, Intl,
+    vendor, validCatalogue, mediaUrl, track() {}, URL, AbortSignal, console, Intl,
     setTimeout, clearTimeout, crypto: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
     FormData: class {
       *[Symbol.iterator]() {
@@ -84,6 +85,48 @@ test("customer catalogue is loaded dynamically and saved carts are bound to its 
   assert.equal(ui.get("#review").disabled, true);
   assert.match(ui.get("#storage-warning").children[0].textContent, /year or prices changed/);
   assert.equal(ui.get("year-label").textContent, 2027);
+});
+
+test("customer media covers and gallery preserve cart controls, render credits safely, retry failures and stop video", async () => {
+  const ui = await harness();
+  const photo = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
+    resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
+    duration: 0, alt: "Illustrative example, not exact brand", credit: "<script>not executable</script> CC BY test credit" };
+  const video = { ...photo, publicId: photo.publicId.slice(0, -1) + "2", resourceType: "video", duration: 30, format: "mp4" };
+  ui.respond(async () => Response.json({ year: 2026, revision: 1, products: [{ ...products[0], media: [photo, video] }] }));
+  await ui.emit("#reload-catalogue", "click");
+  const cover = ui.get("#products").children[0].children[0];
+  assert.equal(cover.children[0].loading, "lazy");
+  assert.match(cover.children[0].src, /w_640/);
+  await cover.events.get("click")();
+  assert.equal(ui.get("#product-media-dialog").open, true);
+  assert.equal(ui.get("#product-media-credit").textContent, `Credit / license: ${photo.credit}`);
+  assert.equal(ui.get("#product-media-description").textContent, photo.alt);
+  const image = ui.get("#product-media-stage").children[0];
+  assert.match(image.src, /w_1600/);
+  image.events.get("error")();
+  assert.equal(ui.get("#retry-product-media").hidden, false);
+  await ui.emit("#retry-product-media", "click");
+  assert.equal(ui.get("#retry-product-media").hidden, true);
+  await ui.emit("#next-product-media", "click");
+  const player = ui.get("#product-media-stage").children[0];
+  assert.equal(player.preload, "none");
+  assert.equal(player.controls, true);
+  assert.equal(player.autoplay, undefined);
+  assert.match(player.src, /f_mp4/);
+  assert.match(player.poster, /\.jpg$/);
+  let paused = 0;
+  let unloaded = 0;
+  player.pause = () => paused++;
+  player.load = () => unloaded++;
+  await ui.emit("#product-media-dialog", "close");
+  assert.equal(paused, 1);
+  assert.equal(unloaded, 1);
+  assert.equal(ui.get("#product-media-stage").children.length, 0);
+  ui.run("updateQuantity(1, 1, false)");
+  assert.equal(ui.run("cart[1]"), 1);
+  cover.children[0].events.get("error")();
+  assert.match(cover.children.at(-1).textContent, /Preview unavailable/);
 });
 
 test("catalogue failures are explicit, block checkout, and allow retry without a static-price fallback", async () => {

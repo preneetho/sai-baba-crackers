@@ -1,6 +1,7 @@
 import { vendorSettings, vendorJson, vendorSession, sameOriginMutation } from "../lib/vendor-auth.mjs";
 import { orderBackend } from "../lib/order-backend.mjs";
 import { validCatalogue, validYear, catalogueProducts } from "../../vendor-app/catalogue-model.mjs";
+import { cloudinarySettings, verifiedMedia, mediaIdentity, mediaProof } from "../lib/product-media.mjs";
 
 export async function handleVendorCatalogue(request, {
   env = process.env, now = Date.now,
@@ -27,10 +28,10 @@ export async function handleVendorCatalogue(request, {
     if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
       return vendorJson({ error: "Send the price list as JSON." }, 415);
     }
-    if (Number(request.headers.get("content-length")) > 512000) return vendorJson({ error: "Price list is too large." }, 413);
+    if (Number(request.headers.get("content-length")) > 5000000) return vendorJson({ error: "Price list is too large." }, 413);
     try {
       const body = await request.text();
-      if (Buffer.byteLength(body) > 512000) return vendorJson({ error: "Price list is too large." }, 413);
+      if (Buffer.byteLength(body) > 5000000) return vendorJson({ error: "Price list is too large." }, 413);
       input = JSON.parse(body);
       if (!input || !["create", "save", "activate"].includes(input.action) ||
           !validYear(input.year) || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 1 ||
@@ -44,7 +45,24 @@ export async function handleVendorCatalogue(request, {
     }
   }
   try {
-    const result = await (await databaseFactory()).priceLists(input, session.email);
+    const database = await databaseFactory();
+    if (input.action === "save") {
+      const assets = input.products.flatMap(product => product.media ?? []);
+      const unverified = assets.filter(asset => !verifiedMedia(asset, cloudinarySettings(env), settings.secret));
+      if (unverified.length) {
+        const current = await database.priceLists({ year: input.year });
+        if (current.catalogue.revision !== input.expectedRevision) {
+          return vendorJson({ error: "This price list changed. Reload it before saving." }, 409);
+        }
+        // Previously persisted assets remain trusted after vendor-secret rotation.
+        const persisted = new Set(current.catalogue.products.flatMap(product => product.media ?? []).map(mediaIdentity));
+        if (unverified.some(asset => !persisted.has(mediaIdentity(asset)))) {
+          return vendorJson({ error: "One or more media files could not be verified. Upload them through the vendor controls; do not paste media URLs." }, 400);
+        }
+        for (const asset of unverified) asset.proof = mediaProof(asset, settings.secret);
+      }
+    }
+    const result = await database.priceLists(input, session.email);
     if (!validCatalogue(result.catalogue) || !validYear(result.activeYear) || !Array.isArray(result.years) ||
         !result.years.some(year => year.year === result.activeYear) ||
         !result.years.every(year => validYear(year.year) && Number.isSafeInteger(year.revision) && year.revision > 0)) {
