@@ -1,20 +1,24 @@
 # Sai Baba Crackers Centre catalogue
 
 A standalone, mobile-friendly enquiry app with a static frontend, a Netlify
-order-recording function and a Google Apps Script integration. No frontend
-framework, frontend npm dependencies, customer accounts, payments, analytics or automatic
+order-recording function and a configurable Google Sheets or Netlify Database integration. No frontend
+framework, frontend npm dependencies, customer accounts, payments or automatic
 WhatsApp messaging. The existing Product Memory Graph application is unchanged.
 Server-only dependencies generate PDFs and store them in private Netlify Blobs.
 The separate `/vendor/` dashboard uses approved vendor Google sign-in to view
-requests and update the existing Sheet statuses. Customers do not need accounts.
+requests and update statuses in the selected order backend. Customers do not need accounts.
 See the [vendor dashboard setup](../integrations/google-sheets/VENDOR-DASHBOARD.md)
 for OAuth, the approved-email list and deployment steps.
+For isolated Netlify Database development, follow the
+[database setup](../README.md#netlify-database-development). Sheets remains the
+default; no 2026 orders are imported or modified automatically.
 
 ## Run
 
-From the repository root, using Node.js 22.5 or later:
+From the repository root, using Node.js 22.12 or later:
 
 ```powershell
+npm.cmd ci
 npm.cmd ci --prefix netlify
 npm.cmd run vendor:dev
 ```
@@ -22,7 +26,7 @@ npm.cmd run vendor:dev
 Open <http://127.0.0.1:4173>. Set `VENDOR_PORT` to choose another port.
 The preview binds to loopback only; it is not a public deployment.
 Catalogue and cart work without credentials. Saving a requirement needs the
-Google Sheets configuration described below; missing configuration is reported
+order backend configuration described in the setup guides; missing configuration is reported
 explicitly and never treated as a saved order.
 
 ```powershell
@@ -108,7 +112,7 @@ full-width preview or update images already shown in existing messages.
 ### Netlify
 
 The repository's `netlify.toml` uses the repository root as the base directory,
-publishes only `vendor-app`, and runs `npm ci --omit=dev --prefix netlify`.
+publishes only `vendor-app`, and runs `npm ci --omit=dev && npm ci --omit=dev --prefix netlify`.
 Server functions live outside the published files in `netlify/functions`. The configuration
 also sets security headers and the JavaScript content type for `.mjs` files.
 Builds are not skipped when only the functions outside the base directory change.
@@ -116,16 +120,19 @@ Builds are not skipped when only the functions outside the base directory change
 In Netlify, choose **Add new project > Import an existing project > GitHub**,
 authorize only the vendor app repository and select its `main` branch.
 Use the checked-in settings: base directory `.`, publish directory `vendor-app`,
-build command `npm ci --omit=dev --prefix netlify`, and Node.js 22. Remove
+build command `npm ci --omit=dev && npm ci --omit=dev --prefix netlify`, and Node.js 22. Remove
 old dashboard overrides that still use `vendor-app` as the base. Set
 `GOOGLE_SHEETS_WEBHOOK_URL` and `ORDER_TRACKING_SECRET` in Netlify's Functions
-environment. Follow the [Google Sheets setup guide](../integrations/google-sheets/README.md)
+environment for the default Sheets backend. Follow the
+[Google Sheets setup guide](../integrations/google-sheets/README.md) or the
+[database development setup](../README.md#netlify-database-development)
 before publishing, then verify the generated HTTPS URL on a real phone.
 Subsequent pushes to `main` trigger a new deployment once the GitHub integration
 is connected.
 
 Deployed Netlify Functions automatically receive the private Blobs connection.
-No new public bucket, API key or Apps Script change is needed for PDF links.
+No new public bucket or Apps Script change is needed for PDF links. Database
+mode requires the server-only `ORDER_PDF_SECRET` documented in its setup guide.
 The hourly cleanup runs on the published deployment, not deploy previews.
 Storage and function usage depend on the site's Netlify plan and limits.
 

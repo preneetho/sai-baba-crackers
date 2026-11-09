@@ -404,7 +404,7 @@ $("#customer-form").addEventListener("submit", async event => {
     $("#recipient").textContent = `${vendor.name} \u00b7 ${vendor.phone}`;
     $("#message-title").textContent = "Order request saved";
     $("#handoff-instructions").textContent = message.isSummary ?
-      "Your complete order request is saved. WhatsApp should open with one short summary, your request ID and a PDF link valid for 7 days. The PDF contains every item and your customer details; the shop also has the full record in its Google Sheet. Tap Send in WhatsApp. Your complete order request is also available below. The shop will confirm your order." :
+      "Your complete order request is saved. WhatsApp should open with one short summary, your request ID and a PDF link valid for 7 days. The PDF contains every item and your customer details; the shop also has the full record in its private order register. Tap Send in WhatsApp. Your complete order request is also available below. The shop will confirm your order." :
       "Your order request is saved. WhatsApp should open with your message. Tap Send there to share it with the shop. If it does not open, use the button below. The shop will confirm your order.";
     $("#handoff-instructions").textContent += " If WhatsApp closes or does not open, use the copy-and-open option below without submitting again.";
     const link = element("a", "button primary wide", "Send order request via WhatsApp \u2197");

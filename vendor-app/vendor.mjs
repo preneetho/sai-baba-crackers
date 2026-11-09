@@ -294,7 +294,7 @@ $("status-form").addEventListener("submit", async event => {
   $("save-status").disabled = true;
   $("detail-status").disabled = true;
   $("close-details").disabled = true;
-  notice("detail-message", "Saving status to the Google Sheet...");
+  notice("detail-message", "Saving status to the order register...");
   try {
     const result = await api("/api/vendor-orders", {
       method: "POST", headers: { "Content-Type": "application/json", "X-Vendor-CSRF": session.csrf },

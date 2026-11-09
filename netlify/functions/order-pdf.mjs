@@ -19,7 +19,7 @@ export async function handlePdfRequest(request, { readPdf = readOrderPdf } = {})
     const result = await readPdf(token);
     if (result.status !== 200) {
       return new Response(request.method === "HEAD" ? null :
-        "This PDF link is invalid or has expired. Contact the shop using your request ID; the complete order remains in its Google Sheet.",
+        "This PDF link is invalid or has expired. Contact the shop using your request ID; the complete order remains in its private order register.",
       { status: result.status, headers });
     }
     return new Response(request.method === "HEAD" ? null : result.data, {

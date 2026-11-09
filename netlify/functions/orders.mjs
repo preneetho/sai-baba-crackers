@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { DISCOUNT_PERCENT, MAX_WHATSAPP_URL_LENGTH, sanitizeCart, cartLines, pricing, validateCustomer, createRequirement, whatsappUrl } from "../../vendor-app/order.mjs";
 import { saveOrderPdf } from "../lib/order-pdfs.mjs";
-import { sheetSettings } from "../lib/sheets.mjs";
+import { orderBackend } from "../lib/order-backend.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_BODY_BYTES = 16384;
@@ -52,7 +52,8 @@ function orderTime(createdAt) {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} IST`;
 }
 
-function orderSummary(order, savedAt, pdf) {
+function orderSummary(order, savedAt, pdf, backend) {
+  const register = backend === "netlify-db" ? "private order register" : "Google Sheet";
   const packs = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const lines = [
     `Order ID: ${order.orderId}`,
@@ -66,9 +67,9 @@ function orderSummary(order, savedAt, pdf) {
     "",
     ...(pdf ? [
       `Full order PDF (expires ${orderTime(new Date(pdf.expiresAt))}): ${pdf.url}`,
-      "All details are in the PDF and the shop's Google Sheet.",
+      `All details are in the PDF and the shop's ${register}.`,
     ] : [
-      "Full item list and customer details are saved in the shop's Google Sheet under this ID.",
+      `Full item list and customer details are saved in the shop's ${register} under this ID.`,
       "Please confirm stock, final price and arrangements.",
     ]),
     "Request only, not a confirmed order. No payment made.",
@@ -81,17 +82,28 @@ function orderSummary(order, savedAt, pdf) {
 
 export async function handleOrderRequest(request, {
   env = process.env, fetchImpl = fetch, now = () => new Date(), savePdf = saveOrderPdf,
+  databaseFactory = async () => (await import("../lib/order-database.mjs")).getOrderDatabase(),
 } = {}) {
   if (request.method !== "GET" && request.method !== "POST") {
     const response = json({ error: "Use POST to save an order request." }, 405);
     response.headers.set("Allow", "GET, POST");
     return response;
   }
-  const connection = sheetSettings(env);
-  if (!connection) {
+  const backend = orderBackend(env);
+  if (!backend) {
     return json({ error: "Order tracking is not configured yet. Contact the shop; no order request has been recorded." }, 503);
   }
-  if (request.method === "GET") return json({ available: true });
+  if (request.method === "GET") {
+    if (backend.name === "netlify-db") {
+      try {
+        await (await databaseFactory()).ready();
+      } catch {
+        console.error("Order database readiness could not be confirmed.");
+        return json({ error: "The order database is unavailable or its schema is not deployed. No order request has been recorded." }, 503);
+      }
+    }
+    return json({ available: true });
+  }
   if (request.headers.get("origin") !== new URL(request.url).origin) {
     return json({ error: "Submit your order request from this website." }, 403);
   }
@@ -117,49 +129,59 @@ export async function handleOrderRequest(request, {
   } catch (error) {
     return json({ error: error.message }, 400);
   }
-  let upstream;
-  try {
-    upstream = await fetchImpl(connection.url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret: connection.secret, order }),
-      signal: AbortSignal.timeout(20000),
-      redirect: "follow",
-    });
-  } catch {
-    console.error("Order tracking: upstream request failed or timed out.");
-    return json({ error: "We could not confirm saving your order request. Keep checkout open and retry to avoid duplicate records." }, 503);
-  }
-  if (!upstream.ok) {
-    console.error(`Order tracking: upstream HTTP ${upstream.status}.`);
-    return json({ error: "The order tracker is unavailable. Keep checkout open and retry." }, 503);
-  }
   let result;
-  try {
-    const body = await upstream.text();
-    if (body.length > 2048) throw new Error("Unexpected tracker response size");
-    result = JSON.parse(body);
-  } catch {
-    console.error("Order tracking: invalid upstream acknowledgement.");
-    return json({ error: "We could not confirm the order tracker update. Keep checkout open and retry." }, 502);
+  if (backend.name === "netlify-db") {
+    try {
+      result = await (await databaseFactory()).save(order);
+    } catch {
+      console.error("Order database transaction failed or its acknowledgement was lost.");
+      return json({ error: "We could not confirm saving your order request. Keep checkout open and retry with the same details to avoid duplicate records." }, 503);
+    }
+  } else {
+    const connection = backend.connection;
+    let upstream;
+    try {
+      upstream = await fetchImpl(connection.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret: connection.secret, order }),
+        signal: AbortSignal.timeout(20000),
+        redirect: "follow",
+      });
+    } catch {
+      console.error("Order tracking: upstream request failed or timed out.");
+      return json({ error: "We could not confirm saving your order request. Keep checkout open and retry to avoid duplicate records." }, 503);
+    }
+    if (!upstream.ok) {
+      console.error(`Order tracking: upstream HTTP ${upstream.status}.`);
+      return json({ error: "The order tracker is unavailable. Keep checkout open and retry." }, 503);
+    }
+    try {
+      const body = await upstream.text();
+      if (body.length > 2048) throw new Error("Unexpected tracker response size");
+      result = JSON.parse(body);
+    } catch {
+      console.error("Order tracking: invalid upstream acknowledgement.");
+      return json({ error: "We could not confirm the order tracker update. Keep checkout open and retry." }, 502);
+    }
   }
   if (result?.ok !== true || result.orderId !== order.orderId) {
     if (result?.error === "CONFLICT") {
       return json({ error: "This request ID already records different details. Close checkout and submit a new order request." }, 409);
     }
-    console.error("Order tracking: sheet did not acknowledge the requirement.");
+    console.error("Order tracking: backend did not acknowledge the requirement.");
     return json({ error: "The tracker has not acknowledged your order request. Keep checkout open and retry, or contact the shop." }, 503);
   }
   const savedAt = typeof result.createdAt === "string" ? new Date(result.createdAt) : new Date(NaN);
   if (!Number.isFinite(savedAt.getTime()) || savedAt.toISOString() !== result.createdAt) {
-    console.error("Order tracking: missing or invalid saved order timestamp. Check the Apps Script deployment version.");
+    console.error("Order tracking: missing or invalid saved order timestamp.");
     return json({ error: "We could not confirm the recorded order request time. Keep checkout open and retry, or contact the shop." }, 503);
   }
   const message = order.message.replace("\n", `\nOrder date & time: ${orderTime(savedAt)}\n`);
   let pdf;
   if (input.pdfConsent === true && new URL(whatsappUrl(message)).href.length > MAX_WHATSAPP_URL_LENGTH) {
     try {
-      pdf = await savePdf({ order, message, savedAt, origin: new URL(request.url).origin, secret: connection.secret });
+      pdf = await savePdf({ order, message, savedAt, origin: new URL(request.url).origin, secret: backend.secret });
     } catch (error) {
       console.error("Order PDF generation or storage failed after the order was recorded.");
       const detail = error.code === "PDF_UNSUPPORTED_TEXT" ?
@@ -169,7 +191,7 @@ export async function handleOrderRequest(request, {
       return json({ error: `Your order request ${order.orderId} is saved. ${detail}` }, 503);
     }
   }
-  return json({ orderId: order.orderId, message, summary: orderSummary(order, savedAt, pdf), ...(pdf ? { pdf } : {}) });
+  return json({ orderId: order.orderId, message, summary: orderSummary(order, savedAt, pdf, backend.name), ...(pdf ? { pdf } : {}) });
 }
 
 export default async request => handleOrderRequest(request);

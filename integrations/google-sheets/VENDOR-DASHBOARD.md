@@ -1,9 +1,13 @@
 # Vendor dashboard setup
 
 The dashboard lives at **https://saibabacrackers.netlify.app/vendor/**.
-It reads the existing private `Orders` Sheet and updates its Status column.
+By default it reads the existing private `Orders` Sheet and updates its Status column.
 Customer checkout, pricing, PDF retention and WhatsApp handoff are unchanged.
-There is no new database, customer login or automated customer notification.
+An opt-in Netlify Database backend is also available; follow the
+[database development setup](../../README.md#netlify-database-development)
+instead of step 1 when `ORDER_BACKEND=netlify-db`. Google sign-in and its
+approved-email restrictions remain the same for either backend. There is no
+customer login or automated customer notification.
 
 ## 1. Update the existing Apps Script deployment
 
@@ -106,12 +110,15 @@ confirm a payment or create a binding sale. The vendor must contact the customer
 separately. Estimated request value excludes cancelled requests and is **not
 revenue**. Counts/value reflect the applied filters, not just the current page.
 
-The dashboard supports a register of up to 10,000 data rows. Beyond that it
+The Sheets backend supports a register of up to 10,000 data rows. Beyond that it
 reports an explicit error instead of showing incomplete results; customer
 recording still works. Do not delete or move original rows solely to bypass this
 limit: customer retries look up their original request IDs in `Orders`. Larger
 registers need a separately planned indexed storage or archive solution that
 preserves request-ID lookup, timestamps and vendor retention requirements.
+The database backend does not have this Sheet row cap. It stores item/price
+snapshots and authenticated status-change audit records transactionally.
+Old Sheet orders are not automatically copied or combined with database orders.
 
 ## Privacy, sessions and access removal
 
