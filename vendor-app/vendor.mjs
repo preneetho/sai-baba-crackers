@@ -1,4 +1,4 @@
-import { ORDER_STATUSES, PAGE_SIZE, validOrder } from "./vendor-model.mjs";
+import { ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary } from "./vendor-model.mjs";
 
 const $ = id => document.getElementById(id);
 const money = value => `Rs.${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -18,6 +18,13 @@ let saving = false;
 let listController;
 let detailController;
 let accessVersion = 0;
+let importVersion = 0;
+let importController;
+let importSql = "";
+let importReceipt = "";
+let importEnabled = false;
+let importBusy = false;
+let importFileLimit = 0;
 
 function notice(id, message, error = false) {
   $(id).textContent = message;
@@ -35,6 +42,7 @@ function clearPrivateView() {
   accessVersion++;
   clearTimeout(expiryTimer);
   session = null;
+  clearImport();
   listVersion++;
   detailVersion++;
   listController?.abort();
@@ -58,6 +66,81 @@ function clearPrivateView() {
   filters = { query: "", status: "" };
   page = 1;
   $("access-panel").hidden = false;
+}
+
+function clearImport() {
+  importVersion++;
+  importController?.abort();
+  importSql = "";
+  importReceipt = "";
+  importEnabled = false;
+  importBusy = false;
+  $("import-panel").hidden = true;
+  $("import-file").value = "";
+  $("import-ack").checked = false;
+  $("import-message").textContent = "";
+  setImportBusy(false);
+}
+
+function setImportBusy(value) {
+  importBusy = value;
+  $("import-file").disabled = value || !importEnabled;
+  $("preview-import").disabled = value || !importEnabled || !importSql;
+  $("import-ack").disabled = value || !importReceipt;
+  $("commit-import").disabled = value || !importReceipt || !$("import-ack").checked;
+  $("close-import").disabled = value;
+  $("open-import").disabled = value;
+  $("sign-out").disabled = value;
+}
+
+async function submitImport(commit = false) {
+  if (!session || importBusy || !importEnabled || !importSql ||
+      (commit && (!importReceipt || !$("import-ack").checked))) return;
+  const version = importVersion;
+  importController = new AbortController();
+  setImportBusy(true);
+  notice("import-message", commit ? "Importing the approved historical requests..." :
+    "Running the approved import and rolling back all preview changes...");
+  try {
+    const result = await api("/api/vendor-import", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Vendor-CSRF": session.csrf },
+      signal: AbortSignal.any([importController.signal, AbortSignal.timeout(45000)]),
+      body: JSON.stringify({ action: commit ? "import" : "preview", sql: importSql,
+        ...(commit ? { receipt: importReceipt, acknowledge: true } : {}) }),
+    });
+    if (version !== importVersion || !session) return;
+    if (!validImportSummary(result) || (commit ? result.imported !== true :
+      result.previewed !== true || result.rolledBack !== true ||
+      typeof result.receipt !== "string" || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(result.receipt))) {
+      throw new Error("The import acknowledgement could not be verified. Check the register before retrying.");
+    }
+    const summary = `${result.requests} requests, ${result.items} items, ${money(result.totalPaise / 100)}. ` +
+      `${result.newRequests} new requests; ${result.existingRequestsUnchanged} existing requests unchanged. ` +
+      `${result.statusDifferencesPreserved} newer statuses preserved. Current statuses: ` +
+      `${Object.entries(result.statusCounts).map(([status, count]) => `${count} ${status}`).join(", ")}.`;
+    if (commit) {
+      importSql = "";
+      importReceipt = "";
+      $("import-file").value = "";
+      $("import-ack").checked = false;
+      notice("import-message", `Import confirmed. ${summary} No WhatsApp messages were sent.`);
+      page = 1;
+      await loadOrders();
+    } else {
+      importReceipt = result.receipt;
+      $("import-ack").checked = false;
+      notice("import-message", `Preview rolled back; nothing saved. ${summary} ` +
+        `${result.unverifiedSourceHashes} source hashes are marked unverified; the approved file retains the originals. ` +
+        "Review and acknowledge the historical values before confirming within 15 minutes.");
+    }
+  } catch (error) {
+    if (version !== importVersion || !session) return;
+    importReceipt = "";
+    $("import-ack").checked = false;
+    notice("import-message", `${error.message} Check the register, then preview the same file before retrying.`, true);
+  } finally {
+    if (version === importVersion) setImportBusy(false);
+  }
 }
 
 function showAccess(message, error = false, canSignIn = true) {
@@ -268,6 +351,54 @@ $("next-page").addEventListener("click", () => { if (page * PAGE_SIZE < total) {
 $("refresh-orders").addEventListener("click", loadOrders);
 $("retry-orders").addEventListener("click", loadOrders);
 $("access-retry").addEventListener("click", initialise);
+$("open-import").addEventListener("click", async () => {
+  if (!session || importBusy) return;
+  clearImport();
+  $("import-panel").hidden = false;
+  const version = importVersion;
+  importController = new AbortController();
+  notice("import-message", "Checking whether the owner has enabled an approved import...");
+  try {
+    const result = await api("/api/vendor-import", {
+      signal: AbortSignal.any([importController.signal, AbortSignal.timeout(25000)]),
+    });
+    if (version !== importVersion || !session) return;
+    if (typeof result.enabled !== "boolean" || result.maxFileBytes !== 512000 ||
+        typeof result.message !== "string") throw new Error("Import configuration could not be verified.");
+    importEnabled = result.enabled;
+    importFileLimit = result.maxFileBytes;
+    notice("import-message", result.message, !result.enabled);
+    setImportBusy(false);
+  } catch (error) {
+    if (version === importVersion && session) notice("import-message", error.message, true);
+  }
+});
+$("close-import").addEventListener("click", () => { if (!importBusy) clearImport(); });
+$("import-file").addEventListener("change", async () => {
+  importReceipt = "";
+  importSql = "";
+  $("import-ack").checked = false;
+  const version = ++importVersion;
+  const file = $("import-file").files[0];
+  if (!file) { setImportBusy(false); return; }
+  setImportBusy(true);
+  try {
+    if (!file.name.toLowerCase().endsWith(".sql") || !file.size || file.size > importFileLimit) {
+      throw new Error("Choose the original approved .sql file, no larger than 512,000 bytes.");
+    }
+    const text = await file.text();
+    if (version !== importVersion || !session) return;
+    importSql = text;
+    notice("import-message", "File loaded privately in this page. Preview checks the owner-approved checksum and rolls back all changes.");
+  } catch (error) {
+    if (version === importVersion && session) notice("import-message", error.message, true);
+  } finally {
+    if (version === importVersion) setImportBusy(false);
+  }
+});
+$("import-form").addEventListener("submit", event => { event.preventDefault(); submitImport(); });
+$("import-ack").addEventListener("change", () => setImportBusy(importBusy));
+$("commit-import").addEventListener("click", () => submitImport(true));
 $("close-details").addEventListener("click", () => $("order-dialog").close());
 $("order-dialog").addEventListener("cancel", event => { if (saving) event.preventDefault(); });
 $("order-dialog").addEventListener("close", () => {

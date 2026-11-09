@@ -46,6 +46,11 @@
 .vendor-items { padding: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.9 "Segoe UI", Arial, sans-serif; margin: 12px 0; }
 .vendor-status-form { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; padding-top: 20px; margin-top: 20px; border-top: 1px solid var(--line); }
 .vendor-status-form label { flex: 1 1 200px; }
+.vendor-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.vendor-import-form { display: grid; gap: 16px; margin-top: 16px; }
+.vendor-import-form button { justify-self: start; }
+.vendor-page .vendor-import-ack { display: flex; align-items: start; gap: 12px; }
+.vendor-page .vendor-import-ack input { flex: 0 0 22px; width: 22px; min-height: 22px; margin-top: 2px; }
 @media (max-width: 900px) {
   .vendor-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vendor-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }

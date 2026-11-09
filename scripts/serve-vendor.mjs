@@ -6,6 +6,7 @@ import { handleOrderRequest } from "../netlify/functions/orders.mjs";
 import { handlePdfRequest } from "../netlify/functions/order-pdf.mjs";
 import { handleVendorAuth } from "../netlify/functions/vendor-auth.mjs";
 import { handleVendorOrders } from "../netlify/functions/vendor-orders.mjs";
+import { handleVendorImport } from "../netlify/functions/vendor-import.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -47,7 +48,7 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (pathname === "/api/orders" || pathname === "/api/order-pdf" ||
-      pathname === "/api/vendor-orders" || pathname.startsWith("/api/vendor-auth/")) {
+      pathname === "/api/vendor-orders" || pathname === "/api/vendor-import" || pathname.startsWith("/api/vendor-auth/")) {
     try {
       const init = { method: request.method, headers: request.headers };
       if (request.method !== "GET" && request.method !== "HEAD") {
@@ -57,7 +58,8 @@ const server = createServer(async (request, response) => {
       const url = new URL(request.url, `http://127.0.0.1:${port}`);
       const handler = pathname === "/api/orders" ? handleOrderRequest :
         pathname === "/api/order-pdf" ? handlePdfRequest :
-          pathname === "/api/vendor-orders" ? handleVendorOrders : handleVendorAuth;
+          pathname === "/api/vendor-orders" ? handleVendorOrders :
+            pathname === "/api/vendor-import" ? handleVendorImport : handleVendorAuth;
       const result = await handler(new Request(url, init));
       const headers = Object.fromEntries(result.headers);
       const cookies = result.headers.getSetCookie();

@@ -35,9 +35,20 @@
     <section id="dashboard" hidden aria-labelledby="dashboard-title">
       <div class="vendor-heading">
         <div><p class="eyebrow brand-text">Order register</p><h1 id="dashboard-title">Order requests</h1></div>
-        <button id="refresh-orders" type="button">Refresh requests</button>
+        <div class="vendor-actions"><button id="open-import" type="button">Import historical requests</button><button id="refresh-orders" type="button">Refresh requests</button></div>
       </div>
       <p class="vendor-muted">Requests are not confirmed sales. Status updates do not send a WhatsApp message or notify customers.</p>
+      <section id="import-panel" class="vendor-panel" aria-labelledby="import-title" hidden>
+        <div class="vendor-heading"><h2 id="import-title">Approved historical import</h2><button id="close-import" type="button">Close import</button></div>
+        <p>Use the private SQL import file prepared and approved by the site owner, not an Excel file or general SQL. The first step runs the import and rolls it back; only the confirmed second step saves records.</p>
+        <form id="import-form" class="vendor-import-form">
+          <label>Owner-approved SQL file<input id="import-file" type="file" accept=".sql" disabled></label>
+          <button id="preview-import" type="submit" disabled>Preview without saving</button>
+          <label class="vendor-import-ack"><input id="import-ack" type="checkbox" disabled><span>I approve the current source values and original hashes. Earlier status history is unavailable; existing requests and newer statuses must remain unchanged.</span></label>
+          <button id="commit-import" class="vendor-primary" type="button" disabled>Confirm and import</button>
+        </form>
+        <p id="import-message" class="vendor-notice" role="status" aria-live="polite"></p>
+      </section>
       <form id="filter-form" class="vendor-panel vendor-filters">
         <label>Search by name, phone or request ID<input id="order-search" type="search" maxlength="80" autocomplete="off" placeholder="For example, a mobile number"></label>
         <label>Status<select id="status-filter"><option value="">All statuses</option></select></label>

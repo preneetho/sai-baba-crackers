@@ -160,7 +160,7 @@ can copy production data into their database branches, so protect access and
 use synthetic-only development data. Preview database and Functions usage still
 consumes the shared Netlify credit allowance.
 
-No 2026 Sheet records have been imported or modified. Do not flip backends on
+Sheet records are not imported automatically. Do not flip backends on
 an active site without a separate cutover: back up/reconcile IDs, original
 timestamps, fingerprints, item snapshots, statuses and totals, pause new writes
 for the cutover, and test old-ID retries before reopening. Switching back to
@@ -168,3 +168,28 @@ Sheets does not copy new database orders there. Before 2027 launch, agree on
 customer-data retention, backups/restore, billing alerts, catalogue updates
 and a production migration. PDF retention remains seven days. No automatic
 WhatsApp API messaging is added.
+
+## Approved historical order import
+
+Netlify's SQL editor and CLI production connection can be read-only. The
+vendor dashboard instead uses the application's database connection at
+`/api/vendor-import`. It is disabled unless the site owner sets
+`VENDOR_IMPORT_SQL_SHA256` to the SHA-256 of a privately prepared, reviewed
+historical import SQL file and redeploys with `ORDER_BACKEND=netlify-db`.
+Never commit that file or put it in `vendor-app`: its hex payload contains
+customer data and is not encrypted. Do not approve unreviewed or general SQL.
+
+Sign in at `/vendor/`, choose **Import historical requests**, and select the
+original approved `.sql` file (maximum 512,000 bytes, 100 requests and 2,000
+items). **Preview without saving** executes and rolls back the transaction.
+Review the counts/value and hash warnings, acknowledge the historical values,
+then choose **Confirm and import** within 15 minutes. Approval is bound to
+that exact file and vendor session. Any file edit requires fresh owner review
+and configuration, not bypassing the checksum.
+
+The prepared import must atomically validate immutable request/item snapshots,
+preserve existing statuses, reject conflicts and be safe to retry. New import
+audit events retain source provenance and record the authenticated vendor.
+An uncertain response is not proof of failure: check the register before
+retrying the same file. No WhatsApp messages are sent. After the migration,
+remove `VENDOR_IMPORT_SQL_SHA256` and redeploy to disable further imports.

@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { orderRequests, orderItems, orderStatusHistory } from "./order-schema.mjs";
 import { ORDER_STATUSES, PAGE_SIZE } from "../../vendor-app/vendor-model.mjs";
 import { vendor } from "../../vendor-app/catalog.mjs";
+import { approvedImportMetadata, ImportPreviewRollback } from "./approved-import.mjs";
 
 function paise(value) {
   const amount = Math.round(value * 100);
@@ -50,6 +51,53 @@ export function createOrderDatabase(db) {
         await tx.select().from(orderItems).limit(0);
         await tx.select().from(orderStatusHistory).limit(0);
       }, true);
+    },
+    async importApprovedSql(statement, approvedHash, actor, preview = false) {
+      const metadata = approvedImportMetadata(statement, approvedHash);
+      const ids = metadata.source.map(order => order.order_id);
+      try {
+        return await transaction(async tx => {
+          await tx.execute(sql`lock table public.order_requests, public.order_items,
+            public.order_status_history in share row exclusive mode`);
+          const before = await tx.select({ orderId: orderRequests.orderId })
+            .from(orderRequests).where(inArray(orderRequests.orderId, ids));
+          const existing = new Set(before.map(order => order.orderId));
+          const newIds = ids.filter(id => !existing.has(id));
+          // The exact owner-approved SHA-256 is checked before any raw SQL executes.
+          await tx.execute(sql.raw(statement));
+          if (newIds.length) {
+            await tx.update(orderStatusHistory).set({
+              actor: sql`${orderStatusHistory.actor} || ${`; executed by approved vendor ${actor}`}`,
+            }).where(inArray(orderStatusHistory.orderId, newIds));
+          }
+          const rows = await tx.select().from(orderRequests).where(inArray(orderRequests.orderId, ids));
+          const items = await tx.select().from(orderItems).where(inArray(orderItems.orderId, ids));
+          if (rows.length !== metadata.requests || items.length !== metadata.items ||
+              !metadata.source.every(source => rows.some(row => row.orderId === source.order_id &&
+                row.fingerprint === source.fingerprint &&
+                new Date(row.createdAt).toISOString() === source.created_at &&
+                row.totalPaise === source.total_paise))) {
+            throw new Error("Historical import reconciliation failed.");
+          }
+          const result = {
+            requests: metadata.requests, items: metadata.items, totalPaise: metadata.totalPaise,
+            newRequests: newIds.length,
+            newItems: metadata.source.filter(order => !existing.has(order.order_id))
+              .reduce((sum, order) => sum + order.items.length, 0),
+            existingRequestsUnchanged: before.length,
+            statusDifferencesPreserved: metadata.source.filter(source =>
+              rows.find(row => row.orderId === source.order_id).status !== source.status).length,
+            statusCounts: Object.fromEntries(ORDER_STATUSES.map(status =>
+              [status, rows.filter(row => row.status === status).length]).filter(([, count]) => count)),
+            unverifiedSourceHashes: metadata.unverifiedSourceHashes,
+          };
+          if (preview) throw new ImportPreviewRollback(result);
+          return result;
+        });
+      } catch (error) {
+        if (preview && error instanceof ImportPreviewRollback) return error.result;
+        throw error;
+      }
     },
     async save(order) {
       return transaction(async tx => {
