@@ -3,6 +3,7 @@ import { orderRequests, orderItems, orderStatusHistory } from "./order-schema.mj
 import { ORDER_STATUSES, PAGE_SIZE } from "../../vendor-app/vendor-model.mjs";
 import { vendor } from "../../vendor-app/catalog.mjs";
 import { approvedImportMetadata, ImportPreviewRollback } from "./approved-import.mjs";
+import { createCatalogueDatabase, activeCatalogue, catalogueLock, catalogueConflict } from "./catalogue-database.mjs";
 
 function paise(value) {
   const amount = Math.round(value * 100);
@@ -45,6 +46,7 @@ export function createOrderDatabase(db) {
   }
 
   return {
+    ...createCatalogueDatabase(db),
     async ready() {
       await transaction(async tx => {
         await tx.select().from(orderRequests).limit(0);
@@ -101,8 +103,22 @@ export function createOrderDatabase(db) {
     },
     async save(order) {
       return transaction(async tx => {
+        if (order.catalogueRevision !== undefined) {
+          await tx.execute(catalogueLock);
+          const [existing] = await tx.select({
+            fingerprint: orderRequests.fingerprint, createdAt: orderRequests.createdAt,
+          }).from(orderRequests).where(eq(orderRequests.orderId, order.orderId));
+          if (existing) return existing.fingerprint === order.fingerprint ?
+            { ok: true, orderId: order.orderId, createdAt: new Date(existing.createdAt).toISOString() } :
+            { ok: false, error: "CONFLICT" };
+          const active = await activeCatalogue(tx);
+          if (active.year !== order.season || active.revision !== order.catalogueRevision) {
+            throw catalogueConflict("Prices or the active year changed. Refresh the catalogue and review your cart before submitting.");
+          }
+        }
         const inserted = await tx.insert(orderRequests).values({
-          orderId: order.orderId, fingerprint: order.fingerprint, season: Number(vendor.year),
+          orderId: order.orderId, fingerprint: order.fingerprint, season: order.season ?? Number(vendor.year),
+          catalogueRevision: order.catalogueRevision,
           createdAt: order.createdAt, status: "New", ...order.customer,
           subtotalPaise: paise(order.amounts.subtotal), discountPercent: order.amounts.discountPercent,
           discountPaise: paise(order.amounts.discount), deliveryChargePaise: paise(order.amounts.deliveryCharge),

@@ -7,6 +7,8 @@ import { handlePdfRequest } from "../netlify/functions/order-pdf.mjs";
 import { handleVendorAuth } from "../netlify/functions/vendor-auth.mjs";
 import { handleVendorOrders } from "../netlify/functions/vendor-orders.mjs";
 import { handleVendorImport } from "../netlify/functions/vendor-import.mjs";
+import { handleCatalogue } from "../netlify/functions/catalogue.mjs";
+import { handleVendorCatalogue } from "../netlify/functions/vendor-catalogue.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -23,7 +25,9 @@ const files = new Map([
   ["/vendor-model.mjs", ["vendor-model.mjs", "text/javascript; charset=utf-8"]],
   ["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
   ["/app.mjs", ["app.mjs", "text/javascript; charset=utf-8"]],
+  ["/telemetry-client.mjs", ["telemetry-client.mjs", "text/javascript; charset=utf-8"]],
   ["/catalog.mjs", ["catalog.mjs", "text/javascript; charset=utf-8"]],
+  ["/catalogue-model.mjs", ["catalogue-model.mjs", "text/javascript; charset=utf-8"]],
   ["/order.mjs", ["order.mjs", "text/javascript; charset=utf-8"]],
   ["/hero-fireworks.mjs", ["hero-fireworks.mjs", "text/javascript; charset=utf-8"]],
   ["/sai-baba-logo.png", ["sai-baba-logo.png", "image/png"]],
@@ -48,7 +52,8 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (pathname === "/api/orders" || pathname === "/api/order-pdf" ||
-      pathname === "/api/vendor-orders" || pathname === "/api/vendor-import" || pathname.startsWith("/api/vendor-auth/")) {
+      pathname === "/api/vendor-orders" || pathname === "/api/vendor-import" ||
+      pathname === "/api/catalogue" || pathname === "/api/vendor-catalogue" || pathname.startsWith("/api/vendor-auth/")) {
     try {
       const init = { method: request.method, headers: request.headers };
       if (request.method !== "GET" && request.method !== "HEAD") {
@@ -59,7 +64,9 @@ const server = createServer(async (request, response) => {
       const handler = pathname === "/api/orders" ? handleOrderRequest :
         pathname === "/api/order-pdf" ? handlePdfRequest :
           pathname === "/api/vendor-orders" ? handleVendorOrders :
-            pathname === "/api/vendor-import" ? handleVendorImport : handleVendorAuth;
+            pathname === "/api/vendor-import" ? handleVendorImport :
+              pathname === "/api/catalogue" ? handleCatalogue :
+                pathname === "/api/vendor-catalogue" ? handleVendorCatalogue : handleVendorAuth;
       const result = await handler(new Request(url, init));
       const headers = Object.fromEntries(result.headers);
       const cookies = result.headers.getSetCookie();

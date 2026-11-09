@@ -9,6 +9,7 @@ export const orderRequests = pgTable("order_requests", {
   orderId: text("order_id").primaryKey(),
   fingerprint: text("fingerprint").notNull(),
   season: integer("season").notNull(),
+  catalogueRevision: integer("catalogue_revision"),
   createdAt: instant("created_at").notNull(),
   status: text("status").notNull().default("New"),
   name: text("name").notNull(),

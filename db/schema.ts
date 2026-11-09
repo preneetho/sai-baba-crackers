@@ -1,5 +1,6 @@
 import { pgTable, uuid, text, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 export { orderRequests, orderItems, orderStatusHistory } from '../netlify/lib/order-schema.mjs';
+export { catalogueYears, catalogueRevisions, catalogueSettings } from '../netlify/lib/catalogue-schema.mjs';
 export const telemetryEvents = pgTable('telemetry_events', {
   id: uuid('id').primaryKey(),
   session: uuid('session').notNull(),

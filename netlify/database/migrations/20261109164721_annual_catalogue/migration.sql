@@ -1,0 +1,103 @@
+CREATE TABLE "catalogue_revisions" (
+	"year" integer,
+	"revision" integer,
+	"products" jsonb NOT NULL,
+	"actor" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "catalogue_revisions_pkey" PRIMARY KEY("year","revision"),
+	CONSTRAINT "catalogue_revision_values" CHECK ("revision" > 0 and jsonb_typeof("products") = 'array'
+    and jsonb_array_length("products") between 1 and 200)
+);
+--> statement-breakpoint
+CREATE TABLE "catalogue_settings" (
+	"id" integer PRIMARY KEY,
+	"active_year" integer NOT NULL,
+	CONSTRAINT "catalogue_singleton" CHECK ("id" = 1)
+);
+--> statement-breakpoint
+CREATE TABLE "catalogue_years" (
+	"year" integer PRIMARY KEY,
+	"revision" integer NOT NULL,
+	CONSTRAINT "catalogue_year_values" CHECK ("year" between 2000 and 9999 and "revision" > 0)
+);
+--> statement-breakpoint
+ALTER TABLE "order_requests" ADD COLUMN "catalogue_revision" integer;--> statement-breakpoint
+ALTER TABLE "catalogue_revisions" ADD CONSTRAINT "catalogue_revisions_year_catalogue_years_year_fkey" FOREIGN KEY ("year") REFERENCES "catalogue_years"("year");--> statement-breakpoint
+ALTER TABLE "catalogue_settings" ADD CONSTRAINT "catalogue_settings_active_year_catalogue_years_year_fkey" FOREIGN KEY ("active_year") REFERENCES "catalogue_years"("year");
+--> statement-breakpoint
+INSERT INTO public.catalogue_years (year, revision) VALUES (2026, 1);
+INSERT INTO public.catalogue_revisions (year, revision, actor, products)
+SELECT 2026, 1, 'Original approved 2026 catalogue', jsonb_agg(
+  jsonb_build_object('id', id, 'name', name, 'brand', brand, 'unit', unit, 'price', price, 'category', category)
+  ORDER BY id
+) FROM (VALUES
+  (1, 'Ground Chakkar Big', 'STANDARD', '10 pcs / box', 70, 'Chakkars'),
+  (2, 'Ground Chakkar Special', 'STANDARD', '10 pcs / box', 155, 'Chakkars'),
+  (3, 'Ground Chakkar Deluxe', 'STANDARD', '10 pcs / box', 240, 'Chakkars'),
+  (4, 'Vishnu Chakkar Special', 'AYYAN', '10 pcs / box', 225, 'Chakkars'),
+  (5, 'Whistling Wheel Chakkar Special', 'KAL', '10 pcs / box', 300, 'Chakkars'),
+  (6, 'Twinkling Star 45 cm', 'STANDARD', '10 pcs / packet', 70, 'Pencils & stars'),
+  (7, '4 ft Silver Twinkling Star', 'STANDARD', '10 pcs / box', 170, 'Pencils & stars'),
+  (8, '7 inch Magnesium Fire Pencil', 'STANDARD', '10 pcs / box', 90, 'Pencils & stars'),
+  (9, 'Multi Color Candle Pencil', 'STANDARD', '10 pcs / box', 200, 'Pencils & stars'),
+  (10, 'Emerald / Electric Foils', 'SONY', '10 pcs / box', 60, 'Pencils & stars'),
+  (11, 'Flower Pot Big', 'STANDARD', '10 pcs / box', 170, 'Flower pots'),
+  (12, 'Flower Pot Special', 'STANDARD', '10 pcs / box', 230, 'Flower pots'),
+  (13, 'Flower Pot Giant (Color Pinjori Dlx.)', 'KISAN', '10 pcs / box', 425, 'Flower pots'),
+  (14, 'Flower Pot Giant (Color Flowers)', 'STANDARD', '10 pcs / box', 455, 'Flower pots'),
+  (15, 'Flower Pot Deluxe', 'STANDARD', '5 pcs / box', 350, 'Flower pots'),
+  (16, 'Tricolor Fountain Crackling Flower Pot', 'SKY KING', '5 pcs / box', 525, 'Flower pots'),
+  (17, 'Loose Crackers', 'STANDARD', '50 pcs / packet', 50, 'Crackers'),
+  (18, '28 inch Chorsa (Goa)', 'CORONATION', '1 packet', 25, 'Crackers'),
+  (19, '28 inch Giant Chorsa (Taj Mahal)', 'CORONATION', '1 packet', 50, 'Crackers'),
+  (20, 'Bullet Bomb Medium', 'STANDARD', '10 pcs / box', 60, 'Crackers'),
+  (21, 'Bird Bomb', 'CORONATION', '5 pcs / packet', 20, 'Crackers'),
+  (22, 'Double Sound Bomb', 'STD/VIJAY', '5 pcs / packet', 55, 'Crackers'),
+  (23, '4 inch Lakshmi Deluxe', 'CORONATION', '5 pcs / packet', 65, 'Crackers'),
+  (24, 'Hydrogen Bomb (Green)', 'SONY', '10 pcs / box', 140, 'Crackers'),
+  (25, 'King Kong Bomb (Green)', 'SONY', '10 pcs / box', 170, 'Crackers'),
+  (26, 'Nazi Bomb (Green)', 'CORONATION', '10 pcs / box', 220, 'Crackers'),
+  (27, '100 Wala Crackers', 'STANDARD', '1 piece', 130, 'Crackers'),
+  (28, '1000 Wala Crackers', 'STANDARD', '1 piece', 750, 'Crackers'),
+  (29, '1000 Wala Crackers', 'RAMJI/GLAXO', '1 piece', 650, 'Crackers'),
+  (30, '2000 Wala Crackers', 'RAMJI/GLAXO', '1 piece', 1300, 'Crackers'),
+  (31, '5000 Wala Crackers', 'ARD/GLAXO', '1 piece', 3000, 'Crackers'),
+  (32, '10000 Wala Crackers', 'ARD/GLAXO', '1 piece', 6000, 'Crackers'),
+  (33, 'Red & Green Matches (Micromax)', 'RAMESH', '5 boxes / packet', 35, 'Novelties'),
+  (34, 'Prince Matches (5 in 1)', 'RAMESH', '5 boxes / packet', 140, 'Novelties'),
+  (35, 'Roll Caps', 'STANDARD', '10 packets / box', 120, 'Novelties'),
+  (36, 'Pop-Pop''s (50 Mini Boxes)', 'MICKY', '1 box', 450, 'Novelties'),
+  (37, 'Gun (Big) P-101', 'BULLET', '1 piece', 110, 'Novelties'),
+  (38, 'Hunter Gun (with Ring Caps 360 Bullets)', 'AYYANS', '1 piece', 200, 'Novelties'),
+  (39, 'Bomb Rocket', 'STD/SV', '10 pcs / box', 175, 'Rockets'),
+  (40, 'Rainbow Rocket', 'STANDARD', '10 pcs / box', 175, 'Rockets'),
+  (41, 'Sky Whistle Rocket', 'KAL', '10 pcs / box', 275, 'Rockets'),
+  (42, 'Rohini Rocket', 'STANDARD', '10 pcs / box', 275, 'Rockets'),
+  (43, 'Whistling Zitiwala Rocket', 'COR/KAL', '10 pcs / box', 325, 'Rockets'),
+  (44, '12 Star', 'STANDARD', '1 piece', 260, 'Novelties'),
+  (45, 'Helicopter', 'RUBY''S', '5 pcs / box', 180, 'Novelties'),
+  (46, 'Lala Candle (Crackling Torch Multi Color)', 'SKY KING', '3 pcs / box', 230, 'Fountains & shots'),
+  (47, 'Merry Go Round', 'KAL', '3 pcs / box', 500, 'Novelties'),
+  (48, '7Cock Siren', 'KAL', '3 pcs / box', 500, 'Novelties'),
+  (49, '7 Shots 7 Colors (Pandav)', 'STD/SONY', '5 pcs / box', 250, 'Fountains & shots'),
+  (50, 'Color Changing Butterfly', 'STANDARD', '5 pcs / box', 100, 'Novelties'),
+  (51, 'Bingo Peacock Small', 'SKY KING', '1 piece', 225, 'Fountains & shots'),
+  (52, 'Jack Danials / Once More (Crackling Fountain)', 'VIMAL', '5 pieces', 600, 'Fountains & shots'),
+  (53, 'Lemon Tree (Dual Crackling Fountain)', 'AYYANS', '1 piece', 160, 'Fountains & shots'),
+  (54, '7 cm Electric Sparklers', 'STANDARD', '10 boxes / packet', 220, 'Sparklers'),
+  (55, '7 cm Color Sparklers', 'STANDARD', '10 boxes / packet', 250, 'Sparklers'),
+  (56, '12 cm Electric Sparklers', 'STANDARD', '5 boxes / packet', 245, 'Sparklers'),
+  (57, '12 cm Color Sparklers', 'STANDARD', '5 boxes / packet', 300, 'Sparklers'),
+  (58, '15/30 cm Electric Sparklers', 'STANDARD', '1 box', 110, 'Sparklers'),
+  (59, '15/30 cm Color Sparklers', 'STANDARD', '1 box', 120, 'Sparklers'),
+  (60, '50 cm Sparklers', 'COR/RAJ', '5 pcs / box', 260, 'Sparklers'),
+  (61, '15 cm Red / Lavender Sparklers', 'STANDARD', '1 box', 120, 'Sparklers'),
+  (62, '30 cm Sparklers (Carnival) 5 Colors', 'RAMESH', '5 boxes / packet', 450, 'Sparklers'),
+  (63, '1 1/4 inch Comet', 'STANDARD', '1 piece', 120, 'Fountains & shots'),
+  (64, '2 inch Comet', 'STANDARD', '1 piece', 300, 'Fountains & shots'),
+  (65, '3 inch Comet', 'STANDARD', '1 piece', 450, 'Fountains & shots'),
+  (66, 'Speed-30 Shots (Multi Color)', 'RAMJI/KS', '1 piece', 900, 'Fountains & shots'),
+  (67, 'Speed-60 Shots (Multi Color)', 'RAMJI/KS', '1 piece', 1600, 'Fountains & shots'),
+  (68, 'Speed-100 Shots (Multi Color)', 'STANDARD', '1 piece', 3500, 'Fountains & shots')
+) AS source(id, name, brand, unit, price, category);
+INSERT INTO public.catalogue_settings (id, active_year) VALUES (1, 2026);

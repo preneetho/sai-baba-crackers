@@ -1,8 +1,18 @@
 import { track } from "./telemetry-client.mjs";
-import { products, categories, vendor } from "./catalog.mjs";
-import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart, cartLines, pricing, total, money, localDate, validateCustomer, prepareOrderMessage, validatePdfLink } from "./order.mjs";
+import { vendor } from "./catalog.mjs";
+import { validCatalogue } from "./catalogue-model.mjs";
+import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, total as getTotal, money, localDate, validateCustomer, prepareOrderMessage, validatePdfLink } from "./order.mjs";
 
 const $ = selector => document.querySelector(selector);
+let products = [];
+let categories = ["All products"];
+let catalogue = null;
+let catalogueLoading = false;
+let retainedCart = null;
+const sanitizeCart = value => checkCart(value, products);
+const cartLines = value => getLines(value, products);
+const pricing = value => getPricing(value, products);
+const total = value => getTotal(value, products);
 let cart = {};
 let category = "All products";
 let query = "";
@@ -33,16 +43,19 @@ function showStorageWarning(message, reset = false) {
   warning.hidden = false;
 }
 
-try {
-  const stored = localStorage.getItem(CART_KEY);
-  if (stored) cart = sanitizeCart(JSON.parse(stored));
-} catch (error) {
-  showStorageWarning(`Your saved cart could not be restored. ${error instanceof SyntaxError ? "The saved data is unreadable." : error.message}`, true);
+function restoredCart(text) {
+  const stored = JSON.parse(text);
+  if (stored?.year !== catalogue.year || stored?.revision !== catalogue.revision) {
+    throw new Error("The price-list year or prices changed. Start a new cart using the current list.");
+  }
+  const selection = sanitizeCart(stored.cart);
+  pricing(selection);
+  return selection;
 }
 
 function saveCart() {
   try {
-    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    localStorage.setItem(CART_KEY, JSON.stringify({ year: catalogue.year, revision: catalogue.revision, cart }));
   } catch {
     showStorageWarning("Your cart could not be saved on this device. Keep this page open or download your order request before leaving.");
   }
@@ -77,10 +90,20 @@ function quantityControl(product, compact = false) {
 }
 
 function updateQuantity(id, change, fromCart) {
+  if (!catalogue || catalogueLoading || saving) return;
   const previous = cart[id] ?? 0;
   const next = Math.max(0, Math.min(MAX_QUANTITY, previous + change));
-  if (next === 0) delete cart[id];
-  else cart[id] = next;
+  const updated = { ...cart };
+  if (next === 0) delete updated[id];
+  else updated[id] = next;
+  try {
+    pricing(updated);
+  } catch (error) {
+    $("#catalogue-status").textContent = error.message;
+    $("#announcement").textContent = error.message;
+    return;
+  }
+  cart = updated;
   if (next > previous) track("cart");
   saveCart();
   renderProducts();
@@ -116,7 +139,7 @@ const artworkVariants = {
 
 function productIllustration(product) {
   const type = artworkVariants[product.category]?.find(([pattern]) => pattern.test(product.name))?.[1] ??
-    categoryArtwork[product.category];
+    categoryArtwork[product.category] ?? "fountain";
   if (typeof type !== "string") throw new Error(`Missing artwork for category: ${product.category}`);
   const namespace = "http://www.w3.org/2000/svg";
   const illustration = document.createElementNS(namespace, "svg");
@@ -246,6 +269,7 @@ function updateFulfilment() {
 }
 
 function showReview() {
+  if (!catalogue || catalogueLoading || !cartLines(cart).length) return;
   lastReviewTrigger = document.activeElement;
   const summary = element("div", "review-lines");
   for (const line of cartLines(cart)) {
@@ -325,6 +349,7 @@ $("#reset-filters").addEventListener("click", () => {
   $("#search").focus();
 });
 function clearSelection() {
+  if (!catalogue || catalogueLoading) return;
   if (!window.confirm("Remove all items from your cart?")) return;
   cart = {};
   saveCart();
@@ -344,6 +369,7 @@ $("#customer-form").addEventListener("submit", async event => {
   $("#form-error").hidden = true;
   try {
     const customer = validateCustomer(Object.fromEntries(new FormData(event.currentTarget)));
+    if (!catalogue) throw new Error("Load the current price list before submitting.");
     const selection = sanitizeCart(cart);
     const fingerprint = JSON.stringify({ cart: selection, customer });
     if (!submission || submission.fingerprint !== fingerprint) {
@@ -355,7 +381,8 @@ $("#customer-form").addEventListener("submit", async event => {
       response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId: submission.requestId, cart: selection, customer, consent: true, pdfConsent: true }),
+        body: JSON.stringify({ requestId: submission.requestId, cart: selection, customer,
+          catalogue: { year: catalogue.year, revision: catalogue.revision }, consent: true, pdfConsent: true }),
         signal: AbortSignal.timeout(25000),
       });
     } catch {
@@ -372,7 +399,7 @@ $("#customer-form").addEventListener("submit", async event => {
       "We could not confirm saving your order request. Keep checkout open and retry.");
     const orderId = `SBC-${submission.requestId.toUpperCase()}`;
     if (result?.orderId !== orderId || typeof result.message !== "string" ||
-        !result.message.startsWith(`Order ID: ${orderId}\n`) || result.message.length > 65536 ||
+        !result.message.startsWith(`Order ID: ${orderId}\n`) || result.message.length > 131072 ||
         (result.summary !== undefined && (typeof result.summary !== "string" ||
           !result.summary.startsWith(`Order ID: ${orderId}\n`) || result.summary.length > 65536))) {
       throw new Error("The order tracker did not confirm the expected request ID. Keep checkout open and retry.");
@@ -474,13 +501,63 @@ window.addEventListener("storage", event => {
     return;
   }
   try {
-    cart = event.newValue ? sanitizeCart(JSON.parse(event.newValue)) : {};
+    if (!catalogue) return;
+    cart = event.newValue ? restoredCart(event.newValue) : {};
     renderProducts();
     renderCart();
   } catch {
     showStorageWarning("Another tab saved an invalid cart. This tab has kept your current cart.", true);
   }
 });
-renderCategories();
-renderProducts();
-renderCart();
+async function loadCatalogue() {
+  if (catalogueLoading || saving || $("#checkout").open) return;
+  if (catalogue) retainedCart = JSON.stringify({ year: catalogue.year, revision: catalogue.revision, cart });
+  catalogueLoading = true;
+  $("#reload-catalogue").disabled = true;
+  $("#review").disabled = true;
+  $("#catalogue-status").textContent = "Loading the current price list...";
+  try {
+    const response = await fetch("/api/catalogue", { cache: "no-store", signal: AbortSignal.timeout(25000) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "The price list is unavailable.");
+    if (!validCatalogue(result)) throw new Error("The price list could not be verified. Retry or contact the shop.");
+    catalogue = result;
+    products = result.products;
+    categories = ["All products", ...new Set(products.map(product => product.category))];
+    category = "All products";
+    cart = {};
+    submission = null;
+    try {
+      const stored = retainedCart ?? localStorage.getItem(CART_KEY);
+      if (stored) cart = restoredCart(stored);
+      else if (localStorage.getItem("sai-baba-cart-v1")) {
+        showStorageWarning("Your old cart used the previous catalogue format. Please select items again using the current prices.");
+      }
+    } catch (error) {
+      showStorageWarning(`Your saved cart could not be restored. ${error.message}`, true);
+    }
+    document.title = `${vendor.name} | Diwali ${result.year}`;
+    for (const node of document.querySelectorAll("[data-catalogue-year]")) node.textContent = result.year;
+    $("#catalogue-status").textContent = `${result.year} price list loaded. Prices are confirmed again when you submit.`;
+    renderCategories();
+    renderProducts();
+    renderCart();
+    retainedCart = null;
+  } catch (error) {
+    console.error("Customer catalogue could not be loaded.");
+    catalogue = null;
+    products = [];
+    cart = {};
+    $("#products").replaceChildren();
+    $("#categories").replaceChildren();
+    $("#results-count").textContent = "Price list unavailable";
+    $("#no-results").hidden = true;
+    renderCart();
+    $("#catalogue-status").textContent = `${error.message} Retry loading the price list or contact the shop.`;
+  } finally {
+    catalogueLoading = false;
+    $("#reload-catalogue").disabled = false;
+  }
+}
+$("#reload-catalogue").addEventListener("click", loadCatalogue);
+loadCatalogue();

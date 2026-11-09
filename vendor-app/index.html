@@ -7,7 +7,7 @@
   <meta name="description" content="Sai Baba Crackers Centre: 35 years in the crackers trade. Explore Sanathnagar's wholesale crackers collection, get 15% off your cart, and choose free home delivery or store pickup.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Sai Baba Crackers Centre">
-  <meta property="og:title" content="Sai Baba Crackers Centre | Diwali 2026">
+  <meta property="og:title" content="Sai Baba Crackers Centre | Diwali price list">
   <meta property="og:description" content="Explore Sanathnagar's wholesale crackers collection. Get 15% off your cart, with free home delivery or store pickup.">
   <meta property="og:url" content="https://saibabacrackers.netlify.app/">
   <meta property="og:image" content="https://saibabacrackers.netlify.app/diwali-crackers-square.png">
@@ -16,11 +16,11 @@
   <meta property="og:image:height" content="800">
   <meta property="og:image:alt" content="Diwali crackers: colourful rockets, sparklers, a flower pot and fireworks on a blue and gold background.">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Sai Baba Crackers Centre | Diwali 2026">
+  <meta name="twitter:title" content="Sai Baba Crackers Centre | Diwali price list">
   <meta name="twitter:description" content="Explore Sanathnagar's wholesale crackers collection. Get 15% off your cart, with free home delivery or store pickup.">
   <meta name="twitter:image" content="https://saibabacrackers.netlify.app/diwali-crackers-square.png">
   <meta name="twitter:image:alt" content="Diwali crackers: colourful rockets, sparklers, a flower pot and fireworks on a blue and gold background.">
-  <title>Sai Baba Crackers Centre | Diwali 2026</title>
+  <title>Sai Baba Crackers Centre | Diwali price list</title>
   <link rel="icon" type="image/png" href="./sai-baba-logo.png">
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./auth-callback.mjs"></script>
@@ -180,7 +180,7 @@
         </ul>
         <p class="hero-delivery-note">Delivery area and timing confirmed by the shop.</p>
         <a class="hero-link" href="#catalogue">Shop crackers <span aria-hidden="true">&#8595;</span></a>
-        <div class="hero-meta"><span>2026 COLLECTION</span><span>Sanathnagar, Hyderabad</span></div>
+        <div class="hero-meta"><span><span data-catalogue-year>Current</span> COLLECTION</span><span>Sanathnagar, Hyderabad</span></div>
       </div>
       <div class="hero-art" aria-hidden="true">
         <img class="hero-fireworks" src="./diwali-fireworks.png" alt="" width="420" height="340" decoding="async">
@@ -195,11 +195,13 @@
     </div>
 
     <div id="storage-warning" class="notice" role="status" hidden></div>
+    <p id="catalogue-status" class="notice" role="status" aria-live="polite">Loading the current price list...</p>
+    <button id="reload-catalogue" type="button" class="text-button">Reload price list</button>
     <div class="shop-layout">
       <section id="catalogue" class="catalogue" aria-labelledby="catalogue-title">
         <div class="section-heading">
           <div><p class="eyebrow brand-text">THE DIWALI COLLECTION</p><h2 id="catalogue-title">Shop crackers</h2></div>
-          <span class="catalogue-year">2026 price list</span>
+          <span class="catalogue-year"><span data-catalogue-year>Current</span> price list</span>
         </div>
         <label class="search-box"><span aria-hidden="true">&#9906;</span><span class="sr-only">Search products, brands or product numbers</span><input id="search" type="search" placeholder="Search sparklers, flower pots, brands..." maxlength="100"><kbd aria-hidden="true">SEARCH</kbd></label>
         <div id="categories" class="categories" role="group" aria-label="Filter by category"></div>
@@ -229,7 +231,7 @@
     </section>
     <section class="fine-print" aria-label="Important information"><p><strong>Celebrate responsibly.</strong> Follow local rules, age restrictions and product safety instructions. This site collects order requests only; it does not confirm a sale. Free home delivery availability, service area and timing must be confirmed by the shop.</p><p>Shop's printed terms: goods once sold cannot be returned or exchanged; manufacturing defects are subject to the manufacturer's terms. Applicable consumer rights are not excluded.</p></section>
   </main>
-  <footer><span>SAI BABA CRACKERS CENTRE</span><span>A brighter Diwali, together. &middot; 2026</span></footer>
+  <footer><span>SAI BABA CRACKERS CENTRE</span><span>A brighter Diwali, together. &middot; <span data-catalogue-year>Current collection</span></span></footer>
   <a id="mobile-cart" class="mobile-cart" href="#requirement" hidden><span id="mobile-cart-label"></span><span>View cart &#8594;</span></a>
   <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
 

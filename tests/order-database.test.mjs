@@ -26,7 +26,7 @@ const cookie = createSession({ sub: "test-vendor", email: "owner@example.com" },
 const csrf = unseal(cookie, "session", settings, now.getTime()).csrf;
 const id = number => `00000000-0000-4000-8000-${number.toString(16).padStart(12, "0")}`;
 const input = (number = 1) => ({
-  requestId: id(number), consent: true, cart: { 1: 2 },
+  requestId: id(number), consent: true, cart: { 1: 2 }, catalogue: { year: 2026, revision: 1 },
   customer: {
     name: "Synthetic Customer", phone: "9876543210", address: "Synthetic test address only",
     fulfilment: "pickup", preferredDate: "", notes: "<script>test only</script>",

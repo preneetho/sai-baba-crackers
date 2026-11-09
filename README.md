@@ -1,6 +1,6 @@
 # Sai Baba Crackers Centre
 
-Mobile-friendly 2026 catalogue with 68 products, a saved cart, an automatic
+Mobile-friendly yearly catalogue, initially seeded with the 68 original 2026 products, a saved cart, an automatic
 15% discount, free home delivery or store pickup, and a customer-reviewed
 order request including the customer's name, mobile number and address.
 Order requests are saved to the vendor's private order register before WhatsApp is prepared.
@@ -89,6 +89,46 @@ deployment; for database mode, follow the development setup below. The page
 reports unavailable access until configured.
 The storefront and customer WhatsApp flow do not require Google sign-in.
 
+## Yearly database price lists
+
+With `ORDER_BACKEND=netlify-db`, products, pack descriptions, brands, categories
+and prices are read from Netlify Database rather than the static JavaScript list.
+The tracked annual-catalogue migration creates `catalogue_years`,
+`catalogue_revisions` and `catalogue_settings`, seeds the original 68-product
+2026 price list, and selects 2026 as the active year. It does not import, delete
+or reprice historical orders. No additional environment variables are needed.
+Push this source to `main` and publish a Git-connected Netlify deployment so
+the migration and both new Functions (`catalogue` and `vendor-catalogue`) ship
+together; a static drag-and-drop deploy is insufficient.
+
+At `/vendor/`, sign in and choose **Manage yearly price lists**:
+
+1. Select an existing year, or enter a new year and choose **Copy selected list
+   to new year**. Copying does not change the active year.
+2. Edit product names, brands, selling packs, categories and prices. You can
+   add/remove products (1-200 per year). Existing product numbers stay stable;
+   new numbers are allocated automatically. Prices allow two decimals, from
+   Rs.0 to Rs.100,000 per selling pack.
+3. Choose **Save price list**. Saving the active year changes prices for new
+   requests immediately after confirmation. Other years remain unpublished.
+4. Choose **Make this the active year** to switch the customer catalogue.
+   There is one selected year, with no automatic calendar rollover.
+
+The 15% discount and free-delivery/pickup rules are unchanged. Each save retains
+an immutable revision with the authenticated editor and timestamp. Concurrent
+edits are rejected rather than overwritten. If a response is uncertain, visible
+drafts remain on screen but further changes require **Reload saved list**;
+reload/close/year changes warn before discarding unsaved edits.
+
+Customers see only the active year at `/api/catalogue`. Saved carts are bound
+to that year and revision; when they change, customers must select items again
+rather than silently accepting different prices. Checkout rebuilds every line
+and total from the database, rejects stale new requests, and preserves the
+original prices, timestamp and status when retrying an already-saved request.
+Database failures show an explicit error, never a fallback to static prices.
+The explicitly selected Sheets backend continues using the original static
+2026 list and does not support vendor yearly-price editing.
+
 ## Netlify Database development
 
 The database backend is implemented but **not enabled automatically**.
@@ -136,8 +176,9 @@ new tables even when Sheets remains the selected backend.
 Order creation, snapshot items and initial audit entry commit in one transaction.
 Repeated IDs preserve the original timestamp/status; different details with
 the same ID return a conflict. Prices are snapshotted in integer paise.
-The season is taken from the catalogue year, currently **2026**; this change
-does not relabel the catalogue or invent 2027 prices. Vendor status changes and
+The season is taken from the selected catalogue year, initially **2026**.
+Other years require the vendor to copy/edit and explicitly activate a list;
+prices are never invented or changed automatically. Vendor status changes and
 their audit records commit together, recording the authenticated vendor email.
 Audit history is stored privately, not exposed as a new dashboard feature.
 Listing supports 25-request pages beyond the Sheet's 10,000-row cap, with a

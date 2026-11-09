@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 import { ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary } from "../vendor-app/vendor-model.mjs";
+import { validCatalogue, validYear, catalogueProducts } from "../vendor-app/catalogue-model.mjs";
+import { products } from "../vendor-app/catalog.mjs";
 
 const result = {
   requests: 1, items: 1, totalPaise: 8500, newRequests: 1, newItems: 1,
@@ -15,9 +17,11 @@ async function harness() {
   const get = id => {
     if (!nodes.has(id)) nodes.set(id, {
       value: "", textContent: "", hidden: false, disabled: false, checked: false,
-      dataset: {}, files: [], events: new Map(),
+      dataset: {}, files: [], events: new Map(), children: [],
       addEventListener(type, callback) { this.events.set(type, callback); },
-      append() {}, replaceChildren() {}, setAttribute() {}, close() {}, showModal() {},
+      append(...children) { this.children.push(...children); },
+      replaceChildren(...children) { this.children = children; },
+      setAttribute() {}, close() {}, showModal() {}, querySelectorAll() { return []; }, focus() {},
     });
     return nodes.get(id);
   };
@@ -25,11 +29,16 @@ async function harness() {
   let respondImport = async () => new Response(JSON.stringify({
     ...result, previewed: true, rolledBack: true, receipt: "signed.preview",
   }));
+  let respondPrice = async () => new Response(JSON.stringify({
+    activeYear: 2026, years: [{ year: 2026, revision: 1 }],
+    catalogue: { year: 2026, revision: 1, products: catalogueProducts(products.slice(0, 1)) },
+  }));
+  let confirmed = true;
   const context = vm.createContext({
-    ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary,
+    ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary, validCatalogue, validYear, catalogueProducts,
     AbortController, AbortSignal, URL, URLSearchParams, Intl, console,
     document: { getElementById: get, createElement: () => get(Symbol()) },
-    window: { addEventListener() {} }, history: { replaceState() {} },
+    window: { addEventListener() {}, confirm: () => confirmed }, history: { replaceState() {} },
     location: { href: "https://vendor.example/vendor/" },
     setTimeout: () => 0, clearTimeout() {},
     fetch: async (path, options) => {
@@ -46,11 +55,12 @@ async function harness() {
       }));
       if (path === "/api/vendor-import") return respondImport(JSON.parse(options.body));
       if (path === "/api/vendor-auth/logout") return new Response("{}");
+      if (path.startsWith("/api/vendor-catalogue")) return respondPrice(path, options);
       throw new Error("Unexpected test route");
     },
   });
   const source = await readFile(new URL("../vendor-app/vendor.mjs", import.meta.url), "utf8");
-  vm.runInContext(source.replace(/^import .*;\r?\n/, ""), context);
+  vm.runInContext(source.replace(/^import .*;\r?\n/gm, ""), context);
   await tick();
   const emit = async (id, type = "click") => {
     await get(id).events.get(type)({ preventDefault() {} });
@@ -59,6 +69,8 @@ async function harness() {
   return {
     get, requests, emit, context,
     respond(callback) { respondImport = callback; },
+    respondPrice(callback) { respondPrice = callback; },
+    confirm(value) { confirmed = value; },
     async choose() {
       await emit("open-import");
       get("import-file").files = [{ name: "approved.sql", size: 16, text: async () => "approved-fixture" }];
@@ -94,6 +106,78 @@ test("import loads on demand, requires rolled-back preview and acknowledgement, 
   assert.equal(ui.requests.filter(req => req.path.startsWith("/api/vendor-orders")).length, listBefore + 1);
 });
 
+  test("yearly prices load on demand, protect dirty edits and send an authenticated optimistic save", async () => {
+    const ui = await harness();
+    assert.equal(ui.requests.some(req => req.path.startsWith("/api/vendor-catalogue")), false);
+    await ui.emit("open-prices");
+    assert.equal(ui.get("price-products").children.length, 1);
+    assert.equal(ui.get("save-prices").disabled, true);
+    const price = ui.get("price-products").children[0].children[5].children[0];
+    price.value = "99.95";
+    price.events.get("input")();
+    assert.equal(ui.get("save-prices").disabled, false);
+    assert.equal(ui.get("activate-prices").disabled, true);
+    ui.confirm(false);
+    await ui.emit("close-prices");
+    assert.equal(ui.get("price-panel").hidden, false);
+    const before = ui.requests.length;
+    await ui.emit("reload-prices");
+    assert.equal(ui.requests.length, before);
+    ui.confirm(true);
+    ui.respondPrice(async (path, options) => {
+      const body = JSON.parse(options.body);
+      assert.equal(body.action, "save");
+      assert.equal(body.year, 2026);
+      assert.equal(body.expectedRevision, 1);
+      assert.equal(body.products[0].price, 99.95);
+      assert.equal(options.headers["X-Vendor-CSRF"], "a".repeat(43));
+      return new Response(JSON.stringify({
+        activeYear: 2026, years: [{ year: 2026, revision: 2 }],
+        catalogue: { year: 2026, revision: 2, products: body.products },
+      }));
+    });
+    await ui.emit("price-form", "submit");
+    assert.match(ui.get("price-message").textContent, /Price list saved for 2026/);
+    assert.equal(ui.get("save-prices").disabled, true);
+  });
+
+  test("price writes block duplicates and late acknowledgements cannot repopulate signed-out private data", async () => {
+    const ui = await harness();
+    await ui.emit("open-prices");
+    let finish;
+    ui.respondPrice(() => new Promise(resolve => { finish = resolve; }));
+    ui.get("new-price-year").value = "2027";
+    await ui.emit("create-price-year", "submit");
+    assert.equal(ui.get("sign-out").disabled, true);
+    assert.equal(ui.get("close-prices").disabled, true);
+    const before = ui.requests.length;
+    await ui.emit("create-price-year", "submit");
+    await ui.emit("close-prices");
+    assert.equal(ui.requests.length, before);
+    vm.runInContext("clearPrivateView()", ui.context);
+    finish(new Response(JSON.stringify({ activeYear: 2026, years: [{ year: 2026, revision: 1 }, { year: 2027, revision: 1 }],
+      catalogue: { year: 2027, revision: 1, products: catalogueProducts(products.slice(0, 1)) } })));
+    await tick();
+    assert.equal(ui.get("price-panel").hidden, true);
+    assert.equal(ui.get("price-products").children.length, 0);
+    assert.equal(ui.get("price-message").textContent, "");
+  });
+
+  test("uncertain price writes keep visible drafts but require reload instead of blindly repeating", async () => {
+    const ui = await harness();
+    await ui.emit("open-prices");
+    const price = ui.get("price-products").children[0].children[5].children[0];
+    price.value = "125";
+    price.events.get("input")();
+    ui.respondPrice(async () => { throw new Error("Synthetic network loss"); });
+    await ui.emit("price-form", "submit");
+    assert.match(ui.get("price-message").textContent, /visible edits have been kept.*whether the change was committed/);
+    assert.equal(ui.get("save-prices").disabled, true);
+    assert.equal(price.value, "125");
+    const before = ui.requests.length;
+    await ui.emit("price-form", "submit");
+    assert.equal(ui.requests.length, before);
+  });
 test("pending imports cannot duplicate or close; logout clears private data and suppresses late responses", async () => {
   const ui = await harness();
   await ui.choose();

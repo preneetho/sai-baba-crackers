@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { DISCOUNT_PERCENT, MAX_WHATSAPP_URL_LENGTH, sanitizeCart, cartLines, pricing, validateCustomer, createRequirement, whatsappUrl } from "../../vendor-app/order.mjs";
 import { saveOrderPdf } from "../lib/order-pdfs.mjs";
 import { orderBackend } from "../lib/order-backend.mjs";
+import { validYear } from "../../vendor-app/catalogue-model.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_BODY_BYTES = 16384;
@@ -18,7 +19,7 @@ function json(body, status = 200) {
   });
 }
 
-export function buildOrder(input, now = new Date()) {
+export function buildOrder(input, now = new Date(), catalogue) {
   if (!input || typeof input !== "object" || Array.isArray(input) ||
       typeof input.requestId !== "string" || !UUID.test(input.requestId)) {
     throw new Error("The order request ID is invalid. Close checkout and try again.");
@@ -30,16 +31,19 @@ export function buildOrder(input, now = new Date()) {
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(now);
-  const cart = sanitizeCart(input.cart);
+  const cart = sanitizeCart(input.cart, catalogue?.products);
   const customer = validateCustomer(input.customer, today);
-  const message = createRequirement(cart, customer, today);
-  const items = cartLines(cart);
-  const amounts = { ...pricing(cart), discountPercent: DISCOUNT_PERCENT, deliveryCharge: 0 };
+  const message = createRequirement(cart, customer, today, catalogue);
+  const items = cartLines(cart, catalogue?.products);
+  const amounts = { ...pricing(cart, catalogue?.products), discountPercent: DISCOUNT_PERCENT, deliveryCharge: 0 };
   const orderId = `SBC-${input.requestId.toUpperCase()}`;
-  const fingerprint = createHash("sha256").update(JSON.stringify({ customer, items, amounts })).digest("hex");
+  const fingerprint = createHash("sha256").update(JSON.stringify({
+    customer, items, amounts, ...(catalogue ? { season: catalogue.year } : {}),
+  })).digest("hex");
   return {
     orderId, fingerprint, createdAt: now.toISOString(), status: "New",
     customer, items, amounts,
+    ...(catalogue ? { season: catalogue.year, catalogueRevision: catalogue.revision } : {}),
     message: `Order ID: ${orderId}\n${message}`,
   };
 }
@@ -124,16 +128,33 @@ export async function handleOrderRequest(request, {
     return json({ error: "The order request could not be read. Please retry." }, 400);
   }
   let order;
+  let database;
+  let catalogue;
+  if (backend.name === "netlify-db") {
+    if (!validYear(input?.catalogue?.year) || !Number.isSafeInteger(input?.catalogue?.revision) ||
+        input.catalogue.revision < 1) {
+      return json({ error: "Refresh the catalogue and review current prices before submitting." }, 409);
+    }
+    try {
+      database = await databaseFactory();
+      catalogue = await database.catalogueVersion(input.catalogue.year, input.catalogue.revision);
+    } catch (error) {
+      if (error.code === "CATALOGUE_CONFLICT") return json({ error: error.message }, 409);
+      console.error("Checkout price list could not be loaded.");
+      return json({ error: "The price list could not be confirmed. Keep checkout open and retry." }, 503);
+    }
+  }
   try {
-    order = buildOrder(input, now());
+    order = buildOrder(input, now(), catalogue);
   } catch (error) {
     return json({ error: error.message }, 400);
   }
   let result;
   if (backend.name === "netlify-db") {
     try {
-      result = await (await databaseFactory()).save(order);
-    } catch {
+      result = await database.save(order);
+    } catch (error) {
+      if (error.code === "CATALOGUE_CONFLICT") return json({ error: error.message }, 409);
       console.error("Order database transaction failed or its acknowledgement was lost.");
       return json({ error: "We could not confirm saving your order request. Keep checkout open and retry with the same details to avoid duplicate records." }, 503);
     }

@@ -1,4 +1,5 @@
 import { ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary } from "./vendor-model.mjs";
+import { validCatalogue, validYear, catalogueProducts } from "./catalogue-model.mjs";
 
 const $ = id => document.getElementById(id);
 const money = value => `Rs.${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -25,6 +26,12 @@ let importReceipt = "";
 let importEnabled = false;
 let importBusy = false;
 let importFileLimit = 0;
+let priceVersion = 0;
+let priceList = null;
+let activePriceYear = null;
+let priceDirty = false;
+let priceBusy = false;
+let priceNeedsReload = false;
 
 function notice(id, message, error = false) {
   $(id).textContent = message;
@@ -43,6 +50,7 @@ function clearPrivateView() {
   clearTimeout(expiryTimer);
   session = null;
   clearImport();
+  clearPrices();
   listVersion++;
   detailVersion++;
   listController?.abort();
@@ -90,7 +98,154 @@ function setImportBusy(value) {
   $("commit-import").disabled = value || !importReceipt || !$("import-ack").checked;
   $("close-import").disabled = value;
   $("open-import").disabled = value;
-  $("sign-out").disabled = value;
+  $("sign-out").disabled = value || priceBusy;
+  $("open-prices").disabled = value || priceBusy;
+}
+
+function clearPrices() {
+  priceVersion++;
+  priceList = null;
+  activePriceYear = null;
+  priceDirty = false;
+  priceNeedsReload = false;
+  $("price-panel").hidden = true;
+  $("price-controls").hidden = true;
+  $("price-products").replaceChildren();
+  $("price-year").replaceChildren();
+  $("price-active").textContent = "";
+  $("price-message").textContent = "";
+  $("new-price-year").value = "";
+  setPriceBusy(false);
+}
+
+function setPriceBusy(value) {
+  priceBusy = value;
+  $("price-panel").setAttribute("aria-busy", String(value));
+  for (const control of $("price-panel").querySelectorAll("button, input, select")) {
+    control.disabled = value || priceNeedsReload;
+  }
+  $("close-prices").disabled = value;
+  $("reload-prices").disabled = value;
+  $("open-prices").disabled = value || importBusy;
+  $("open-import").disabled = value || importBusy;
+  $("sign-out").disabled = value || importBusy;
+  $("activate-prices").disabled = value || priceNeedsReload || priceDirty || !priceList || activePriceYear === priceList.year;
+  $("save-prices").disabled = value || priceNeedsReload || !priceDirty;
+  $("add-price-product").disabled = value || priceNeedsReload || !priceList || priceList.products.length >= 200;
+}
+
+function renderPriceProducts() {
+  $("price-products").replaceChildren(...priceList.products.map(product => {
+    const row = element("fieldset", undefined, "vendor-panel vendor-price-product");
+    row.append(element("legend", `Product #${product.id}`));
+    for (const [key, title] of [["name", "Product name"], ["brand", "Brand"], ["unit", "Selling pack"],
+      ["category", "Category"], ["price", "Price per pack (Rs.)"]]) {
+      const label = element("label", title);
+      const input = element("input");
+      input.type = key === "price" ? "number" : "text";
+      input.required = true;
+      input.value = product[key];
+      if (key === "price") { input.min = "0"; input.max = "100000"; input.step = "0.01"; }
+      else input.maxLength = 120;
+      input.addEventListener("input", () => {
+        product[key] = key === "price" ? (input.value === "" ? NaN : Number(input.value)) : input.value;
+        priceDirty = true;
+        setPriceBusy(false);
+      });
+      label.append(input);
+      row.append(label);
+    }
+    const remove = element("button", `Remove product #${product.id}`);
+    remove.type = "button";
+    remove.addEventListener("click", () => {
+      if (priceList.products.length === 1) {
+        notice("price-message", "Keep at least one product in the price list.", true);
+        return;
+      }
+      if (!window.confirm(`Remove product #${product.id} from this year's list? Existing orders will not change.`)) return;
+      priceList.products = priceList.products.filter(item => item.id !== product.id);
+      priceDirty = true;
+      renderPriceProducts();
+      setPriceBusy(false);
+      $("add-price-product").focus();
+    });
+    row.append(remove);
+    return row;
+  }));
+}
+
+function acceptPrices(result, expectedYear) {
+  if (!validCatalogue(result.catalogue) || !validYear(result.activeYear) ||
+      (expectedYear !== undefined && result.catalogue.year !== expectedYear) ||
+      !Array.isArray(result.years) || !result.years.some(year => year.year === result.activeYear) ||
+      !result.years.every(year => validYear(year.year) && Number.isSafeInteger(year.revision) && year.revision > 0)) {
+    throw new Error("The price-list acknowledgement could not be verified. Reload before editing.");
+  }
+  priceList = { ...result.catalogue, products: catalogueProducts(result.catalogue.products) };
+  activePriceYear = result.activeYear;
+  priceDirty = false;
+  priceNeedsReload = false;
+  $("price-year").replaceChildren(...result.years.map(year => {
+    const option = element("option", `${year.year}${year.year === result.activeYear ? " (active)" : ""}`);
+    option.value = year.year;
+    return option;
+  }));
+  $("price-year").value = priceList.year;
+  $("price-active").textContent = `Customers currently see ${result.activeYear}. Selected list: ${priceList.year}, version ${priceList.revision}.`;
+  $("new-price-year").value = Math.min(priceList.year + 1, 9999);
+  $("price-controls").hidden = false;
+  renderPriceProducts();
+}
+
+async function loadPrices(year) {
+  if (!session || priceBusy) return;
+  const version = ++priceVersion;
+  priceNeedsReload = false;
+  setPriceBusy(true);
+  notice("price-message", "Loading saved yearly price lists...");
+  try {
+    const result = await api(`/api/vendor-catalogue${year === undefined ? "" : `?year=${year}`}`);
+    if (version !== priceVersion || !session) return;
+    acceptPrices(result, year);
+    notice("price-message", `${priceList.products.length} products loaded. Changes are saved only when you choose Save price list.`);
+  } catch (error) {
+    if (version !== priceVersion || !session) return;
+    priceNeedsReload = true;
+    notice("price-message", error.message, true);
+  } finally {
+    if (version === priceVersion) setPriceBusy(false);
+  }
+}
+
+async function changePrices(input) {
+  if (!session || priceBusy || priceNeedsReload) return;
+  const version = priceVersion;
+  setPriceBusy(true);
+  notice("price-message", "Saving price-list changes...");
+  try {
+    const result = await api("/api/vendor-catalogue", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Vendor-CSRF": session.csrf },
+      body: JSON.stringify(input),
+    });
+    if (version !== priceVersion || !session) return;
+    if (result.catalogue?.year !== input.year ||
+        (input.action === "activate" && result.activeYear !== input.year) ||
+        (input.action === "save" && result.catalogue.revision !== input.expectedRevision + 1) ||
+        (input.action === "create" && result.catalogue.revision !== 1)) {
+      throw new Error("The change could not be verified.");
+    }
+    acceptPrices(result, input.year);
+    notice("price-message", input.action === "activate" ?
+      `Customers now see the ${priceList.year} price list. Existing orders are unchanged.` :
+      `Price list saved for ${priceList.year}. ${activePriceYear === priceList.year ?
+        "Current prices apply to new requests." : "This year is not active for customers."} Existing orders are unchanged.`);
+  } catch (error) {
+    if (version !== priceVersion || !session) return;
+    priceNeedsReload = true;
+    notice("price-message", `${error.message} Your visible edits have been kept. Reload the saved list to establish whether the change was committed before trying again.`, true);
+  } finally {
+    if (version === priceVersion) setPriceBusy(false);
+  }
 }
 
 async function submitImport(commit = false) {
@@ -351,8 +506,74 @@ $("next-page").addEventListener("click", () => { if (page * PAGE_SIZE < total) {
 $("refresh-orders").addEventListener("click", loadOrders);
 $("retry-orders").addEventListener("click", loadOrders);
 $("access-retry").addEventListener("click", initialise);
+$("open-prices").addEventListener("click", () => {
+  if (!session || priceBusy || importBusy) return;
+  if (!$("price-panel").hidden) return;
+  clearPrices();
+  $("price-panel").hidden = false;
+  loadPrices();
+});
+$("close-prices").addEventListener("click", () => {
+  if (priceBusy || (priceDirty && !window.confirm("Discard unsaved price-list edits?"))) return;
+  clearPrices();
+  $("open-prices").focus();
+});
+$("reload-prices").addEventListener("click", () => {
+  if (priceDirty && !window.confirm("Reloading discards visible unsaved edits. Continue?")) return;
+  loadPrices(priceList?.year);
+});
+$("price-year").addEventListener("change", () => {
+  const year = Number($("price-year").value);
+  if (priceDirty && !window.confirm("Discard unsaved edits and select another year?")) {
+    $("price-year").value = priceList.year;
+    return;
+  }
+  loadPrices(year);
+});
+$("create-price-year").addEventListener("submit", event => {
+  event.preventDefault();
+  if (!priceList || priceDirty) {
+    notice("price-message", "Save or reload your current edits before copying this list.", true);
+    return;
+  }
+  const year = Number($("new-price-year").value);
+  if (!validYear(year)) { notice("price-message", "Enter a whole year between 2000 and 9999.", true); return; }
+  changePrices({ action: "create", year, sourceYear: priceList.year, expectedRevision: priceList.revision });
+});
+$("activate-prices").addEventListener("click", () => {
+  if (!priceList || priceDirty || activePriceYear === priceList.year ||
+      !window.confirm(`Show the ${priceList.year} price list to all customers? Existing orders will not change.`)) return;
+  changePrices({ action: "activate", year: priceList.year, expectedRevision: priceList.revision, expectedActiveYear: activePriceYear });
+});
+$("add-price-product").addEventListener("click", () => {
+  if (!priceList || priceBusy || priceNeedsReload || priceList.products.length >= 200) return;
+  const id = Math.max(...priceList.products.map(product => product.id)) + 1;
+  if (id > 999999) { notice("price-message", "The product ID limit has been reached.", true); return; }
+  priceList.products.push({ id, name: "", brand: "", unit: "", category: "", price: 0 });
+  priceDirty = true;
+  renderPriceProducts();
+  setPriceBusy(false);
+  $("price-products").lastElementChild.querySelector("input").focus();
+});
+$("price-form").addEventListener("submit", event => {
+  event.preventDefault();
+  if (!priceList || !priceDirty) return;
+  const products = priceList.products.map(product => ({
+    ...product, ...Object.fromEntries(["name", "brand", "unit", "category"].map(key => [key, product[key].trim()])),
+  }));
+  if (!validCatalogue({ ...priceList, products })) {
+    notice("price-message", "Complete every product field. Use unique positive IDs and prices from Rs.0 to Rs.100,000 with at most two decimals.", true);
+    return;
+  }
+  if (activePriceYear === priceList.year &&
+      !window.confirm(`Update the active ${priceList.year} price list for new requests? Existing orders will not change.`)) return;
+  changePrices({ action: "save", year: priceList.year, expectedRevision: priceList.revision, products });
+});
+window.addEventListener("beforeunload", event => {
+  if (priceDirty || priceBusy) { event.preventDefault(); event.returnValue = ""; }
+});
 $("open-import").addEventListener("click", async () => {
-  if (!session || importBusy) return;
+  if (!session || importBusy || priceBusy) return;
   clearImport();
   $("import-panel").hidden = false;
   const version = importVersion;
@@ -449,7 +670,8 @@ $("status-form").addEventListener("submit", async event => {
   }
 });
 $("sign-out").addEventListener("click", async () => {
-  if (!session) return;
+  if (!session || priceBusy || importBusy ||
+      (priceDirty && !window.confirm("Sign out and discard unsaved price-list edits?"))) return;
   $("sign-out").disabled = true;
   try {
     await api("/api/vendor-auth/logout", {

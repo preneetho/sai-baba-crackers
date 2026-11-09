@@ -118,6 +118,23 @@ registers need a separately planned indexed storage or archive solution that
 preserves request-ID lookup, timestamps and vendor retention requirements.
 The database backend does not have this Sheet row cap. It stores item/price
 snapshots and authenticated status-change audit records transactionally.
+
+## Yearly price lists (Netlify Database only)
+
+After deploying the tracked annual-catalogue migration, choose **Manage yearly
+price lists** in the dashboard. Select a year to edit products and prices, or
+copy the selected saved list into a new year. Save your changes, then explicitly
+choose **Make this the active year** when that year should be visible to
+customers. The original 2026 list is seeded automatically; no manual SQL import
+or new credentials are required.
+
+There is exactly one active year and no automatic rollover. Saving an active
+list updates new-request prices immediately after confirmation. Existing order
+snapshots are unchanged, and the 15% customer discount remains in place.
+Conflicting edits require a reload rather than overwriting another vendor's
+changes. See the [yearly-price guide](../../README.md#yearly-database-price-lists)
+for limits, stale-cart behavior and deployment details. This editor is not
+available when the order backend is Google Sheets.
 Old Sheet orders are not automatically copied or combined with database orders.
 
 ## Privacy, sessions and access removal

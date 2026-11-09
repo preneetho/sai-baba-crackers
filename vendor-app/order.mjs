@@ -1,16 +1,16 @@
 import { products, vendor } from "./catalog.mjs";
 
 export const MAX_QUANTITY = 99;
-export const CART_KEY = "sai-baba-cart-v1";
+export const CART_KEY = "sai-baba-cart-v2";
 export const DISCOUNT_PERCENT = 15;
 export const MAX_WHATSAPP_URL_LENGTH = 1800;
-const byId = new Map(products.map(product => [product.id, product]));
 export const money = value => new Intl.NumberFormat("en-IN", {
   style: "currency", currency: "INR",
   minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2,
 }).format(value);
 
-export function sanitizeCart(value) {
+export function sanitizeCart(value, catalogue = products) {
+  const byId = new Map(catalogue.map(product => [product.id, product]));
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("The saved cart is not valid. Start a new cart.");
   }
@@ -25,14 +25,18 @@ export function sanitizeCart(value) {
   return cart;
 }
 
-export function cartLines(cart) {
-  return Object.entries(sanitizeCart(cart)).map(([id, quantity]) => ({
-    ...byId.get(Number(id)), quantity, amount: byId.get(Number(id)).price * quantity,
+export function cartLines(cart, catalogue = products) {
+  const byId = new Map(catalogue.map(product => [product.id, product]));
+  return Object.entries(sanitizeCart(cart, catalogue)).map(([id, quantity]) => ({
+    ...byId.get(Number(id)), quantity, amount: Math.round(byId.get(Number(id)).price * 100) * quantity / 100,
   }));
 }
 
-export function pricing(cart) {
-  const subtotalPaise = cartLines(cart).reduce((sum, line) => sum + line.amount * 100, 0);
+export function pricing(cart, catalogue = products) {
+  const subtotalPaise = cartLines(cart, catalogue).reduce((sum, line) => sum + Math.round(line.amount * 100), 0);
+  if (!Number.isSafeInteger(subtotalPaise) || subtotalPaise > 2147483647) {
+    throw new Error("This cart exceeds the supported request value. Reduce the quantities or contact the shop.");
+  }
   const discountPaise = Math.round(subtotalPaise * DISCOUNT_PERCENT / 100);
   return {
     subtotal: subtotalPaise / 100,
@@ -41,8 +45,8 @@ export function pricing(cart) {
   };
 }
 
-export function total(cart) {
-  return pricing(cart).total;
+export function total(cart, catalogue = products) {
+  return pricing(cart, catalogue).total;
 }
 
 export function localDate(date = new Date()) {
@@ -79,15 +83,15 @@ export function validateCustomer(input, today = localDate()) {
   return { name, phone: normalizedPhone, address, fulfilment, preferredDate, notes };
 }
 
-export function createRequirement(cart, input, today) {
-  const lines = cartLines(cart);
+export function createRequirement(cart, input, today, catalogue = { products, year: vendor.year }) {
+  const lines = cartLines(cart, catalogue.products);
   if (!lines.length) throw new Error("Add at least one product to your cart.");
   const customer = validateCustomer(input, today);
-  const amounts = pricing(cart);
+  const amounts = pricing(cart, catalogue.products);
   const delivery = customer.fulfilment === "delivery";
   const arrangement = delivery ? "delivery" : "pickup";
   return [
-    `New order request - ${vendor.name} (${vendor.year})`,
+    `New order request - ${vendor.name} (${catalogue.year})`,
     "",
     `Customer: ${customer.name}`,
     `Mobile: +91 ${customer.phone}`,
