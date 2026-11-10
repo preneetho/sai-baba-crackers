@@ -26,7 +26,18 @@ function orderListing(orders = [], page = 1) {
       ...Object.fromEntries(ORDER_STATUSES.map(status => [status, orders.filter(order => order.status === status).length])) },
   };
 }
-async function harness() {
+function shareResult() {
+  const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+  return {
+    orderId: sampleOrder.orderId, expiresAt,
+    url: `https://vendor.example/request/${expiresAt.slice(0, 10).replaceAll("-", "")}.${"a".repeat(43)}`,
+  };
+}
+async function openShareOrder(ui) {
+  ui.respondOrders(async path => Response.json(path.includes("orderId=") ? { order: sampleOrder } : orderListing([sampleOrder])));
+  await vm.runInContext(`openDetails(${JSON.stringify(sampleOrder.orderId)})`, ui.context);
+}
+async function harness({ navigator = {} } = {}) {
   const nodes = new Map();
   let focused;
   let resizeBar;
@@ -41,7 +52,7 @@ async function harness() {
     replaceChildren(...children) { this.children = children; }
     setAttribute(key, value) { this.attributes[key] = value; }
     getAttribute(key) { return this.attributes[key]; }
-    removeAttribute(key) { delete this.attributes[key]; }
+    removeAttribute(key) { delete this.attributes[key]; if (key === "href") delete this.href; }
     setCustomValidity(message) { this.validationMessage = message; }
     checkValidity() {
       if (this.disabled) return true;
@@ -67,6 +78,7 @@ async function harness() {
     }
     querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
     focus() { focused = this; }
+    select() { this.selected = true; }
     scrollIntoView() { this.scrolled = true; }
     getBoundingClientRect() { return { height: this.height ?? 0 }; }
     close() { this.open = false; }
@@ -88,6 +100,7 @@ async function harness() {
   get("price-save-bar").append(...["price-save-state", "price-view-message", "save-prices", "add-price-product"].map(get));
   const requests = [];
   let respondOrders = async () => Response.json(orderListing());
+  let respondShare = async () => Response.json(shareResult());
   let respondPrice = async () => new Response(JSON.stringify({
     activeYear: 2026, years: [{ year: 2026, revision: 1 }],
     catalogue: { year: 2026, revision: 1, products: catalogueProducts(products.slice(0, 1)) },
@@ -100,7 +113,7 @@ async function harness() {
   const context = vm.createContext({
     ORDER_STATUSES, PAGE_SIZE, validOrder, validCatalogue, validYear, catalogueProducts,
     validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId, inspectMediaFile, transferMedia: (...args) => transfer(...args),
-    AbortController, AbortSignal, URL, URLSearchParams, Intl, console,
+    AbortController, AbortSignal, URL, URLSearchParams, Intl, console, navigator,
     document: { getElementById: get, createElement: tag => new Node(tag),
       documentElement: { style: { setProperty: (key, value) => styles.set(key, value) } } },
     ResizeObserver: class {
@@ -117,6 +130,7 @@ async function harness() {
       }));
       if (path.startsWith("/api/vendor-orders")) return respondOrders(path, options);
       if (path === "/api/vendor-auth/logout") return new Response("{}");
+      if (path === "/api/vendor-order-share") return respondShare(JSON.parse(options.body), options);
       if (path.startsWith("/api/vendor-catalogue")) return respondPrice(path, options);
       if (path === "/api/vendor-media") return respondMedia(JSON.parse(options.body), options);
       throw new Error("Unexpected test route");
@@ -136,12 +150,194 @@ async function harness() {
       resizeBar([{ target: get("price-save-bar") }]);
     },
     respondOrders(callback) { respondOrders = callback; },
+    respondShare(callback) { respondShare = callback; },
     respondPrice(callback) { respondPrice = callback; },
     respondMedia(callback) { respondMedia = callback; },
     transfer(callback) { transfer = callback; },
     confirm(value) { confirmed = value; },
   };
 }
+
+test("sharing is explicitly created for the selected saved request and exposes WhatsApp, native sharing and copying without automatic sends", async () => {
+  const copied = [];
+  const shared = [];
+  const ui = await harness({ navigator: {
+    clipboard: { writeText: async value => copied.push(value) },
+    share: async payload => shared.push(payload), canShare: () => true,
+  } });
+  await openShareOrder(ui);
+  assert.equal(ui.get("share-ready").hidden, true);
+  assert.equal(ui.requests.some(request => request.path === "/api/vendor-order-share"), false);
+  await ui.emit("create-share");
+  assert.equal(ui.get("share-ready").hidden, false);
+  assert.equal(ui.get("create-share").hidden, true);
+  assert.equal(ui.get("share-other").hidden, false);
+  const creation = ui.requests.find(request => request.path === "/api/vendor-order-share");
+  assert.equal(creation.method, "POST");
+  assert.equal(creation.headers["X-Vendor-CSRF"], "a".repeat(43));
+  assert.deepEqual(JSON.parse(creation.body), { orderId: sampleOrder.orderId });
+  const link = ui.get("share-link").value;
+  assert.match(link, /^https:\/\/vendor\.example\/request\/\d{8}\.[a-z]{43}$/);
+  const whatsapp = new URL(ui.get("share-whatsapp").href);
+  assert.equal(whatsapp.origin, "https://wa.me");
+  assert.ok(whatsapp.searchParams.get("text").includes(link));
+  assert.ok(!whatsapp.searchParams.get("text").includes(sampleOrder.phone));
+  assert.match(ui.get("share-expiry").textContent, /IST/);
+  assert.equal(copied.length, 0);
+  assert.equal(shared.length, 0);
+  await ui.emit("copy-share");
+  assert.deepEqual(copied, [link]);
+  await ui.emit("share-other");
+  assert.equal(shared[0].url, link);
+  assert.ok(shared[0].title.includes(sampleOrder.orderId));
+  assert.match(ui.get("share-message").textContent, /handed to your sharing app/);
+  assert.equal(ui.requests.filter(request => request.path === "/api/vendor-order-share").length, 1);
+});
+
+test("unsupported sharing and blocked clipboard access keep a selectable link with explicit fallback feedback", async () => {
+  const ui = await harness();
+  await openShareOrder(ui);
+  await ui.emit("create-share");
+  assert.equal(ui.get("share-other").hidden, true);
+  await ui.emit("copy-share");
+  assert.match(ui.get("share-message").textContent, /Select and copy.*manually/);
+  assert.equal(ui.get("share-message").dataset.error, "true");
+  assert.equal(ui.get("share-link").selected, true);
+  assert.equal(ui.focused, ui.get("share-link"));
+  const unsupported = await harness({ navigator: { share() {}, canShare: () => false } });
+  await openShareOrder(unsupported);
+  await unsupported.emit("create-share");
+  assert.equal(unsupported.get("share-other").hidden, true);
+  assert.equal(unsupported.get("share-ready").hidden, false);
+});
+
+test("native share cancellation is not a failure; real failures remain actionable and repeated pending shares are blocked", async () => {
+  let finish;
+  const ui = await harness({ navigator: { share: () => new Promise(resolve => { finish = resolve; }) } });
+  await openShareOrder(ui);
+  await ui.emit("create-share");
+  const pending = ui.emit("share-other");
+  await tick();
+  assert.equal(ui.get("share-other").disabled, true);
+  await ui.emit("share-other");
+  finish();
+  await pending;
+  assert.equal(ui.get("share-other").disabled, false);
+  ui.context.navigator.share = async () => { throw Object.assign(new Error("Cancelled"), { name: "AbortError" }); };
+  await ui.emit("share-other");
+  assert.match(ui.get("share-message").textContent, /Sharing cancelled/);
+  assert.equal(ui.get("share-message").dataset.error, "false");
+  ui.context.navigator.share = async () => { throw new Error("Sharing blocked"); };
+  await ui.emit("share-other");
+  assert.match(ui.get("share-message").textContent, /Sharing blocked.*Use WhatsApp or Copy link/);
+  assert.equal(ui.get("share-message").dataset.error, "true");
+});
+
+test("unverified, foreign, mismatched and expired links are never offered for sharing, and failed creation can be retried", async () => {
+  const ui = await harness();
+  await openShareOrder(ui);
+  const valid = shareResult();
+  for (const result of [
+    { ...valid, url: valid.url.replace("vendor.example", "elsewhere.example") },
+    { ...valid, url: valid.url.replace("vendor.example", "user:password@vendor.example") },
+    { ...valid, url: valid.url + "?other=1" },
+    { ...valid, url: valid.url + "#other" },
+    { ...valid, orderId: "another-order" },
+    { ...valid, expiresAt: new Date(Date.now() - 1).toISOString() },
+    { ...valid, expiresAt: new Date(Date.now() + 8 * 86400000).toISOString() },
+    { ...valid, url: "https://vendor.example/request/invalid" },
+    { ...valid, expiresAt: "invalid" }, {},
+  ]) {
+    ui.respondShare(async () => Response.json(result));
+    await ui.emit("create-share");
+    assert.equal(ui.get("share-ready").hidden, true);
+    assert.equal(ui.get("share-link").value, "");
+    assert.equal(ui.get("create-share").disabled, false);
+    assert.match(ui.get("share-message").textContent, /could not be verified/);
+  }
+  ui.respondShare(async () => { throw new Error("Network unavailable"); });
+  await ui.emit("create-share");
+  assert.match(ui.get("share-message").textContent, /Network unavailable/);
+  ui.respondShare(async () => Response.json(shareResult()));
+  await ui.emit("create-share");
+  assert.equal(ui.get("share-ready").hidden, false);
+});
+
+test("duplicate link creation is blocked and close, changed details or sign-out suppress late replies and clear private links", async () => {
+  for (const action of ["close", "change", "sign-out"]) {
+    const ui = await harness();
+    await openShareOrder(ui);
+    let finish;
+    ui.respondShare(() => new Promise(resolve => { finish = resolve; }));
+    const pending = ui.emit("create-share");
+    await tick();
+    assert.equal(ui.get("create-share").disabled, true);
+    const before = ui.requests.length;
+    await ui.emit("create-share");
+    assert.equal(ui.requests.length, before);
+    if (action === "close") await ui.emit("order-dialog", "close");
+    else if (action === "change") await openShareOrder(ui);
+    else await ui.emit("sign-out");
+    finish(Response.json(shareResult()));
+    await pending;
+    assert.equal(ui.get("share-ready").hidden, true);
+    assert.equal(ui.get("share-link").value, "");
+    assert.equal(ui.get("share-whatsapp").href, undefined);
+  }
+  const ui = await harness();
+  await openShareOrder(ui);
+  await ui.emit("create-share");
+  await ui.emit("sign-out");
+  assert.equal(ui.get("share-link").value, "");
+  assert.equal(ui.get("share-expiry").textContent, "");
+  assert.equal(ui.get("share-message").textContent, "");
+});
+
+test("saving a status clears sharing controls and stale clipboard replies cannot repopulate them", async () => {
+  let finish;
+  const ui = await harness({ navigator: { clipboard: { writeText: () => new Promise(resolve => { finish = resolve; }) } } });
+  await openShareOrder(ui);
+  await ui.emit("create-share");
+  const pendingCopy = ui.emit("copy-share");
+  await tick();
+  ui.respondOrders(async (path, options) => Response.json(options.method === "POST" ?
+    { order: { ...sampleOrder, status: "Confirmed" } } : orderListing()));
+  ui.get("detail-status").value = "Confirmed";
+  await ui.emit("status-form", "submit");
+  assert.equal(ui.get("share-ready").hidden, true);
+  assert.equal(ui.get("share-link").value, "");
+  finish();
+  await pendingCopy;
+  assert.equal(ui.get("share-message").textContent, "");
+  await ui.emit("create-share");
+  assert.equal(ui.get("share-ready").hidden, false);
+  vm.runInContext("clearPrivateView()", ui.context);
+  assert.equal(ui.get("share-link").value, "");
+  assert.equal(ui.get("share-ready").hidden, true);
+});
+
+test("late native-sharing success or failure cannot restore cleared private controls or messages", async () => {
+  for (const succeeds of [true, false]) {
+    let finish;
+    const ui = await harness({ navigator: {
+      share: () => new Promise((resolve, reject) => {
+        finish = () => succeeds ? resolve() : reject(new Error("Synthetic sharing failure"));
+      }),
+    } });
+    await openShareOrder(ui);
+    await ui.emit("create-share");
+    const pending = ui.emit("share-other");
+    await tick();
+    assert.equal(ui.get("share-other").disabled, true);
+    vm.runInContext("clearPrivateView()", ui.context);
+    finish();
+    await pending;
+    assert.equal(ui.get("share-message").textContent, "");
+    assert.equal(ui.get("share-link").value, "");
+    assert.equal(ui.get("share-ready").hidden, true);
+    assert.equal(ui.get("share-other").disabled, false);
+  }
+});
 
 test("order table rows open the existing details and keep status updates and focus restoration working", async () => {
   const ui = await harness();

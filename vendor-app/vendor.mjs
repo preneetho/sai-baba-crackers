@@ -20,6 +20,9 @@ let expiryTimer;
 let saving = false;
 let listController;
 let detailController;
+let shareController;
+let shareVersion = 0;
+let shareBusy = false;
 let accessVersion = 0;
 let priceVersion = 0;
 let priceList = null;
@@ -61,6 +64,7 @@ function clearPrivateView() {
   listController?.abort();
   detailController?.abort();
   selected = null;
+  clearShare();
   detailId = "";
   $("order-dialog").close();
   $("dashboard").hidden = true;
@@ -697,6 +701,7 @@ function detailFields(id, pairs) {
 }
 
 function renderDetail(order) {
+  clearShare();
   selected = order;
   $("detail-content").hidden = false;
   $("detail-id").textContent = order.orderId;
@@ -718,6 +723,7 @@ function renderDetail(order) {
 
 async function openDetails(id) {
   if (!session || saving) return;
+  clearShare();
   detailId = id;
   selected = null;
   const version = ++detailVersion;
@@ -741,6 +747,106 @@ async function openDetails(id) {
     $("reload-detail").hidden = false;
   }
 }
+
+function clearShare() {
+  shareVersion++;
+  shareController?.abort();
+  shareBusy = false;
+  $("create-share").disabled = saving;
+  $("create-share").hidden = false;
+  $("share-ready").hidden = true;
+  $("share-link").value = "";
+  $("share-expiry").textContent = "";
+  $("share-whatsapp").removeAttribute("href");
+  $("share-other").hidden = true;
+  $("share-other").disabled = false;
+  $("share-message").textContent = "";
+}
+
+function sharePayload() {
+  return {
+    title: `Sai Baba Crackers request ${selected.orderId}`,
+    text: `Order request ${selected.orderId}. Read-only snapshot. ${$("share-expiry").textContent}`,
+    url: $("share-link").value,
+  };
+}
+
+$("create-share").addEventListener("click", async () => {
+  if (!session || !selected || saving || shareBusy) return;
+  const id = selected.orderId;
+  const version = ++shareVersion;
+  shareController = new AbortController();
+  shareBusy = true;
+  $("create-share").disabled = true;
+  notice("share-message", "Creating a private request link...");
+  try {
+    const result = await api("/api/vendor-order-share", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Vendor-CSRF": session.csrf },
+      signal: AbortSignal.any([shareController.signal, AbortSignal.timeout(25000)]),
+      body: JSON.stringify({ orderId: id }),
+    });
+    if (version !== shareVersion || !session || selected?.orderId !== id) return;
+    if (typeof result.url !== "string" || typeof result.expiresAt !== "string") {
+      throw new Error("The shared request link could not be verified. Create a new link.");
+    }
+    const url = new URL(result.url);
+    const expiry = Date.parse(result.expiresAt);
+    if (result.orderId !== id || url.origin !== new URL(location.href).origin || url.username || url.password || url.search || url.hash ||
+        !/^\/request\/\d{8}\.[A-Za-z0-9_-]{43}$/.test(url.pathname) ||
+        !Number.isFinite(expiry) || new Date(expiry).toISOString() !== result.expiresAt ||
+        expiry <= Date.now() || expiry > Date.now() + 7 * 86400000 + 60000 ||
+        url.pathname.slice(9, 17) !== result.expiresAt.slice(0, 10).replaceAll("-", "")) {
+      throw new Error("The shared request link could not be verified. Create a new link.");
+    }
+    $("share-link").value = url.href;
+    $("share-expiry").textContent = `Link expires ${orderTime(result.expiresAt)}.`;
+    const payload = sharePayload();
+    $("share-whatsapp").href = `https://wa.me/?text=${encodeURIComponent(`${payload.text}\n${payload.url}`)}`;
+    $("share-other").hidden = typeof navigator.share !== "function" ||
+      (typeof navigator.canShare === "function" && !navigator.canShare(payload));
+    $("share-ready").hidden = false;
+    $("create-share").hidden = true;
+    notice("share-message", "Link ready. Choose a sharing action below. No message has been sent.");
+    $("share-link").focus();
+  } catch (error) {
+    if (version === shareVersion && session) notice("share-message", error.message, true);
+  } finally {
+    if (version === shareVersion) {
+      shareBusy = false;
+      $("create-share").disabled = false;
+    }
+  }
+});
+$("copy-share").addEventListener("click", async () => {
+  if (!session || !selected || !$("share-link").value) return;
+  const version = shareVersion;
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("Clipboard access is unavailable.");
+    await navigator.clipboard.writeText($("share-link").value);
+    if (version === shareVersion && session) notice("share-message", "Request link copied. Paste it into WhatsApp, email or another app.");
+  } catch (error) {
+    if (version !== shareVersion || !session) return;
+    notice("share-message", `${error.message} Select and copy the request link manually.`, true);
+    $("share-link").focus();
+    $("share-link").select();
+  }
+});
+$("share-other").addEventListener("click", async () => {
+  if (!session || !selected || !$("share-link").value || typeof navigator.share !== "function") return;
+  if ($("share-other").disabled) return;
+  const version = shareVersion;
+  $("share-other").disabled = true;
+  try {
+    await navigator.share(sharePayload());
+    if (version === shareVersion && session) notice("share-message", "Request link handed to your sharing app.");
+  } catch (error) {
+    if (version !== shareVersion || !session) return;
+    notice("share-message", error.name === "AbortError" ? "Sharing cancelled. The link is still available." :
+      `${error.message} Use WhatsApp or Copy link instead.`, error.name !== "AbortError");
+  } finally {
+    if (version === shareVersion) $("share-other").disabled = false;
+  }
+});
 
 for (const id of ["status-filter", "detail-status"]) {
   for (const status of ORDER_STATUSES) {
@@ -857,6 +963,7 @@ $("order-dialog").addEventListener("close", () => {
   const trigger = $(`order-open-${detailId}`);
   detailVersion++;
   detailController?.abort();
+  clearShare();
   selected = null;
   detailId = "";
   $("detail-content").hidden = true;
@@ -875,7 +982,9 @@ $("status-form").addEventListener("submit", async event => {
   const id = selected.orderId;
   const version = detailVersion;
   const status = $("detail-status").value;
+  clearShare();
   saving = true;
+  $("create-share").disabled = true;
   $("save-status").disabled = true;
   $("detail-status").disabled = true;
   $("close-details").disabled = true;
@@ -899,6 +1008,7 @@ $("status-form").addEventListener("submit", async event => {
     $("reload-detail").hidden = false;
   } finally {
     saving = false;
+    $("create-share").disabled = false;
     $("close-details").disabled = false;
   }
 });

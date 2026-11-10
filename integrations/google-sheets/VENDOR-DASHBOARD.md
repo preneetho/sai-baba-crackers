@@ -120,6 +120,23 @@ confirm a payment or create a binding sale. The vendor must contact the customer
 separately. Estimated request value excludes cancelled requests and is **not
 revenue**. Counts/value reflect the applied filters, not just the current page.
 
+### Share a request as a link
+
+In request details, choose **Create share link**, then **WhatsApp (new tab)**,
+**Share...** (on supported devices), or **Copy link** for email and other apps.
+If copying is blocked, select and copy the visible link yourself. WhatsApp
+opens a draft for the recipient you choose; the application sends nothing
+automatically.
+
+The recipient does not need a vendor login. **Anyone with the link can see
+customer details and all line items**, so share only with trusted recipients.
+The read-only page shows the saved status and estimates at sharing time, not
+live changes or unsaved selections. Links expire seven days after creation.
+Expiry and cleanup remove only the shared snapshot, never the original request.
+Saving a status clears the displayed link so you can create an updated one;
+earlier shared links remain valid snapshots until expiry. Closing details or
+signing out clears local sharing controls but does not revoke a shared link.
+
 The Sheets backend supports a register of up to 10,000 data rows. Beyond that it
 reports an explicit error instead of showing incomplete results; customer
 recording still works. Do not delete or move original rows solely to bypass this

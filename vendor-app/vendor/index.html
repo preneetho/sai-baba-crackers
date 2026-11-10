@@ -115,6 +115,21 @@
       <h3>Requested items</h3><pre id="detail-items" class="vendor-items"></pre>
       <dl id="detail-amounts" class="vendor-detail-fields"></dl>
       <p class="vendor-muted">Listed quantities are selling packs/units. Stock, final price and arrangements need shop confirmation.</p>
+      <section class="vendor-share" aria-labelledby="share-title">
+        <h3 id="share-title">Share request</h3>
+        <p class="vendor-muted">Anyone with the link can view customer details and all items for seven days. It is a read-only snapshot of saved details, not live updates or unsaved status selections. Share only with trusted recipients.</p>
+        <button id="create-share" type="button">Create share link</button>
+        <div id="share-ready" hidden>
+          <label>Request link<input id="share-link" type="url" readonly></label>
+          <p id="share-expiry" class="vendor-muted"></p>
+          <div class="vendor-actions">
+            <a id="share-whatsapp" class="vendor-primary" target="_blank" rel="noopener noreferrer">WhatsApp (new tab)</a>
+            <button id="share-other" type="button" hidden>Share...</button>
+            <button id="copy-share" type="button">Copy link</button>
+          </div>
+        </div>
+        <p id="share-message" class="vendor-notice" role="status" aria-live="polite"></p>
+      </section>
       <form id="status-form" class="vendor-status-form">
         <label>Request status<select id="detail-status" required></select></label>
         <button id="save-status" class="vendor-primary" type="submit">Save status</button>

@@ -324,6 +324,38 @@ customer-data retention, backups/restore, billing alerts, catalogue updates
 and a production migration. PDF retention remains seven days. No automatic
 WhatsApp API messaging is added.
 
+## Sharing a request
+
+Open a request in `/vendor/` and choose **Create share link**. Then choose
+**WhatsApp (new tab)**, **Share...** (where supported by the browser), or
+**Copy link** to paste into email or another app. Nothing is sent automatically.
+If clipboard access is blocked, select and copy the displayed link manually.
+
+The recipient sees a read-only web page without a vendor login. **Anyone with
+the link can view customer contact details, address, notes and all requested
+items**, so share only with trusted recipients. The page is a snapshot of the
+saved request at sharing time, including its status and estimates; it does not
+show live updates or permit editing, status changes, checkout or payment.
+Unsaved vendor status selections are not included.
+
+Links expire exactly seven days after creation, including links for older or
+previously imported requests. Create a new link to share again after expiry.
+Changing a status clears the displayed link so a new one can reflect that
+change; previously shared links remain valid snapshots until their expiry.
+Closing details or signing out clears the link from the vendor page, but does
+not revoke a link already shared. Do not share links on public pages.
+
+Authenticated, same-origin `POST /api/vendor-order-share` uses the existing
+approved-vendor session and CSRF protection and reads the saved request through
+the normal order backend (Netlify Database or Sheets). Snapshots are kept in the
+private `order-shares` Netlify Blobs store, separate from the permanent order
+register and the existing PDF store. Unguessable links use `/request/<token>`,
+contain no customer details, and use no public listing or order-ID lookup.
+Pages require no scripts, deny caching/indexing/framing, and do not send
+referrers. Expiry is enforced on every read even if the hourly
+`expire-order-shares` cleanup is delayed. No database migration or new secret
+is required; Netlify Blobs must be available to deployed Functions.
+
 ## Approved historical order import
 
 The vendor dashboard has no historical-import controls. Previously imported

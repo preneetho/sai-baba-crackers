@@ -10,6 +10,8 @@ import { handleVendorImport } from "../netlify/functions/vendor-import.mjs";
 import { handleCatalogue } from "../netlify/functions/catalogue.mjs";
 import { handleVendorCatalogue } from "../netlify/functions/vendor-catalogue.mjs";
 import { handleVendorMedia } from "../netlify/functions/vendor-media.mjs";
+import { handleVendorOrderShare } from "../netlify/functions/vendor-order-share.mjs";
+import { handleOrderShare } from "../netlify/functions/order-share.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -57,7 +59,8 @@ const server = createServer(async (request, response) => {
   if (pathname === "/api/orders" || pathname === "/api/order-pdf" ||
       pathname === "/api/vendor-orders" || pathname === "/api/vendor-import" ||
       pathname === "/api/catalogue" || pathname === "/api/vendor-catalogue" ||
-      pathname === "/api/vendor-media" || pathname.startsWith("/api/vendor-auth/")) {
+      pathname === "/api/vendor-media" || pathname === "/api/vendor-order-share" ||
+      pathname.startsWith("/request/") || pathname.startsWith("/api/vendor-auth/")) {
     try {
       const init = { method: request.method, headers: request.headers };
       if (request.method !== "GET" && request.method !== "HEAD") {
@@ -71,7 +74,9 @@ const server = createServer(async (request, response) => {
             pathname === "/api/vendor-import" ? handleVendorImport :
               pathname === "/api/catalogue" ? handleCatalogue :
                 pathname === "/api/vendor-catalogue" ? handleVendorCatalogue :
-                  pathname === "/api/vendor-media" ? handleVendorMedia : handleVendorAuth;
+                  pathname === "/api/vendor-media" ? handleVendorMedia :
+                    pathname === "/api/vendor-order-share" ? handleVendorOrderShare :
+                      pathname.startsWith("/request/") ? handleOrderShare : handleVendorAuth;
       const result = await handler(new Request(url, init));
       const headers = Object.fromEntries(result.headers);
       const cookies = result.headers.getSetCookie();
