@@ -10,11 +10,12 @@ import * as order from "../vendor-app/order.mjs";
 const tick = () => new Promise(resolve => setImmediate(resolve));
 async function harness({ stored, unavailableStorage = false, price = 70 } = {}) {
   class Node {
-    constructor() { this.children = []; this.events = new Map(); this.dataset = {}; this.value = ""; }
+    constructor() { this.children = []; this.events = new Map(); this.dataset = {}; this.value = ""; this.attributes = {}; }
     append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; }
     addEventListener(type, callback) { this.events.set(type, callback); }
-    setAttribute() {}
+    setAttribute(key, value) { this.attributes[key] = value; }
+    getAttribute(key) { return this.attributes[key]; }
     removeAttribute() {}
     focus() {}
     click() {}
@@ -98,6 +99,11 @@ test("customer media covers and gallery preserve cart controls, render credits s
   const cover = ui.get("#products").children[0].children[0];
   assert.equal(cover.children[0].loading, "lazy");
   assert.match(cover.children[0].src, /w_640/);
+  assert.match(cover.getAttribute("aria-label"), /View photos and videos for/);
+  assert.equal(cover.getAttribute("aria-haspopup"), "dialog");
+  assert.equal(cover.children.some(child => child.className === "media-cover-caption"), false);
+  assert.equal(cover.children.filter(child => child.className?.includes("media-cover-icon")).length, 2);
+  assert.equal(cover.children[1].getAttribute("aria-hidden"), "true");
   await cover.events.get("click")();
   assert.equal(ui.get("#product-media-dialog").open, true);
   assert.equal(ui.get("#product-media-credit").textContent, `Credit / license: ${photo.credit}`);
@@ -126,7 +132,21 @@ test("customer media covers and gallery preserve cart controls, render credits s
   ui.run("updateQuantity(1, 1, false)");
   assert.equal(ui.run("cart[1]"), 1);
   cover.children[0].events.get("error")();
-  assert.match(cover.children.at(-1).textContent, /Preview unavailable/);
+  assert.match(cover.children.find(child => child.className === "media-cover-error").textContent, /Preview unavailable/);
+  assert.match(cover.getAttribute("aria-label"), /Preview unavailable.*View photos/);
+  assert.equal(cover.children.filter(child => child.className?.includes("media-cover-icon")).length, 2);
+});
+
+test("photo-only covers have one expand icon without a video badge or caption", async () => {
+  const ui = await harness();
+  const photo = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
+    resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
+    duration: 0, alt: "Synthetic photo", credit: "" };
+  ui.respond(async () => Response.json({ year: 2026, revision: 1, products: [{ ...products[0], media: [photo] }] }));
+  await ui.emit("#reload-catalogue", "click");
+  const cover = ui.get("#products").children[0].children[0];
+  assert.equal(cover.children.length, 2);
+  assert.equal(cover.children[1].className, "media-cover-icon media-cover-expand");
 });
 
 test("catalogue failures are explicit, block checkout, and allow retry without a static-price fallback", async () => {

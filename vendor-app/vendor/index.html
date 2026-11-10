@@ -41,8 +41,8 @@
       <section id="price-panel" class="vendor-panel" aria-labelledby="price-title" hidden>
         <div class="vendor-heading"><h2 id="price-title">Yearly price lists</h2><button id="close-prices" type="button">Close price lists</button></div>
         <p>Customers see one active year. Saving changes to the active list updates prices for new requests immediately. Existing orders keep their saved prices. The cart discount remains 15%.</p>
-        <p class="vendor-muted">Expand Photos &amp; video under a saved product to upload Cloudinary media, choose its cover or add credits. Files are public after upload; never include private information. Choose Save price list to publish changes. Photos and videos are independent for each year.</p>
-        <p id="price-message" class="vendor-notice" role="status" aria-live="polite"></p>
+        <p class="vendor-muted">Select a product row to edit its details, photos and videos. Files uploaded to Cloudinary are public; never include private information. Choose Save price list to publish changes. Photos and videos are independent for each year.</p>
+        <p id="price-message" class="vendor-notice" role="status" aria-live="polite" tabindex="-1"></p>
         <button id="reload-prices" type="button">Reload saved list</button>
         <div id="price-controls" hidden>
           <div class="vendor-price-toolbar">
@@ -54,9 +54,16 @@
             <label>New year<input id="new-price-year" type="number" min="2000" max="9999" step="1" required></label>
             <button type="submit">Copy selected list to new year</button>
           </form>
-          <form id="price-form">
-            <div id="price-products" class="vendor-price-products"></div>
-            <div class="vendor-actions"><button id="add-price-product" type="button">Add product</button><button id="save-prices" class="vendor-primary" type="submit">Save price list</button></div>
+          <form id="price-form" novalidate>
+            <div id="price-save-bar" class="vendor-price-save-bar" role="group" aria-label="Price list changes">
+              <p id="price-save-state" class="vendor-muted" role="status" aria-live="polite"></p>
+              <div class="vendor-actions"><button id="price-view-message" type="button" hidden>View error</button><button id="add-price-product" type="button">Add product</button><button id="save-prices" class="vendor-primary" type="submit" disabled>Save price list</button></div>
+            </div>
+            <table class="vendor-price-table">
+              <caption class="sr-only">Price-list products. Select a product to expand editing and media controls. Changes are saved together using Save price list.</caption>
+              <thead><tr><th scope="col" class="vendor-price-secondary">No.</th><th scope="col">Product</th><th scope="col" class="vendor-price-secondary">Category</th><th scope="col" class="vendor-price-secondary">Pack</th><th scope="col" class="vendor-price-number">Price (Rs.)</th><th scope="col" class="vendor-price-number">Media</th></tr></thead>
+              <tbody id="price-products"></tbody>
+            </table>
           </form>
         </div>
       </section>

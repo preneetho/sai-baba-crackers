@@ -105,7 +105,12 @@ At `/vendor/`, sign in and choose **Manage yearly price lists**:
 
 1. Select an existing year, or enter a new year and choose **Copy selected list
    to new year**. Copying does not change the active year.
-2. Edit product names, brands, selling packs, categories and prices. You can
+2. Select a compact table row (or its product-name button using the keyboard)
+   to expand the product's fields and media actions. Edit product names,
+   brands, selling packs, categories and prices. Closing a row keeps its draft.
+   The sticky **Save price list** bar stays visible while scrolling and shows
+   unsaved/saving/saved or reload-required state. **View error** returns to the
+   detailed message if an action fails. You can
    add/remove products (1-200 per year). Existing product numbers stay stable;
    new numbers are allocated automatically. Prices allow two decimals, from
    Rs.0 to Rs.100,000 per selling pack.
@@ -157,8 +162,8 @@ use a unique public ID and refuse overwrite. The API key must support signed
 uploads and server-side Admin API resource lookup. Never use an unsigned
 preset or put the API secret in source, a browser or chat.
 
-At `/vendor/`, open **Manage yearly price lists**, choose the year, and expand
-**Photos & video** under a product:
+At `/vendor/`, open **Manage yearly price lists**, choose the year, select a
+product row, and expand **Photos & video**:
 
 1. Save a newly added product before uploading. Choose a file and select
    **Upload selected file**. Only approved signed-in vendors can authorize it.
@@ -171,8 +176,10 @@ At `/vendor/`, open **Manage yearly price lists**, choose the year, and expand
    change. Saving the active year makes changes visible to customers;
    inactive years remain unpublished.
 
-Customers get lazy optimized cover images and a keyboard-accessible gallery
-with descriptions and credits. Video loads on play, never automatically.
+Customers open the keyboard-accessible gallery by selecting the thumbnail,
+marked with a compact expand icon and a play badge when video is available.
+There is no repeated caption strip; descriptions and credits stay inside the
+gallery. Covers are lazy optimized images. Video loads on play, never automatically.
 Without media, existing category/name icons remain. Preview errors offer retry
 or the icon fallback without blocking quantity controls or checkout.
 

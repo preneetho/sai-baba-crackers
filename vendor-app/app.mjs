@@ -190,18 +190,24 @@ function renderProducts() {
     if (hasMedia) {
       art.type = "button";
       art.dataset.mediaProduct = String(product.id);
-      art.setAttribute("aria-label", `View photos, video and credits for ${product.name}`);
+      const label = `View photos and videos for ${product.name}`;
+      art.setAttribute("aria-label", label);
+      art.setAttribute("aria-haspopup", "dialog");
+      art.title = "View photos & videos";
+      const expand = mediaIcon("expand");
+      const play = product.media.some(asset => asset.resourceType === "video") ? mediaIcon("play") : null;
       const cover = element("img", "product-cover");
       cover.src = mediaUrl(product.media[0]);
       cover.alt = "";
       cover.loading = "lazy";
       cover.decoding = "async";
       cover.addEventListener("error", () => {
-        caption.textContent = "Preview unavailable - open media";
-        art.replaceChildren(productIllustration(product), caption);
+        art.setAttribute("aria-label", `Preview unavailable. ${label}`);
+        const failure = element("span", "media-cover-error", "Preview unavailable");
+        failure.setAttribute("aria-hidden", "true");
+        art.replaceChildren(productIllustration(product), failure, expand, ...(play ? [play] : []));
       }, { once: true });
-      const caption = element("span", "media-cover-caption", "View media & credits");
-      art.append(cover, caption);
+      art.append(cover, expand, ...(play ? [play] : []));
       art.addEventListener("click", () => openMedia(product, art));
     } else {
       art.setAttribute("aria-hidden", "true");
@@ -220,6 +226,20 @@ function renderProducts() {
     card.append(art, body);
     return card;
   }));
+}
+
+function mediaIcon(type) {
+  const badge = element("span", `media-cover-icon media-cover-${type}`);
+  badge.setAttribute("aria-hidden", "true");
+  const namespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(namespace, "svg");
+  svg.setAttribute("viewBox", "0 0 20 20");
+  svg.setAttribute("focusable", "false");
+  const use = document.createElementNS(namespace, "use");
+  use.setAttribute("href", `#media-icon-${type}`);
+  svg.append(use);
+  badge.append(svg);
+  return badge;
 }
 
 function stopGalleryVideo() {

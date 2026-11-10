@@ -34,6 +34,7 @@ let activePriceYear = null;
 let priceDirty = false;
 let priceBusy = false;
 let priceNeedsReload = false;
+let expandedProductId = null;
 let mediaController;
 let savedProductIds = new Set();
 const openMediaProducts = new Set();
@@ -41,6 +42,7 @@ const openMediaProducts = new Set();
 function notice(id, message, error = false) {
   $(id).textContent = message;
   $(id).dataset.error = String(error);
+  if (id === "price-message") $("price-view-message").hidden = !error;
 }
 
 function element(tag, text, className) {
@@ -48,6 +50,12 @@ function element(tag, text, className) {
   if (text !== undefined) node.textContent = text;
   if (className) node.className = className;
   return node;
+}
+
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(([entry]) => {
+    document.documentElement.style.setProperty("--vendor-save-offset", `${Math.max(24, Math.ceil(entry.target.getBoundingClientRect().height) + 16)}px`);
+  }).observe($("price-save-bar"));
 }
 
 function clearPrivateView() {
@@ -113,6 +121,7 @@ function clearPrices() {
   stopPriceMedia();
   savedProductIds.clear();
   openMediaProducts.clear();
+  expandedProductId = null;
   priceList = null;
   activePriceYear = null;
   priceDirty = false;
@@ -123,6 +132,7 @@ function clearPrices() {
   $("price-year").replaceChildren();
   $("price-active").textContent = "";
   $("price-message").textContent = "";
+  $("price-view-message").hidden = true;
   $("new-price-year").value = "";
   setPriceBusy(false);
 }
@@ -143,31 +153,97 @@ function setPriceBusy(value) {
   }
   $("close-prices").disabled = value;
   $("reload-prices").disabled = value;
+  $("price-view-message").disabled = value;
   $("open-prices").disabled = value || importBusy;
   $("open-import").disabled = value || importBusy;
   $("sign-out").disabled = value || importBusy;
   $("activate-prices").disabled = value || priceNeedsReload || priceDirty || !priceList || activePriceYear === priceList.year;
   $("save-prices").disabled = value || priceNeedsReload || !priceDirty;
   $("add-price-product").disabled = value || priceNeedsReload || !priceList || priceList.products.length >= 200;
+  const state = !priceList ? "" : `${priceList.year} - ${priceList.products.length} products. ${
+    value ? "Working... Please wait." : priceNeedsReload ? "Reload required. Edits kept." :
+      priceDirty ? "Unsaved changes." : "All changes saved."}`;
+  if ($("price-save-state").textContent !== state) $("price-save-state").textContent = state;
+}
+
+function togglePriceProduct(id) {
+  if (priceBusy || priceNeedsReload) return;
+  expandedProductId = expandedProductId === id ? null : id;
+  renderPriceProducts();
+  setPriceBusy(false);
+  $(`price-toggle-${id}`).focus({ preventScroll: true });
 }
 
 function renderPriceProducts() {
   stopPriceMedia();
-  $("price-products").replaceChildren(...priceList.products.map(product => {
+  if (!priceList.products.some(product => product.id === expandedProductId)) expandedProductId = null;
+  $("price-products").replaceChildren(...priceList.products.flatMap(product => {
+    const expanded = expandedProductId === product.id;
+    const summary = element("tr", undefined, "vendor-price-summary");
+    summary.dataset.expanded = String(expanded);
+    const number = element("td", product.id, "vendor-price-secondary");
+    const name = element("th");
+    name.scope = "row";
+    const toggle = element("button", undefined, "vendor-price-toggle");
+    toggle.id = `price-toggle-${product.id}`;
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.setAttribute("aria-controls", `price-details-${product.id}`);
+    const nameText = element("span");
+    const productName = element("span", product.name.trim() || `New product #${product.id}`);
+    const brand = element("small", product.brand);
+    nameText.append(productName, brand);
+    toggle.append(nameText);
+    toggle.addEventListener("click", () => togglePriceProduct(product.id));
+    name.append(toggle);
+    const category = element("td", product.category, "vendor-price-secondary");
+    const pack = element("td", product.unit, "vendor-price-secondary");
+    const price = element("td", undefined, "vendor-price-number");
+    const updateSummary = () => {
+      productName.textContent = product.name.trim() || `New product #${product.id}`;
+      brand.textContent = product.brand;
+      category.textContent = product.category;
+      pack.textContent = product.unit;
+      price.textContent = Number.isFinite(product.price) ? money(product.price).slice(3) : "Not set";
+      toggle.setAttribute("aria-label", `${expanded ? "Collapse" : "Edit"} product #${product.id}: ${productName.textContent}`);
+    };
+    updateSummary();
+    const media = element("td", `${product.media?.length ?? 0}/4`, "vendor-price-number");
+    media.setAttribute("aria-label", `${product.media?.length ?? 0} photos or videos attached; maximum 4`);
+    summary.append(number, name, category, pack, price, media);
+    summary.addEventListener("click", event => {
+      if (!event.target.closest("button")) togglePriceProduct(product.id);
+    });
+    const details = element("tr");
+    details.id = `price-details-${product.id}`;
+    details.hidden = !expanded;
+    if (!expanded) return [summary, details];
+    const cell = element("td", undefined, "vendor-price-detail-cell");
+    cell.colSpan = 6;
     const row = element("fieldset", undefined, "vendor-panel vendor-price-product");
+    row.id = `price-editor-${product.id}`;
+    row.tabIndex = -1;
     row.append(element("legend", `Product #${product.id}`));
     for (const [key, title] of [["name", "Product name"], ["brand", "Brand"], ["unit", "Selling pack"],
       ["category", "Category"], ["price", "Price per pack (Rs.)"]]) {
       const label = element("label", title);
       const input = element("input");
+      input.id = `price-${key}-${product.id}`;
       input.type = key === "price" ? "number" : "text";
       input.required = true;
       input.value = product[key];
       if (key === "price") { input.min = "0"; input.max = "100000"; input.step = "0.01"; }
       else input.maxLength = 120;
+      const validateText = () => {
+        if (key !== "price") input.setCustomValidity(!input.value.trim() ? `Enter ${title.toLowerCase()}.` :
+          /[\u0000-\u001f\u007f]/.test(input.value) ? "Remove control characters." : "");
+      };
+      validateText();
       input.addEventListener("input", () => {
         if (priceBusy || priceNeedsReload) return;
         product[key] = key === "price" ? (input.value === "" ? NaN : Number(input.value)) : input.value;
+        validateText();
+        updateSummary();
         priceDirty = true;
         setPriceBusy(false);
       });
@@ -189,8 +265,15 @@ function renderPriceProducts() {
       setPriceBusy(false);
       $("add-price-product").focus();
     });
-    row.append(remove, renderProductMedia(product));
-    return row;
+    const close = element("button", "Close details");
+    close.type = "button";
+    close.addEventListener("click", () => togglePriceProduct(product.id));
+    const actions = element("div", undefined, "vendor-actions");
+    actions.append(close, remove);
+    row.append(actions, renderProductMedia(product));
+    cell.append(row);
+    details.append(cell);
+    return [summary, details];
   }));
 }
 
@@ -210,16 +293,18 @@ function renderProductMedia(product) {
   media.forEach((asset, index) => {
     const item = element("div", undefined, "vendor-media-item");
     const preview = element(asset.resourceType === "image" ? "img" : "video");
+    // Draft descriptions may be incomplete; delivery still validates the saved asset identity.
+    const previewAsset = { ...asset, alt: "Product media preview", credit: "" };
     if (asset.resourceType === "image") {
-      preview.src = mediaUrl(asset);
+      preview.src = mediaUrl(previewAsset);
       preview.alt = asset.alt;
       preview.loading = "lazy";
     } else {
       preview.controls = true;
       preview.preload = "none";
       preview.playsInline = true;
-      preview.poster = mediaUrl(asset);
-      preview.src = mediaUrl(asset, "play");
+      preview.poster = mediaUrl(previewAsset);
+      preview.src = mediaUrl(previewAsset, "play");
       preview.setAttribute("aria-label", asset.alt);
     }
     const failure = element("p", "", "vendor-notice");
@@ -233,8 +318,13 @@ function renderProductMedia(product) {
       input.maxLength = max;
       if (key === "alt") input.required = true;
       else input.rows = 3;
+      const validateDescription = () => {
+        if (key === "alt") input.setCustomValidity(input.value.trim() ? "" : "Describe this photo or video.");
+      };
+      validateDescription();
       input.addEventListener("input", () => {
         if (priceBusy || priceNeedsReload) return;
+        validateDescription();
         asset[key] = input.value; priceDirty = true; setPriceBusy(false);
       });
       label.append(input);
@@ -324,6 +414,7 @@ async function uploadProductMedia(product, input) {
     }
     product.media = [...(product.media ?? []), result.media];
     priceDirty = true;
+    expandedProductId = product.id;
     openMediaProducts.add(product.id);
     renderPriceProducts();
     $(`media-product-${product.id}`).focus({ preventScroll: true });
@@ -343,6 +434,10 @@ function acceptPrices(result, expectedYear) {
       !Array.isArray(result.years) || !result.years.some(year => year.year === result.activeYear) ||
       !result.years.every(year => validYear(year.year) && Number.isSafeInteger(year.revision) && year.revision > 0)) {
     throw new Error("The price-list acknowledgement could not be verified. Reload before editing.");
+  }
+  if (priceList?.year !== result.catalogue.year) {
+    expandedProductId = null;
+    openMediaProducts.clear();
   }
   priceList = { ...result.catalogue, products: catalogueProducts(result.catalogue.products) };
   savedProductIds = new Set(priceList.products.map(product => product.id));
@@ -686,6 +781,10 @@ $("reload-prices").addEventListener("click", () => {
   if (priceDirty && !window.confirm("Reloading discards visible unsaved edits. Continue?")) return;
   loadPrices(priceList?.year);
 });
+$("price-view-message").addEventListener("click", () => {
+  $("price-message").scrollIntoView({ block: "center" });
+  $("price-message").focus({ preventScroll: true });
+});
 $("price-year").addEventListener("change", () => {
   const year = Number($("price-year").value);
   if (priceDirty && !window.confirm("Discard unsaved edits and select another year?")) {
@@ -714,20 +813,32 @@ $("add-price-product").addEventListener("click", () => {
   const id = Math.max(...priceList.products.map(product => product.id)) + 1;
   if (id > 999999) { notice("price-message", "The product ID limit has been reached.", true); return; }
   priceList.products.push({ id, name: "", brand: "", unit: "", category: "", price: 0 });
+  expandedProductId = id;
   priceDirty = true;
   renderPriceProducts();
   setPriceBusy(false);
-  $("price-products").lastElementChild.querySelector("input").focus();
+  $(`price-name-${id}`).focus();
 });
 $("price-form").addEventListener("submit", event => {
   event.preventDefault();
-  if (!priceList || !priceDirty) return;
+  if (!priceList || !priceDirty || priceBusy || priceNeedsReload) return;
   const products = priceList.products.map(product => ({
     ...product, ...Object.fromEntries(["name", "brand", "unit", "category"].map(key => [key, product[key].trim()])),
     ...(product.media ? { media: product.media.map(asset => ({ ...asset, alt: asset.alt.trim(), credit: asset.credit.trim() })) } : {}),
   }));
   if (!validCatalogue({ ...priceList, products })) {
     notice("price-message", "Complete every product field and media description. Use at most 3 photos and 1 video, unique positive IDs and prices from Rs.0 to Rs.100,000 with at most two decimals.", true);
+    const invalid = products.find(product => !validCatalogue({ ...priceList, products: [product] }));
+    if (invalid) {
+      expandedProductId = invalid.id;
+      if (invalid.media?.some(asset => !validMedia(asset))) openMediaProducts.add(invalid.id);
+      renderPriceProducts();
+      setPriceBusy(false);
+      const editor = $(`price-editor-${invalid.id}`);
+      const control = editor.querySelector(":invalid") ?? editor;
+      control.focus();
+      control.reportValidity?.();
+    }
     return;
   }
   if (activePriceYear === priceList.year &&

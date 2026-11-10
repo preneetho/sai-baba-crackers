@@ -126,7 +126,12 @@ price lists** in the dashboard. Select a year to edit products and prices, or
 copy the selected saved list into a new year. Save your changes, then explicitly
 choose **Make this the active year** when that year should be visible to
 customers. The original 2026 list is seeded automatically; no manual SQL import
-or new credentials are required.
+or new credentials are required. Products appear as compact table rows; select
+the product name (also works with Enter/Space) or click the row to expand its
+fields and actions. Closing or switching rows keeps unsaved edits. The sticky
+**Save price list** bar remains available while scrolling and reports draft,
+working, saved and reload-required states. **View error** takes you to the
+full message when an action fails. Saving an incomplete product reopens it.
 
 There is exactly one active year and no automatic rollover. Saving an active
 list updates new-request prices immediately after confirmation. Existing order
@@ -168,8 +173,8 @@ Publish source and Functions together through the Git-connected deployment.
 The `vendor-media` Function must be included; existing Netlify variables alone
 do not add the application integration.
 
-In **Manage yearly price lists**, select the year, expand **Photos & video**
-for a saved product and upload one file at a time. Limits are 3 photos
+In **Manage yearly price lists**, select the year and product row, then expand
+**Photos & video** for a saved product and upload one file at a time. Limits are 3 photos
 (JPG/PNG/WebP, 5 MB each) and 1 video (MP4/WebM/MOV, 20 MB, 30 seconds).
 Review the description/credit, choose the cover/order, then **Save price list**.
 Uploading is a draft change; saving an inactive year does not activate it.

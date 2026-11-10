@@ -54,7 +54,28 @@
 .vendor-page .vendor-import-ack input { flex: 0 0 22px; width: 22px; min-height: 22px; margin-top: 2px; }
 .vendor-price-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 20px 0; }
 .vendor-price-toolbar label { flex: 1 1 180px; }
-.vendor-price-products { display: grid; gap: 16px; margin: 20px 0; }
+.vendor-price-save-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-block: 12px; background: var(--surface); border-block: 1px solid var(--line); }
+.vendor-price-save-bar > p { flex: 1 1 160px; }
+.vendor-price-save-bar .vendor-actions { min-width: 0; }
+.vendor-price-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-block: 12px; font-size: 13px; }
+.vendor-price-table th, .vendor-price-table td { text-align: start; padding: 10px 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.vendor-price-table thead th { color: var(--muted); font-weight: 600; }
+.vendor-price-table th:first-child { width: 7%; }
+.vendor-price-table th:nth-child(2) { width: 33%; }
+.vendor-price-table th:nth-child(3), .vendor-price-table th:nth-child(4) { width: 17%; }
+.vendor-price-table th:nth-child(5) { width: 16%; }
+.vendor-price-table th:nth-child(6) { width: 10%; }
+.vendor-price-table .vendor-price-number { text-align: end; font-variant-numeric: tabular-nums; }
+.vendor-price-summary { cursor: pointer; }
+.vendor-price-summary:hover, .vendor-price-summary:focus-within, .vendor-price-summary[data-expanded="true"] { background: var(--soft); }
+.vendor-page .vendor-price-toggle { display: grid; grid-template-columns: 12px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; padding: 0; border: 0; background: transparent; text-align: start; }
+.vendor-price-toggle::before { content: ""; width: 7px; height: 7px; border-inline-end: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); }
+.vendor-price-toggle[aria-expanded="true"]::before { transform: rotate(45deg); }
+.vendor-price-toggle:dir(rtl)::before { transform: rotate(45deg); }
+.vendor-price-toggle[aria-expanded="true"]:dir(rtl)::before { transform: rotate(-45deg); }
+.vendor-price-toggle span { overflow-wrap: anywhere; }
+.vendor-price-toggle small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+.vendor-price-table .vendor-price-detail-cell { padding: 16px 0; }
 .vendor-price-product { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .vendor-price-product legend { font-weight: 700; padding-inline: 8px; overflow-wrap: anywhere; }
 .vendor-price-product button { align-self: end; }
@@ -66,6 +87,13 @@
 .vendor-media-item img, .vendor-media-item video { width: 100%; max-height: 200px; object-fit: contain; }
 .vendor-media-item p { overflow-wrap: anywhere; }
 .vendor-product-media:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 4px; }
+.vendor-price-product:focus-visible, #price-message:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 4px; }
+@media (max-width: 800px) {
+  .vendor-price-table .vendor-price-secondary { display: none; }
+  .vendor-price-table th:nth-child(2) { width: 52%; }
+  .vendor-price-table th:nth-child(5) { width: 29%; }
+  .vendor-price-table th:nth-child(6) { width: 19%; }
+}
 @media (max-width: 900px) {
   .vendor-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vendor-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -81,4 +109,11 @@
   .vendor-detail-fields dd { margin-bottom: 12px; }
   .vendor-status-form button { width: 100%; }
   .vendor-price-product { grid-template-columns: minmax(0, 1fr); }
+  .vendor-price-save-bar .vendor-actions { flex: 1 1 100%; gap: 8px; }
+  .vendor-page .vendor-price-save-bar button { padding-inline: 12px; font-size: 14px; }
+  .vendor-price-save-bar #save-prices { margin-inline-start: auto; }
+  .vendor-price-table th, .vendor-price-table td { padding-inline: 4px; }
+  .vendor-price-table th:nth-child(2) { width: 51%; }
+  .vendor-price-table th:nth-child(5) { width: 31%; }
+  .vendor-price-table th:nth-child(6) { width: 18%; }
 }

@@ -20,17 +20,63 @@ const result = {
 const tick = () => new Promise(resolve => setImmediate(resolve));
 async function harness() {
   const nodes = new Map();
+  let focused;
+  let resizeBar;
+  const styles = new Map();
+  class Node {
+    constructor(tag = "div") {
+      Object.assign(this, { tagName: tag.toUpperCase(), value: "", textContent: "", hidden: false,
+        disabled: false, checked: false, dataset: {}, files: [], events: new Map(), children: [], attributes: {} });
+    }
+    addEventListener(type, callback) { this.events.set(type, callback); }
+    append(...children) { this.children.push(...children); }
+    replaceChildren(...children) { this.children = children; }
+    setAttribute(key, value) { this.attributes[key] = value; }
+    getAttribute(key) { return this.attributes[key]; }
+    removeAttribute(key) { delete this.attributes[key]; }
+    setCustomValidity(message) { this.validationMessage = message; }
+    checkValidity() {
+      if (this.disabled) return true;
+      if (this.validationMessage || (this.required && String(this.value) === "")) return false;
+      if (this.type !== "number") return true;
+      const value = Number(this.value);
+      return Number.isFinite(value) && value >= Number(this.min) && value <= Number(this.max) &&
+        Math.abs(Math.round(value * 100) - value * 100) < 0.000001;
+    }
+    reportValidity() { this.reported = true; return this.checkValidity(); }
+    matches(selector) {
+      return selector === ":invalid" ? ["INPUT", "TEXTAREA"].includes(this.tagName) && !this.checkValidity() :
+        selector.startsWith(".") ? this.className?.split(" ").includes(selector.slice(1)) :
+          this.tagName === selector.toUpperCase();
+    }
+    querySelectorAll(selector) {
+      const matches = [];
+      for (const child of this.children) {
+        if (selector.split(",").some(part => child.matches(part.trim()))) matches.push(child);
+        matches.push(...child.querySelectorAll(selector));
+      }
+      return matches;
+    }
+    querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
+    focus() { focused = this; }
+    scrollIntoView() { this.scrolled = true; }
+    getBoundingClientRect() { return { height: this.height ?? 0 }; }
+    close() {}
+    showModal() {}
+    pause() { this.paused = true; }
+    load() { this.unloaded = true; }
+  }
+  const find = (node, id) => node.id === id ? node : node.children.map(child => find(child, id)).find(Boolean);
   const get = id => {
-    if (!nodes.has(id)) nodes.set(id, {
-      value: "", textContent: "", hidden: false, disabled: false, checked: false,
-      dataset: {}, files: [], events: new Map(), children: [],
-      addEventListener(type, callback) { this.events.set(type, callback); },
-      append(...children) { this.children.push(...children); },
-      replaceChildren(...children) { this.children = children; },
-      setAttribute() {}, close() {}, showModal() {}, querySelectorAll() { return []; }, focus() {},
-    });
+    const found = [...nodes.values()].map(node => find(node, id)).find(Boolean);
+    if (found) return found;
+    if (!nodes.has(id)) nodes.set(id, new Node());
     return nodes.get(id);
   };
+  get("price-panel").append(...["close-prices", "reload-prices", "price-message", "price-controls"].map(get));
+  get("price-controls").append(...["price-year", "activate-prices", "new-price-year", "price-form"].map(get));
+  get("price-form").append(get("price-save-bar"), get("price-products"));
+  get("price-save-bar").append(...["price-save-state", "price-view-message", "save-prices", "add-price-product"].map(get));
   const requests = [];
   let respondImport = async () => new Response(JSON.stringify({
     ...result, previewed: true, rolledBack: true, receipt: "signed.preview",
@@ -48,7 +94,12 @@ async function harness() {
     ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary, validCatalogue, validYear, catalogueProducts,
     validMedia, MEDIA_LIMITS, mediaUrl, inspectMediaFile, transferMedia: (...args) => transfer(...args),
     AbortController, AbortSignal, URL, URLSearchParams, Intl, console,
-    document: { getElementById: get, createElement: () => get(Symbol()) },
+    document: { getElementById: get, createElement: tag => new Node(tag),
+      documentElement: { style: { setProperty: (key, value) => styles.set(key, value) } } },
+    ResizeObserver: class {
+      constructor(callback) { resizeBar = callback; }
+      observe() {}
+    },
     window: { addEventListener() {}, confirm: () => confirmed }, history: { replaceState() {} },
     location: { href: "https://vendor.example/vendor/" },
     setTimeout: () => 0, clearTimeout() {},
@@ -79,7 +130,11 @@ async function harness() {
     await tick();
   };
   return {
-    get, requests, emit, context,
+    get, requests, emit, context, styles, get focused() { return focused; },
+    resizeSaveBar(height) {
+      get("price-save-bar").height = height;
+      resizeBar([{ target: get("price-save-bar") }]);
+    },
     respond(callback) { respondImport = callback; },
     respondPrice(callback) { respondPrice = callback; },
     respondMedia(callback) { respondMedia = callback; },
@@ -103,18 +158,18 @@ test("vendor uploads remain drafts, require explicit save and retain description
   assert.equal(ui.requests.filter(req => req.path === "/api/vendor-catalogue" && req.method === "POST").length, 0);
   assert.match(ui.get("price-message").textContent, /draft.*Save price list/);
   assert.equal(ui.get("save-prices").disabled, false);
-  let details = ui.get("price-products").children[0].children.at(-1);
+  let details = ui.get("media-product-1");
   const firstItem = details.children[2].children[0];
   const credit = firstItem.children[4].children[0];
   credit.value = "Illustrative example - licensed test credit";
   credit.events.get("input")();
   assert.equal(vm.runInContext("priceList.products[0].media[0].credit", ui.context), credit.value);
   vm.runInContext("priceList.products[0].media.push({ ...priceList.products[0].media[0], publicId: priceList.products[0].media[0].publicId.slice(0,-1) + '2' }); renderPriceProducts()", ui.context);
-  details = ui.get("price-products").children[0].children.at(-1);
+  details = ui.get("media-product-1");
   const secondActions = details.children[2].children[1].children.at(-1);
   secondActions.children.find(button => button.textContent === "Use as cover").events.get("click")();
   assert.match(vm.runInContext("priceList.products[0].media[0].publicId", ui.context), /2$/);
-  details = ui.get("price-products").children[0].children.at(-1);
+  details = ui.get("media-product-1");
   details.children[2].children[1].children.at(-1).children.find(button => button.textContent === "Remove media").events.get("click")();
   assert.equal(vm.runInContext("priceList.products[0].media.length", ui.context), 1);
   ui.respondPrice(async (_path, options) => {
@@ -136,6 +191,7 @@ test("media upload blocks duplicates, enforces product limits and suppresses lat
   const pending = vm.runInContext("uploadProductMedia(priceList.products[0], fileInput)", ui.context);
   await tick();
   assert.equal(ui.get("close-prices").disabled, true);
+  assert.equal(ui.get("price-toggle-1").disabled, true);
   await vm.runInContext("uploadProductMedia(priceList.products[0], fileInput)", ui.context);
   assert.equal(ui.requests.filter(req => req.path === "/api/vendor-media").length, 1);
   vm.runInContext("clearPrivateView()", ui.context);
@@ -182,6 +238,8 @@ test("stale upload authorization forces a saved-list reload without discarding v
   assert.equal(vm.runInContext("priceList.products[0].price", ui.context), 123);
   assert.equal(ui.get("save-prices").disabled, true);
   assert.equal(ui.get("reload-prices").disabled, false);
+  assert.equal(ui.get("price-toggle-1").disabled, true);
+  assert.equal(ui.get("price-view-message").disabled, false);
   assert.match(ui.get("price-message").textContent, /saved list changed.*existing edits/);
 });
 
@@ -216,9 +274,10 @@ test("import loads on demand, requires rolled-back preview and acknowledgement, 
     const ui = await harness();
     assert.equal(ui.requests.some(req => req.path.startsWith("/api/vendor-catalogue")), false);
     await ui.emit("open-prices");
-    assert.equal(ui.get("price-products").children.length, 1);
+    assert.equal(ui.get("price-products").children.length, 2);
     assert.equal(ui.get("save-prices").disabled, true);
-    const price = ui.get("price-products").children[0].children[5].children[0];
+    await ui.emit("price-toggle-1");
+    const price = ui.get("price-price-1");
     price.value = "99.95";
     price.events.get("input")();
     assert.equal(ui.get("save-prices").disabled, false);
@@ -272,7 +331,8 @@ test("import loads on demand, requires rolled-back preview and acknowledgement, 
   test("uncertain price writes keep visible drafts but require reload instead of blindly repeating", async () => {
     const ui = await harness();
     await ui.emit("open-prices");
-    const price = ui.get("price-products").children[0].children[5].children[0];
+    await ui.emit("price-toggle-1");
+    const price = ui.get("price-price-1");
     price.value = "125";
     price.events.get("input")();
     ui.respondPrice(async () => { throw new Error("Synthetic network loss"); });
@@ -284,6 +344,107 @@ test("import loads on demand, requires rolled-back preview and acknowledgement, 
     await ui.emit("price-form", "submit");
     assert.equal(ui.requests.length, before);
   });
+
+test("price table rows expand accessibly, keep drafts across rows and update their summaries", async () => {
+  const ui = await harness();
+  ui.respondPrice(async () => Response.json({ activeYear: 2026, years: [{ year: 2026, revision: 1 }],
+    catalogue: { year: 2026, revision: 1, products: catalogueProducts(products.slice(0, 2)) } }));
+  await ui.emit("open-prices");
+  assert.equal(ui.get("price-products").children.length, 4);
+  assert.equal(ui.get("price-products").querySelectorAll("input").length, 0);
+  assert.equal(ui.get("price-toggle-1").tagName, "BUTTON");
+  assert.equal(ui.get("price-toggle-1").getAttribute("aria-expanded"), "false");
+  assert.equal(ui.get("price-toggle-1").getAttribute("aria-controls"), "price-details-1");
+  await ui.emit("price-toggle-1");
+  assert.equal(ui.get("price-details-1").hidden, false);
+  assert.equal(ui.focused, ui.get("price-toggle-1"));
+  const price = ui.get("price-price-1");
+  price.value = "99.95";
+  price.events.get("input")();
+  assert.equal(ui.get("price-products").children[0].children[4].textContent, "99.95");
+  assert.match(ui.get("price-save-state").textContent, /2026 - 2 products.*Unsaved changes/);
+  await ui.emit("price-toggle-2");
+  assert.equal(ui.get("price-details-1").hidden, true);
+  assert.equal(ui.get("price-details-2").hidden, false);
+  await ui.emit("price-toggle-1");
+  assert.equal(ui.get("price-price-1").value, 99.95);
+  const close = ui.get("price-editor-1").querySelectorAll("button").find(button => button.textContent === "Close details");
+  close.events.get("click")();
+  assert.equal(ui.get("price-details-1").hidden, true);
+  assert.equal(ui.get("save-prices").disabled, false);
+});
+
+test("saving reveals and focuses invalid collapsed fields and media descriptions before making any request", async () => {
+  for (const field of ["brand", "price", "media"]) {
+    const ui = await harness();
+    await ui.emit("open-prices");
+    await ui.emit("price-toggle-1");
+    if (field === "media") {
+      ui.context.asset = { ...mediaAsset, alt: "   " };
+      vm.runInContext("priceList.products[0].media = [asset]; priceDirty = true", ui.context);
+    } else {
+      const input = ui.get(`price-${field}-1`);
+      input.value = field === "price" ? "12.345" : "   ";
+      input.events.get("input")();
+    }
+    await ui.emit("price-toggle-1");
+    await ui.emit("price-form", "submit");
+    assert.equal(ui.requests.filter(req => req.method === "POST").length, 0);
+    assert.equal(ui.get("price-details-1").hidden, false);
+    assert.equal(ui.focused.reported, true);
+    assert.equal(ui.focused.checkValidity(), false);
+    if (field === "media") assert.equal(ui.get("media-product-1").open, true);
+    else assert.equal(ui.focused, ui.get(`price-${field}-1`));
+    assert.equal(ui.get("price-view-message").hidden, false);
+    await ui.emit("price-view-message");
+    assert.equal(ui.focused, ui.get("price-message"));
+    assert.equal(ui.get("price-message").scrolled, true);
+  }
+});
+
+test("adding opens the new product, removal preserves other drafts and year changes reset expanded details", async () => {
+  const ui = await harness();
+  await ui.emit("open-prices");
+  await ui.emit("add-price-product");
+  assert.equal(ui.get("price-details-2").hidden, false);
+  assert.equal(ui.focused, ui.get("price-name-2"));
+  assert.match(ui.get("media-product-2").children[3].textContent, /Save this new product/);
+  const remove = ui.get("price-editor-2").querySelectorAll("button").find(button => button.textContent === "Remove product #2");
+  remove.events.get("click")();
+  assert.equal(ui.get("price-products").children.length, 2);
+  assert.equal(ui.focused, ui.get("add-price-product"));
+  await ui.emit("price-toggle-1");
+  ui.respondPrice(async () => Response.json({ activeYear: 2026,
+    years: [{ year: 2026, revision: 1 }, { year: 2027, revision: 1 }],
+    catalogue: { year: 2027, revision: 1, products: catalogueProducts(products.slice(0, 1)) } }));
+  ui.get("price-year").value = "2027";
+  await ui.emit("price-year", "change");
+  assert.equal(ui.get("price-details-1").hidden, true);
+  assert.match(ui.get("price-save-state").textContent, /2027.*All changes saved/);
+});
+
+test("collapsing an editor unloads its video, and expiry clears expansion and sticky status", async () => {
+  const ui = await harness();
+  await ui.emit("open-prices");
+  ui.context.asset = { ...mediaAsset, resourceType: "video", duration: 10, format: "mp4" };
+  vm.runInContext("priceList.products[0].media = [asset]", ui.context);
+  await ui.emit("price-toggle-1");
+  const video = ui.get("price-products").querySelector("video");
+  await ui.emit("price-toggle-1");
+  assert.equal(video.paused, true);
+  assert.equal(video.unloaded, true);
+  vm.runInContext("clearPrivateView()", ui.context);
+  assert.equal(ui.get("price-save-state").textContent, "");
+  assert.equal(vm.runInContext("expandedProductId", ui.context), null);
+});
+
+test("sticky controls reserve their measured height for focus scrolling and restore the default when hidden", async () => {
+  const ui = await harness();
+  for (const [height, offset] of [[104.8, "121px"], [269.2, "286px"], [0, "24px"]]) {
+    ui.resizeSaveBar(height);
+    assert.equal(ui.styles.get("--vendor-save-offset"), offset);
+  }
+});
 test("pending imports cannot duplicate or close; logout clears private data and suppresses late responses", async () => {
   const ui = await harness();
   await ui.choose();
