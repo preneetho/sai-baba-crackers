@@ -14,6 +14,10 @@ const read = async path => (await readFile(new URL(`../${path}`, import.meta.url
 test("the homepage has crawlable services, honest fulfilment information and working local links", async () => {
   const html = await read("vendor-app/index.html");
   assert.equal([...html.matchAll(/<h1\b/g)].length, 1);
+  assert.deepEqual(
+    [...html.matchAll(/<a class="button[^"]*" href="\/order\/">([^<]+)<\/a>/g)].map(([, label]) => label),
+    ["Shop crackers", "Shop crackers", "Shop crackers"],
+  );
   for (const id of ["main-content", "celebrations", "delivery", "event-enquiries", "faq", "contact"]) {
     assert.ok(html.includes(`id="${id}"`));
   }
