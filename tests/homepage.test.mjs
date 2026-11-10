@@ -75,7 +75,7 @@ test("the sitemap contains only public canonical pages and private pages remain 
 test("catalogue assets stay root-relative after the move, with a homepage return link", async () => {
   const html = await read("vendor-app/order/index.html");
   assert.match(html, /class="wordmark" href="\/" aria-label="Sai Baba Crackers Centre home"/);
-  for (const [, path] of html.matchAll(/(?:src|href)="([^"]+\.(?:png|css|mjs))"/g)) {
+  for (const [, path] of html.matchAll(/(?:src|href)="([^"]+\.(?:png|svg|css|mjs))"/g)) {
     if (path.startsWith("https:")) continue;
     assert.ok(path.startsWith("/"), `Nested catalogue asset must be root-relative: ${path}`);
     await readFile(new URL(`../vendor-app${path}`, import.meta.url));
@@ -158,6 +158,10 @@ test("local preview serves the public routes, assets, redirects and vendor page"
     ["/sitemap.xml", "application/xml", "<urlset"],
     ["/home.css", "text/css", ".home-hero"],
     ["/home.mjs", "text/javascript", "restoreCatalogueBookmark"],
+    ["/modern.css", "text/css", ".modern"],
+    ["/modern-ui.mjs", "text/javascript", "restoreCartBookmark"],
+    ["/canvas-fireworks.mjs", "text/javascript", "prefers-reduced-motion"],
+    ["/modern-fireworks.svg", "image/svg+xml", "<svg"],
     ["/auth-callback.mjs", "text/javascript", "invite_token"],
     ["/app.mjs", "text/javascript", 'fetch("/api/catalogue"'],
   ]) {

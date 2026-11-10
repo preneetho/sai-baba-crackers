@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1e4f91">
+  <meta name="theme-color" content="#080D1F">
   <meta name="description" content="Sai Baba Crackers Centre: 35 years in the crackers trade. Explore Sanathnagar's wholesale crackers collection, get 15% off your cart, and choose free home delivery or store pickup.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Sai Baba Crackers Centre">
@@ -24,10 +24,12 @@
   <link rel="canonical" href="https://saibabacrackers.netlify.app/order/">
   <link rel="icon" type="image/png" href="/sai-baba-logo.png">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/modern.css">
+  <script type="module" src="/modern-ui.mjs"></script>
   <script type="module" src="/auth-callback.mjs"></script>
   <script type="module" src="/app.mjs"></script>
 </head>
-<body>
+<body class="modern">
   <svg class="product-artwork-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
     <defs>
       <symbol id="media-icon-expand" viewBox="0 0 20 20">
@@ -187,11 +189,21 @@
         <a class="hero-link" href="#catalogue">Shop crackers <span aria-hidden="true">&#8595;</span></a>
         <div class="hero-meta"><span><span data-catalogue-year>Current</span> COLLECTION</span><span>Sanathnagar, Hyderabad</span></div>
       </div>
-      <div class="hero-art" aria-hidden="true">
-        <img class="hero-fireworks" src="/diwali-fireworks.png" alt="" width="420" height="340" decoding="async">
-        <span class="art-caption">LET THE GOOD TIMES GLOW</span>
+      <div class="hero-art">
+        <div class="fireworks-stage" aria-hidden="true">
+          <img class="hero-fireworks" src="/modern-fireworks.svg" alt="" width="420" height="340" decoding="async">
+          <canvas class="fireworks-canvas" width="640" height="480" data-fireworks></canvas>
+        </div>
+        <span class="art-caption" aria-hidden="true">LET THE GOOD TIMES GLOW</span>
+        <button class="motion-toggle" type="button" data-fireworks-toggle hidden>Pause fireworks</button>
       </div>
     </section>
+
+    <aside class="festival-ribbon" aria-label="Current catalogue offer">
+      <div><span class="offer-tag">YOUR FESTIVE SAVING</span><strong>15% off your cart</strong></div>
+      <p>Automatically applied to the subtotal. No online payment. Every request needs shop confirmation.</p>
+      <a href="#catalogue">Find your favourites <span aria-hidden="true">&#8595;</span></a>
+    </aside>
 
     <div class="how-it-works" aria-label="How it works">
       <span><b>01</b> Add to cart</span><i aria-hidden="true"></i>
@@ -216,7 +228,9 @@
         <div id="no-results" class="empty-state" hidden><span aria-hidden="true">&#10023;</span><h3 id="no-results-title">No products found</h3><p id="no-results-message">Try a different product name or category.</p><button id="reset-filters" class="button secondary" type="button">Clear filters</button></div>
       </section>
 
+      <dialog id="cart-drawer" aria-labelledby="requirement-title">
       <aside id="requirement" class="requirement" aria-labelledby="requirement-title">
+        <button class="icon-button close-cart" type="button" data-close-cart aria-label="Close cart" autofocus>&times;</button>
         <div class="cart-title"><h2 id="requirement-title">Your cart</h2><span id="cart-count" class="count-pill">0</span></div>
         <p class="cart-subtitle">Review your items before checkout.</p>
         <button id="clear-cart-top" class="text-button" type="button" hidden>Clear cart</button>
@@ -224,10 +238,12 @@
         <div id="cart-pricing"></div>
         <p class="estimate-note">The shop will confirm final prices and availability.</p>
         <button id="review" class="button primary wide" type="button" disabled>Proceed to checkout <span aria-hidden="true">&#8594;</span></button>
+        <button class="button secondary wide continue-shopping" type="button" data-close-cart>Continue browsing</button>
         <p class="cart-footnote">Free home delivery or store pickup. No payment now.</p>
         <button id="clear-cart" class="text-button" type="button" hidden>Clear cart</button>
         <div class="vendor-note"><span aria-hidden="true">&#10022;</span><p><strong>Need a hand choosing?</strong><br><a id="vendor-call" href="tel:+919849293951">Call the shop</a> for a little festive advice.</p></div>
       </aside>
+      </dialog>
     </div>
 
     <section id="contact" class="contact-section" aria-labelledby="contact-title">

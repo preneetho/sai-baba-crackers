@@ -17,10 +17,11 @@ default; no 2026 orders are imported or modified automatically.
 ## Public pages
 
 `index.html` is the evergreen marketing homepage at `/`, styled by `home.css`
-on top of the existing brand styles. It includes services, conditional Hyderabad
+and the public-only `modern.css` on top of the shared styles. It includes services, conditional Hyderabad
 delivery, store pickup, phone enquiries for events, native FAQ disclosures and
-contact/directions links. It works without JavaScript; `home.mjs` only preserves
-old catalogue/cart fragments and the existing authentication callback.
+contact/directions links. Its content works without JavaScript; `home.mjs` preserves
+old catalogue/cart fragments and the existing authentication callback. The separate
+`modern-ui.mjs` initializes decorative fireworks and the catalogue's native cart drawer.
 
 The unchanged shopping flow now lives in `order/index.html` at `/order/`, with
 root-relative assets. The saved-cart key, pricing, checkout, APIs and private
@@ -73,33 +74,56 @@ npm.cmd run vendor:test
 
 ## Appearance
 
-The app uses a blue theme across the catalogue, cart, checkout and mobile controls,
-with gold accents for the festive artwork. Shared colours are defined in
-`styles.css`; both pages' browser theme colours match the brand.
+The public pages use the Modern Fireworks theme: midnight navy `#080D1F`,
+electric purple `#8B5CF6`, orange `#FF6B35` and gold `#FFC857`. Semantic colours
+and responsive overrides live in `modern.css`, scoped to `body.modern`; the private
+vendor dashboard retains its existing shared styles. There is no framework migration
+or new runtime dependency. Both public pages retain their canonical URLs and SEO data.
+The sticky header adapts to narrow screens and its measured height keeps anchor
+targets visible. The offer ribbon describes only the existing automatic 15% discount.
 The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon.
 The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
 experience, the 15% discount and delivery/pickup options. Delivery area and timing
 remain subject to shop confirmation.
-The header uses the bundled static `diwali-fireworks.png` image (about 41 KB).
-There is no active GIF, video, autoplay or playback control. The image works
-without JavaScript and has fixed dimensions to prevent layout shift. Mobile
-artwork is fully visible in its own grid column beside the header links and
-metadata, scaling down further on very narrow screens. Older animation assets
-and their module remain at their original URLs for previously cached pages,
-but the current page neither imports the animation module nor loads those assets.
-No external media service or new runtime dependency is used.
+The hero uses the original, bundled `modern-fireworks.svg` static fallback (under 5 KB)
+in the requested purple, orange and gold palette. The older `diwali-fireworks.png`
+remains available to cached pages.
+`canvas-fireworks.mjs` adds hero-only decorative canvas fireworks, capped at 96
+particles, 30 rendered frames per second and 1.5 device-pixel ratio. Animation stops
+offscreen, in hidden tabs and on page suspension; a visible Play/Pause control
+preserves the customer's pause choice. Reduced-motion preferences disable animation
+entirely, including live preference changes. A canvas/observer failure logs a warning
+and retains the static artwork. No hero video, GIF, external font or CDN is loaded.
+Older animation assets remain available for cached pages only.
+The native cart dialog opens from the header, mobile shortcut or old `#requirement`
+bookmark. It supports Escape, backdrop dismissal and focus restoration. Checkout
+remains the existing native dialog above the cart, full-height on mobile, with the
+same form, validation, consent, request snapshot and recovery controls.
 Changing the theme does not change order recording, pricing or WhatsApp messages.
 Product cards use bundled SVG illustrations matched to the cracker type, with
 specific variants for items such as rockets, sparklers, garlands and flower pots.
-These are illustrative, not manufacturer product photos. On mobile, the artwork
-band is 56 px high with a 40 px illustration; desktop artwork remains larger.
-Selected product cards use a warm-gold background, gold artwork band and stronger
+These are illustrative, not manufacturer product photos. Public cards use a responsive
+four/three/two/one-column layout with 44 px quantity controls and consistently positioned
+product numbers, including photo/video cards.
+Selected product cards use a purple-tinted surface and stronger gold
 border, with the selected quantity in bold. The existing quantity and selection
 announcement also identify the state without relying on colour alone. The
 highlight follows the cart across search, category filters, sorting and reloads,
 and disappears when the product's quantity returns to zero.
 Clear selection is available both above and below the selected-items list.
 Both controls use the same confirmation prompt and are hidden for an empty list.
+
+### Redesign preview and approval
+
+Review the `modern-fireworks-redesign` feature branch on a **draft Netlify deploy**.
+Never use `--prod` or merge/push to the production branch before owner approval.
+With dependencies already installed, `netlify deploy --no-build --context deploy-preview`
+packages the existing functions and applies the checked-in routing/security headers
+without running the dependency-install build command. Verify `/`, `/order/`, the
+public catalogue endpoint and private-route protections on the returned draft URL.
+Preview backend availability depends on the site's deploy-preview environment.
+Use synthetic local fixtures for submission/error checks; do not create test records
+in the live order register or send WhatsApp messages during visual review.
 
 ### WhatsApp link preview
 

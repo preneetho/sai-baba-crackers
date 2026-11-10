@@ -95,10 +95,13 @@ test("clear cart is available above and below the cart items", async () => {
   assert.ok(html.indexOf('id="cart-items"') < html.indexOf('id="clear-cart"'));
 });
 
-test("the header uses only a lightweight static fireworks image", async () => {
+test("the header retains a lightweight static fallback and adds optional hero-only canvas fireworks", async () => {
   const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
-  assert.match(html, /<img class="hero-fireworks" src="\/diwali-fireworks\.png" alt="" width="420" height="340"/);
-  assert.doesNotMatch(html, /<video\b|fireworks-toggle|\.gif\b|\.mp4\b/);
+  assert.match(html, /<img class="hero-fireworks" src="\/modern-fireworks\.svg" alt="" width="420" height="340"/);
+  assert.doesNotMatch(html, /<video\b|\.gif\b|\.mp4\b/);
+  assert.equal([...html.matchAll(/<canvas\b/g)].length, 1);
+  assert.match(html, /class="fireworks-stage" aria-hidden="true">[\s\S]*?<canvas[^>]*data-fireworks/);
+  assert.match(html, /<button[^>]*data-fireworks-toggle hidden>Pause fireworks/);
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(app, /initializeFireworks|hero-fireworks\.mjs/);
   const image = await readFile(new URL("../vendor-app/diwali-fireworks.png", import.meta.url));
@@ -106,6 +109,9 @@ test("the header uses only a lightweight static fireworks image", async () => {
   assert.deepEqual([...image.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.equal(image.readUInt32BE(16), 420);
   assert.equal(image.readUInt32BE(20), 340);
+  const illustration = await readFile(new URL("../vendor-app/modern-fireworks.svg", import.meta.url), "utf8");
+  assert.ok(Buffer.byteLength(illustration) < 5 * 1024, "new static artwork must stay below 5 KB");
+  assert.doesNotMatch(illustration, /<script\b|<image\b|https?:\/\/(?!www.w3.org)/);
 });
 
 test("selected product cards highlight their full surface and artwork without changing card geometry", async () => {

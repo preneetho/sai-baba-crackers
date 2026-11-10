@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1e4f91">
+  <meta name="theme-color" content="#080D1F">
   <title>Sai Baba Crackers Centre | Sanathnagar, Hyderabad</title>
   <meta name="description" content="Crackers for Diwali, weddings and family functions from Sai Baba Crackers Centre, Sanathnagar, Hyderabad. Browse the price list or call about pickup and delivery.">
   <link rel="canonical" href="https://saibabacrackers.netlify.app/">
@@ -25,7 +25,9 @@
   <link rel="icon" type="image/png" href="/sai-baba-logo.png">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/home.css">
+  <link rel="stylesheet" href="/modern.css">
   <script type="module" src="/home.mjs"></script>
+  <script type="module" src="/modern-ui.mjs"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -45,7 +47,7 @@
   }
   </script>
 </head>
-<body class="home">
+<body class="home modern">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header home-header">
     <a class="wordmark" href="/" aria-label="Sai Baba Crackers Centre home" aria-current="page">
@@ -72,11 +74,21 @@
         </div>
         <p class="home-hero-note">Planning a function? Speak to us about products, quantities and availability.</p>
       </div>
-      <div class="home-hero-art" aria-hidden="true">
-        <img src="/diwali-fireworks.png" alt="" width="420" height="340" decoding="async" fetchpriority="high">
-        <p>YOUR OCCASION. OUR COLLECTION.</p>
+      <div class="home-hero-art">
+        <div class="fireworks-stage" aria-hidden="true">
+          <img src="/modern-fireworks.svg" alt="" width="420" height="340" decoding="async" fetchpriority="high">
+          <canvas class="fireworks-canvas" width="640" height="480" data-fireworks></canvas>
+        </div>
+        <p aria-hidden="true">YOUR OCCASION. OUR COLLECTION.</p>
+        <button class="motion-toggle" type="button" data-fireworks-toggle hidden>Pause fireworks</button>
       </div>
     </section>
+
+    <aside class="festival-ribbon" aria-label="Current catalogue offer">
+      <div><span class="offer-tag">A LITTLE MORE TO CELEBRATE</span><strong>15% off your cart</strong></div>
+      <p>Applied automatically in the catalogue. Final prices and availability confirmed by the shop.</p>
+      <a href="/order/">Explore the collection <span aria-hidden="true">&#8599;</span></a>
+    </aside>
 
     <ul class="home-facts" aria-label="About the shop">
       <li><strong>35 years</strong><span>in the crackers trade</span></li>
@@ -91,18 +103,21 @@
       </div>
       <div class="home-service-grid">
         <article class="home-service">
+          <span class="occasion-symbol" aria-hidden="true">&#10023;</span>
           <p class="eyebrow brand-text">THE BIG DAY</p>
           <h3>Weddings &amp; family functions</h3>
           <p>Planning a marriage celebration, reception or family gathering in Hyderabad? Contact the shop to discuss your product requirements and event date.</p>
           <a href="#event-enquiries">Discuss your occasion</a>
         </article>
         <article class="home-service">
+          <span class="occasion-symbol" aria-hidden="true">&#10041;</span>
           <p class="eyebrow brand-text">FESTIVE FAVOURITES</p>
           <h3>Diwali &amp; festivals</h3>
           <p>Browse sparklers, flower pots, chakkars and more in the current price list. See selling-pack details and prepare your requirement at your own pace.</p>
           <a href="/order/">Explore the catalogue</a>
         </article>
         <article class="home-service">
+          <span class="occasion-symbol" aria-hidden="true">&#10022;</span>
           <p class="eyebrow brand-text">PLAN AHEAD</p>
           <h3>Bulk requirements</h3>
           <p>Putting together a larger requirement for a function or festival? Share the quantities you have in mind so the shop can check stock and arrangements.</p>

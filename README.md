@@ -19,8 +19,11 @@ No frontend dependencies, customer accounts or payments are required.
 `/` is the static marketing homepage for Sai Baba Crackers Centre in Sanathnagar,
 Hyderabad. It describes wedding/function, festival and bulk product requirements,
 delivery subject to confirmation, store pickup, phone-based event enquiries,
-FAQs and the existing address/phone numbers. It uses the existing blue/gold brand
-and lightweight illustrative artwork, not invented shop photos or testimonials.
+FAQs and the existing address/phone numbers. Its Modern Fireworks visual theme
+uses midnight navy, electric purple, orange and gold with lightweight illustrative
+artwork, not invented shop photos or testimonials. Public-only styling keeps the
+vendor dashboard unchanged. Hero-only canvas fireworks respect reduced motion,
+offscreen/hidden-page suspension and the customer's pause choice.
 Opening hours and year-round stock are intentionally not promised.
 
 The existing catalogue, saved cart, checkout and WhatsApp flow are at `/order/`;
@@ -34,6 +37,10 @@ public routes. Keep Netlify's default Pretty URLs enabled to normalize `/order`
 to `/order/`; do not add slash-only redirect rules, which can loop after CDN
 normalization. The local preview mirrors these canonical routes. No catch-all rewrite
 intercepts APIs, authentication callbacks or private request pages.
+The cart opens in a native modal drawer, with the existing checkout above it;
+mobile checkout uses the full viewport. These presentation changes do not alter
+pack units, prices, the 15% discount, validation, consent, request recording or
+customer-initiated WhatsApp sending. See [appearance and preview guidance](vendor-app/README.md#appearance).
 
 Both public pages have canonical/social metadata. The homepage contains static
 `Store` JSON-LD matching its visible contact details; no ratings, opening hours,
