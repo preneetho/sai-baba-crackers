@@ -1,6 +1,6 @@
 import { ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary } from "./vendor-model.mjs";
 import { validCatalogue, validYear, catalogueProducts } from "./catalogue-model.mjs";
-import { validMedia, MEDIA_LIMITS, mediaUrl } from "./media-model.mjs";
+import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "./media-model.mjs";
 import { inspectMediaFile, transferMedia } from "./media-upload.mjs";
 
 const $ = id => document.getElementById(id);
@@ -288,14 +288,15 @@ function renderProductMedia(product) {
   });
   const media = product.media ?? [];
   details.append(element("summary", `Photos & video (${media.length}/4)`));
-  details.append(element("p", "Upload up to 3 photos (5 MB each) and 1 video (20 MB, 30 seconds). Upload only media you own or have permission to publish. Add any required credits and label generic examples.", "vendor-muted"));
+  details.append(element("p", "Add up to 3 photos (5 MB each) and 1 video: a YouTube link or an upload (20 MB, 30 seconds). Publish only media you own or have permission to use. Add required credits and label generic examples.", "vendor-muted"));
   const list = element("div", undefined, "vendor-media-list");
   media.forEach((asset, index) => {
     const item = element("div", undefined, "vendor-media-item");
-    const preview = element(asset.resourceType === "image" ? "img" : "video");
+    const youtube = isYouTubeMedia(asset);
+    const preview = element(asset.resourceType === "image" || youtube ? "img" : "video");
     // Draft descriptions may be incomplete; delivery still validates the saved asset identity.
     const previewAsset = { ...asset, alt: "Product media preview", credit: "" };
-    if (asset.resourceType === "image") {
+    if (asset.resourceType === "image" || youtube) {
       preview.src = mediaUrl(previewAsset);
       preview.alt = asset.alt;
       preview.loading = "lazy";
@@ -309,8 +310,10 @@ function renderProductMedia(product) {
     }
     const failure = element("p", "", "vendor-notice");
     failure.setAttribute("role", "status");
-    preview.addEventListener("error", () => { failure.textContent = "Preview unavailable. The saved reference is retained; check Cloudinary before removing it."; });
-    item.append(element("p", `${index === 0 ? "Cover - " : ""}${asset.resourceType === "image" ? "Photo" : "Video"} ${index + 1}`), preview, failure);
+    preview.addEventListener("error", () => {
+      failure.textContent = `Preview unavailable. The saved reference is retained; check ${youtube ? "the YouTube video" : "Cloudinary"} before removing it.`;
+    });
+    item.append(element("p", `${index === 0 ? "Cover - " : ""}${youtube ? "YouTube video" : asset.resourceType === "image" ? "Photo" : "Video"} ${index + 1}`), preview, failure);
     for (const [key, title, max] of [["alt", "Description / illustrative-example label", 240], ["credit", "Credit and license (required if not your own)", 1200]]) {
       const label = element("label", title);
       const input = element(key === "credit" ? "textarea" : "input");
@@ -329,6 +332,13 @@ function renderProductMedia(product) {
       });
       label.append(input);
       item.append(label);
+    }
+    if (youtube) {
+      const link = element("a", "Check video on YouTube (new tab)");
+      link.href = mediaUrl(previewAsset, "watch");
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      item.append(link);
     }
     const actions = element("div", undefined, "vendor-actions");
     for (const [title, next] of [["Use as cover", 0], ["Move earlier", index - 1], ["Move later", index + 1]]) {
@@ -349,7 +359,7 @@ function renderProductMedia(product) {
     const remove = element("button", "Remove media");
     remove.type = "button";
     remove.addEventListener("click", () => {
-      if (priceBusy || priceNeedsReload || !window.confirm("Remove this media from this year's listing? The original file and older catalogues will be kept.")) return;
+      if (priceBusy || priceNeedsReload || !window.confirm("Remove this media from this year's listing? The original source and older catalogues will be kept.")) return;
       product.media = media.filter((_, position) => position !== index);
       priceDirty = true;
       renderPriceProducts();
@@ -361,6 +371,24 @@ function renderProductMedia(product) {
     list.append(item);
   });
   details.append(list);
+  if (!media.some(asset => asset.resourceType === "video")) {
+    const label = element("label", "YouTube video URL");
+    const input = element("input");
+    input.id = `youtube-url-${product.id}`;
+    input.type = "url";
+    input.maxLength = 2048;
+    input.setAttribute("aria-describedby", `youtube-help-${product.id}`);
+    input.addEventListener("input", () => input.setCustomValidity(""));
+    label.append(input);
+    const help = element("p", "Paste an HTTPS YouTube watch, share or Shorts link. Choose Add YouTube video, then Save price list. The video must allow embedding; YouTube links need no Cloudinary setup.", "vendor-muted");
+    help.id = `youtube-help-${product.id}`;
+    const add = element("button", "Add YouTube video");
+    add.type = "button";
+    add.addEventListener("click", () => addYouTubeVideo(product, input));
+    details.append(label, help, add);
+  } else {
+    details.append(element("p", "One video is attached. Remove it before adding a different YouTube link or uploaded video.", "vendor-muted"));
+  }
   if (!savedProductIds.has(product.id)) {
     details.append(element("p", "Save this new product before uploading its media.", "vendor-muted"));
   } else {
@@ -376,6 +404,30 @@ function renderProductMedia(product) {
   }
   details.append(element("p", "The first item is the cover. Uploads and media edits are not published until you choose Save price list. Removed or abandoned uploads remain in Cloudinary; do not delete files used by older yearly lists.", "vendor-muted"));
   return details;
+}
+
+function addYouTubeVideo(product, input) {
+  if (!session || priceBusy || priceNeedsReload || !priceList) return;
+  const videoId = youtubeVideoId(input.value);
+  const error = !videoId ? "Enter a valid HTTPS YouTube video URL, such as a watch, youtu.be or Shorts link." :
+    (product.media ?? []).some(asset => asset.resourceType === "video") ?
+      "This product already has the maximum 1 video. Remove it before adding another." : "";
+  input.setCustomValidity(error);
+  if (error) {
+    notice("price-message", error, true);
+    input.focus();
+    input.reportValidity();
+    return;
+  }
+  product.media = [...(product.media ?? []), { provider: "youtube", resourceType: "video", videoId,
+    alt: product.name.trim() || `Product #${product.id} video`, credit: "" }];
+  priceDirty = true;
+  expandedProductId = product.id;
+  openMediaProducts.add(product.id);
+  renderPriceProducts();
+  setPriceBusy(false);
+  $(`media-product-${product.id}`).focus({ preventScroll: true });
+  notice("price-message", "YouTube video added to the draft. Review its description and credits, then choose Save price list to publish. Check that the video is available and allows embedding.");
 }
 
 async function uploadProductMedia(product, input) {

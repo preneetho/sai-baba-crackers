@@ -137,7 +137,7 @@ The explicitly selected Sheets backend continues using the original static
 ## Product photos and videos (Cloudinary)
 
 The database catalogue supports up to **3 photos and 1 video per product**.
-Photos must be JPG, PNG or WebP, up to 5 MB each. Videos must be MP4, WebM or
+Photos must be JPG, PNG or WebP, up to 5 MB each. Uploaded videos must be MP4, WebM or
 MOV, up to 20 MB and 30 seconds; MP4 is the most widely supported choice.
 The vendor uploads directly to Cloudinary using a server-signed authorization.
 The server checks Cloudinary's actual asset metadata before issuing an
@@ -176,10 +176,29 @@ product row, and expand **Photos & video**:
    change. Saving the active year makes changes visible to customers;
    inactive years remain unpublished.
 
+**YouTube alternative:** In the same **Photos & video** section, paste an HTTPS
+YouTube URL and select **Add YouTube video**, review the description/credit, then
+**Save price list**. Standard watch, `youtu.be`, Shorts, live-video and embed
+links are supported. Only the video ID is stored; tracking, playlist and start-time
+parameters are discarded. Each product can have either one YouTube video or one
+uploaded video, not both. Remove the existing video before replacing it.
+YouTube links need no API key or Cloudinary configuration/storage; upload size
+and 30-second limits apply only to uploaded files. Links can be added to new
+products before their first save. Only link videos you are permitted to publish.
+
 Customers open the keyboard-accessible gallery by selecting the thumbnail,
 marked with a compact expand icon and a play badge when video is available.
 There is no repeated caption strip; descriptions and credits stay inside the
 gallery. Covers are lazy optimized images. Video loads on play, never automatically.
+For YouTube, select **Load YouTube player**, then use the embedded player to play
+inside the gallery. The privacy-enhanced player is not loaded until requested;
+thumbnails are requested from YouTube's image CDN. Loading the player sends only
+the site's origin as its identifying Referer, not the page path or customer details.
+Closing, changing media or retrying unloads the embedded player. YouTube may show
+ads and restrict playback. The video must be available and allow embedding; if
+it is private, removed, age/region restricted or embedding is disabled, use the
+gallery's **Watch on YouTube** fallback or replace the link. The app validates
+the link, not the video's availability, ownership or embedding permission.
 Without media, existing category/name icons remain. Preview errors offer retry
 or the icon fallback without blocking quantity controls or checkout.
 

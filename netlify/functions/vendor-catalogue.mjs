@@ -2,6 +2,7 @@ import { vendorSettings, vendorJson, vendorSession, sameOriginMutation } from ".
 import { orderBackend } from "../lib/order-backend.mjs";
 import { validCatalogue, validYear, catalogueProducts } from "../../vendor-app/catalogue-model.mjs";
 import { cloudinarySettings, verifiedMedia, mediaIdentity, mediaProof } from "../lib/product-media.mjs";
+import { isYouTubeMedia } from "../../vendor-app/media-model.mjs";
 
 export async function handleVendorCatalogue(request, {
   env = process.env, now = Date.now,
@@ -47,7 +48,7 @@ export async function handleVendorCatalogue(request, {
   try {
     const database = await databaseFactory();
     if (input.action === "save") {
-      const assets = input.products.flatMap(product => product.media ?? []);
+      const assets = input.products.flatMap(product => product.media ?? []).filter(asset => !isYouTubeMedia(asset));
       const unverified = assets.filter(asset => !verifiedMedia(asset, cloudinarySettings(env), settings.secret));
       if (unverified.length) {
         const current = await database.priceLists({ year: input.year });
@@ -55,9 +56,10 @@ export async function handleVendorCatalogue(request, {
           return vendorJson({ error: "This price list changed. Reload it before saving." }, 409);
         }
         // Previously persisted assets remain trusted after vendor-secret rotation.
-        const persisted = new Set(current.catalogue.products.flatMap(product => product.media ?? []).map(mediaIdentity));
+        const persisted = new Set(current.catalogue.products.flatMap(product => product.media ?? [])
+          .filter(asset => !isYouTubeMedia(asset)).map(mediaIdentity));
         if (unverified.some(asset => !persisted.has(mediaIdentity(asset)))) {
-          return vendorJson({ error: "One or more media files could not be verified. Upload them through the vendor controls; do not paste media URLs." }, 400);
+          return vendorJson({ error: "One or more uploaded media files could not be verified. Use the vendor upload controls, or the YouTube URL field for YouTube videos." }, 400);
         }
         for (const asset of unverified) asset.proof = mediaProof(asset, settings.secret);
       }

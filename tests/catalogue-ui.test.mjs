@@ -4,20 +4,20 @@ import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 import { vendor, products } from "../vendor-app/catalog.mjs";
 import { validCatalogue } from "../vendor-app/catalogue-model.mjs";
-import { mediaUrl } from "../vendor-app/media-model.mjs";
+import { mediaUrl, isYouTubeMedia } from "../vendor-app/media-model.mjs";
 import * as order from "../vendor-app/order.mjs";
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 async function harness({ stored, unavailableStorage = false, price = 70 } = {}) {
   class Node {
-    constructor() { this.children = []; this.events = new Map(); this.dataset = {}; this.value = ""; this.attributes = {}; }
+    constructor(tag = "div") { this.tagName = tag.toUpperCase(); this.children = []; this.events = new Map(); this.dataset = {}; this.value = ""; this.attributes = {}; }
     append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; }
     addEventListener(type, callback) { this.events.set(type, callback); }
     setAttribute(key, value) { this.attributes[key] = value; }
     getAttribute(key) { return this.attributes[key]; }
-    removeAttribute() {}
-    focus() {}
+    removeAttribute(key) { delete this.attributes[key]; delete this[key]; }
+    focus() { this.focused = true; }
     click() {}
     replaceWith() {}
     reset() {}
@@ -40,7 +40,7 @@ async function harness({ stored, unavailableStorage = false, price = 70 } = {}) 
     ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "DISCOUNT_PERCENT", "money", "localDate", "validateCustomer",
       "prepareOrderMessage", "validatePdfLink"].map(key => [key, order[key]])),
     checkCart: order.sanitizeCart, getLines: order.cartLines, getPricing: order.pricing, getTotal: order.total,
-    vendor, validCatalogue, mediaUrl, track() {}, URL, AbortSignal, console, Intl,
+    vendor, validCatalogue, mediaUrl, isYouTubeMedia, track() {}, URL, AbortSignal, console, Intl,
     setTimeout, clearTimeout, crypto: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
     FormData: class {
       *[Symbol.iterator]() {
@@ -49,7 +49,7 @@ async function harness({ stored, unavailableStorage = false, price = 70 } = {}) 
       }
     },
     document: {
-      querySelector: get, createElement: () => new Node(), createElementNS: () => new Node(),
+      querySelector: get, createElement: tag => new Node(tag), createElementNS: (namespace, tag) => new Node(tag),
       createTextNode: text => ({ textContent: text }),
       querySelectorAll: selector => selector === "#clear-cart, #clear-cart-top" ? [get("#clear-cart"), get("#clear-cart-top")] :
         selector === "[data-catalogue-year]" ? [get("year-label")] : [],
@@ -147,6 +147,61 @@ test("photo-only covers have one expand icon without a video badge or caption", 
   const cover = ui.get("#products").children[0].children[0];
   assert.equal(cover.children.length, 2);
   assert.equal(cover.children[1].className, "media-cover-icon media-cover-expand");
+});
+
+test("YouTube galleries require explicit loading, retain fallback links and unload frames on retry, navigation and close", async () => {
+  const ui = await harness();
+  const youtube = { provider: "youtube", resourceType: "video", videoId: "M7lc1UVf-VE",
+    alt: "Illustrative YouTube video", credit: "<script>safe text only</script>" };
+  const photo = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
+    resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
+    duration: 0, alt: "Synthetic photo", credit: "" };
+  ui.respond(async () => Response.json({ year: 2026, revision: 1, products: [{ ...products[0], media: [youtube, photo] }] }));
+  await ui.emit("#reload-catalogue", "click");
+  const cover = ui.get("#products").children[0].children[0];
+  assert.equal(cover.children[0].src, mediaUrl(youtube));
+  assert.equal(cover.children.at(-1).className, "media-cover-icon media-cover-play");
+  await cover.events.get("click")();
+  let stage = ui.get("#product-media-stage").children[0];
+  assert.deepEqual(stage.children.map(node => node.tagName), ["IMG", "BUTTON", "A"]);
+  assert.match(ui.get("#product-media-credit").textContent, /<script>safe text only<\/script>/);
+  stage.children[0].events.get("error")();
+  assert.equal(stage.children[0].hidden, true);
+  await stage.children[1].events.get("click")();
+  let frame = stage.children[0];
+  assert.equal(frame.tagName, "IFRAME");
+  assert.equal(frame.src, mediaUrl(youtube, "play"));
+  assert.equal(frame.autoplay, undefined);
+  assert.equal(frame.allow.includes("autoplay"), false);
+  assert.equal(frame.allowFullscreen, true);
+  assert.equal(frame.referrerPolicy, "strict-origin-when-cross-origin");
+  assert.match(frame.title, /Illustrative YouTube video/);
+  assert.equal(frame.focused, true);
+  const link = stage.children[1];
+  assert.equal(link.href, mediaUrl(youtube, "watch"));
+  assert.equal(link.target, "_blank");
+  assert.equal(link.rel, "noopener noreferrer");
+  frame.events.get("error")();
+  assert.match(ui.get("#product-media-status").textContent, /could not load.*Watch on YouTube/);
+  await ui.emit("#retry-product-media", "click");
+  assert.equal(frame.src, undefined);
+  stage = ui.get("#product-media-stage").children[0];
+  await stage.children[1].events.get("click")();
+  frame = stage.children[0];
+  await ui.emit("#next-product-media", "click");
+  assert.equal(frame.src, undefined);
+  assert.equal(ui.get("#product-media-stage").children[0].tagName, "IMG");
+  frame.events.get("load")();
+  assert.equal(ui.get("#product-media-status").textContent, "Loading photo...");
+  await ui.emit("#previous-product-media", "click");
+  stage = ui.get("#product-media-stage").children[0];
+  await stage.children[1].events.get("click")();
+  frame = stage.children[0];
+  await ui.emit("#product-media-dialog", "close");
+  assert.equal(frame.src, undefined);
+  assert.equal(ui.get("#product-media-stage").children.length, 0);
+  ui.run("updateQuantity(1, 1, false)");
+  assert.equal(ui.run("cart[1]"), 1);
 });
 
 test("catalogue failures are explicit, block checkout, and allow retry without a static-price fallback", async () => {

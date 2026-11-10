@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import { ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary } from "../vendor-app/vendor-model.mjs";
 import { validCatalogue, validYear, catalogueProducts } from "../vendor-app/catalogue-model.mjs";
 import { products } from "../vendor-app/catalog.mjs";
-import { validMedia, MEDIA_LIMITS, mediaUrl } from "../vendor-app/media-model.mjs";
+import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "../vendor-app/media-model.mjs";
 import { inspectMediaFile } from "../vendor-app/media-upload.mjs";
 
 const mediaAsset = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
@@ -92,7 +92,7 @@ async function harness() {
     { media: { ...mediaAsset } });
   const context = vm.createContext({
     ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary, validCatalogue, validYear, catalogueProducts,
-    validMedia, MEDIA_LIMITS, mediaUrl, inspectMediaFile, transferMedia: (...args) => transfer(...args),
+    validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId, inspectMediaFile, transferMedia: (...args) => transfer(...args),
     AbortController, AbortSignal, URL, URLSearchParams, Intl, console,
     document: { getElementById: get, createElement: tag => new Node(tag),
       documentElement: { style: { setProperty: (key, value) => styles.set(key, value) } } },
@@ -208,6 +208,45 @@ test("media upload blocks duplicates, enforces product limits and suppresses lat
   await vm.runInContext("uploadProductMedia(priceList.products[0], fileInput)", limited.context);
   assert.match(limited.get("price-message").textContent, /maximum 3 photos/);
   assert.equal(limited.requests.some(req => req.path === "/api/vendor-media"), false);
+});
+
+test("vendors add validated YouTube links as drafts without upload calls and save them explicitly", async () => {
+  const ui = await harness();
+  await ui.emit("open-prices");
+  await ui.emit("price-toggle-1");
+  const input = ui.get("youtube-url-1");
+  const add = ui.get("media-product-1").querySelectorAll("button").find(node => node.textContent === "Add YouTube video");
+  input.value = "https://youtube.com.evil.example/watch?v=M7lc1UVf-VE";
+  await add.events.get("click")();
+  assert.equal(input.reported, true);
+  assert.equal(ui.focused, input);
+  assert.match(ui.get("price-message").textContent, /valid HTTPS YouTube video URL/);
+  assert.equal(vm.runInContext("priceList.products[0].media", ui.context), undefined);
+  input.value = "https://youtu.be/M7lc1UVf-VE?si=discard&t=20";
+  await add.events.get("click")();
+  const media = JSON.parse(vm.runInContext("JSON.stringify(priceList.products[0].media)", ui.context));
+  assert.deepEqual(media, [{ provider: "youtube", resourceType: "video", videoId: "M7lc1UVf-VE",
+    alt: products[0].name, credit: "" }]);
+  assert.equal(ui.requests.some(req => req.path === "/api/vendor-media"), false);
+  assert.equal(ui.requests.some(req => req.method === "POST"), false);
+  assert.match(ui.get("price-message").textContent, /draft.*Save price list/);
+  assert.equal(ui.get("save-prices").disabled, false);
+  await add.events.get("click")();
+  assert.match(ui.get("price-message").textContent, /maximum 1 video/);
+  assert.equal(vm.runInContext("priceList.products[0].media.length", ui.context), 1);
+  ui.context.inspectMediaFile = async () => "video";
+  ui.context.fileInput = { files: [{ name: "video.mp4", size: 1000 }] };
+  await vm.runInContext("uploadProductMedia(priceList.products[0], fileInput)", ui.context);
+  assert.match(ui.get("price-message").textContent, /maximum 1 video/);
+  assert.equal(ui.requests.some(req => req.path === "/api/vendor-media"), false);
+  ui.respondPrice(async (_path, options) => {
+    const body = JSON.parse(options.body);
+    assert.deepEqual(body.products[0].media, media);
+    return Response.json({ activeYear: 2026, years: [{ year: 2026, revision: 2 }],
+      catalogue: { year: 2026, revision: 2, products: body.products } });
+  });
+  await ui.emit("price-form", "submit");
+  assert.equal(ui.get("save-prices").disabled, true);
 });
 
 test("unconfirmed or failed media verification keeps existing draft edits and never appends an asset", async () => {
@@ -408,7 +447,8 @@ test("adding opens the new product, removal preserves other drafts and year chan
   await ui.emit("add-price-product");
   assert.equal(ui.get("price-details-2").hidden, false);
   assert.equal(ui.focused, ui.get("price-name-2"));
-  assert.match(ui.get("media-product-2").children[3].textContent, /Save this new product/);
+  assert.ok(ui.get("media-product-2").children.some(node => /Save this new product/.test(node.textContent)));
+  assert.equal(ui.get("youtube-url-2").type, "url");
   const remove = ui.get("price-editor-2").querySelectorAll("button").find(button => button.textContent === "Remove product #2");
   remove.events.get("click")();
   assert.equal(ui.get("price-products").children.length, 2);

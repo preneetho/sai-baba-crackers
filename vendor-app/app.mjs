@@ -1,7 +1,7 @@
 import { track } from "./telemetry-client.mjs";
 import { vendor } from "./catalog.mjs";
 import { validCatalogue } from "./catalogue-model.mjs";
-import { mediaUrl } from "./media-model.mjs";
+import { mediaUrl, isYouTubeMedia } from "./media-model.mjs";
 import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, total as getTotal, money, localDate, validateCustomer, prepareOrderMessage, validatePdfLink } from "./order.mjs";
 
 const $ = selector => document.querySelector(selector);
@@ -26,6 +26,7 @@ let galleryProduct = null;
 let galleryIndex = 0;
 let galleryTrigger = null;
 let galleryVideo = null;
+let galleryFrame = null;
 const warning = $("#storage-warning");
 
 function showStorageWarning(message, reset = false) {
@@ -243,6 +244,10 @@ function mediaIcon(type) {
 }
 
 function stopGalleryVideo() {
+  if (galleryFrame) {
+    galleryFrame.removeAttribute("src");
+    galleryFrame = null;
+  }
   if (!galleryVideo) return;
   galleryVideo.pause();
   galleryVideo.removeAttribute("src");
@@ -268,12 +273,53 @@ function renderMedia() {
   const status = $("#product-media-status");
   const retry = $("#retry-product-media");
   retry.hidden = true;
-  const node = element(asset.resourceType === "image" ? "img" : "video", "gallery-asset");
+  const youtube = isYouTubeMedia(asset);
+  const node = element(youtube ? "div" : asset.resourceType === "image" ? "img" : "video",
+    youtube ? "gallery-asset gallery-youtube" : "gallery-asset");
   node.addEventListener("error", () => {
     status.textContent = "This media could not be loaded. Retry, choose another item, or close this preview to keep shopping.";
     retry.hidden = false;
   });
-  if (asset.resourceType === "image") {
+  if (youtube) {
+    status.textContent = "Load the YouTube player, then press play. Nothing plays automatically. YouTube content is loaded from YouTube.";
+    const poster = element("img", "gallery-youtube-poster");
+    poster.alt = asset.alt;
+    poster.src = mediaUrl(asset);
+    poster.addEventListener("error", () => {
+      if (galleryProduct?.media[galleryIndex] !== asset || galleryFrame) return;
+      poster.hidden = true;
+      status.textContent = "Thumbnail unavailable. You can still load the YouTube player or watch on YouTube.";
+    });
+    const watch = element("a", "", "Video unavailable? Watch on YouTube (new tab)");
+    watch.href = mediaUrl(asset, "watch");
+    watch.target = "_blank";
+    watch.rel = "noopener noreferrer";
+    const load = element("button", "", "Load YouTube player");
+    load.type = "button";
+    load.addEventListener("click", () => {
+      const frame = element("iframe");
+      frame.title = `YouTube video: ${asset.alt}`;
+      frame.allow = "encrypted-media; picture-in-picture; fullscreen";
+      frame.allowFullscreen = true;
+      // YouTube requires an identifying Referer; disclose only this site's origin.
+      frame.referrerPolicy = "strict-origin-when-cross-origin";
+      frame.addEventListener("load", () => {
+        if (galleryFrame !== frame) return;
+        status.textContent = "Press play in the YouTube player. If playback is unavailable, use Watch on YouTube.";
+      });
+      frame.addEventListener("error", () => {
+        if (galleryFrame !== frame) return;
+        status.textContent = "The YouTube player could not load. Retry or use Watch on YouTube.";
+      });
+      frame.src = mediaUrl(asset, "play");
+      galleryFrame = frame;
+      status.textContent = "Loading YouTube player... If unavailable, use Watch on YouTube.";
+      retry.hidden = false;
+      node.replaceChildren(frame, watch);
+      frame.focus();
+    });
+    node.append(poster, load, watch);
+  } else if (asset.resourceType === "image") {
     status.textContent = "Loading photo...";
     node.alt = asset.alt;
     node.addEventListener("load", () => { status.textContent = ""; });

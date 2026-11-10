@@ -181,6 +181,17 @@ Uploading is a draft change; saving an inactive year does not activate it.
 New products must be saved before uploading. Failed uploads retain other edits.
 Do not navigate away while a file is being uploaded or verified.
 
+Alternatively, paste a YouTube watch, share or Shorts URL into **YouTube video URL**,
+choose **Add YouTube video**, review the description/credits and **Save price list**.
+YouTube links do not require a YouTube API key or Cloudinary setup and may be added
+before saving a new product. The one-video limit includes both YouTube links and
+uploaded videos; remove the current video before adding a replacement. Link only
+permitted videos that allow embedding. Tracking, playlist and timestamp parameters
+are not retained. Upload size/duration limits do not apply to YouTube links.
+Customers load the privacy-enhanced player explicitly and play inside the gallery,
+with **Watch on YouTube** available if embedding or playback is unavailable.
+The application does not verify video availability or embedding permission.
+
 Files are public in Cloudinary, so do not upload private information. Publish
 only media you own or may license; provide required creator, source and license
 credit, and label generic examples honestly. Removing media never deletes a
@@ -211,7 +222,12 @@ may still use Cloudinary storage; check references before deleting them there.
   need `api.cloudinary.com`, and local video inspection needs `blob:` media
   in the checked-in CSP. For a CSP error, identify the actual blocked URL;
   unrelated analytics failures do not establish that the upload was blocked.
-  Do not relax script or frame restrictions.
+  YouTube thumbnails need `i.ytimg.com`; embedded players need only
+  `https://www.youtube-nocookie.com` in `frame-src`. The iframe's
+  `strict-origin-when-cross-origin` referrer policy supplies the site identity
+  YouTube requires, while the rest of the site keeps `no-referrer`.
+  Check YouTube availability/embedding permissions if a player shows an error.
+  Do not add arbitrary frame hosts or relax script restrictions.
 
 ## Local preview and troubleshooting
 

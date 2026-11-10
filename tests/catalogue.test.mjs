@@ -129,6 +129,7 @@ test("catalogue rejects forged media but preserves trusted saved assets after ve
     method: "POST", headers: { Origin: origin, "Content-Type": "application/json",
       Cookie: `${rotatedSettings.sessionCookie}=${rotatedCookie}`, "X-Vendor-CSRF": rotatedCsrf }, body: JSON.stringify(value),
   });
+
   rows[0].media[0].credit = "Updated legal credit";
   const response = await handleVendorCatalogue(rotatedRequest(body), { ...options, env: rotatedEnv });
   assert.equal(response.status, 200);
@@ -137,6 +138,45 @@ test("catalogue rejects forged media but preserves trusted saved assets after ve
   assert.equal(stored.credit, "Updated legal credit");
   rows[0].media[0].bytes++;
   assert.equal((await handleVendorCatalogue(rotatedRequest({ ...body, expectedRevision: 3 }), { ...options, env: rotatedEnv })).status, 400);
+});
+
+test("YouTube links save without Cloudinary configuration and retain independent immutable yearly references", async () => {
+  const youtube = { provider: "youtube", resourceType: "video", videoId: "M7lc1UVf-VE",
+    alt: "Illustrative YouTube video", credit: "Synthetic source credit" };
+  const rows = catalogueProducts(products);
+  rows[0].media = [youtube];
+  const response = await edit({ action: "save", year: 2026, expectedRevision: 1, products: rows });
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).catalogue.products[0].media, [youtube]);
+  assert.deepEqual((await (await publicList()).json()).products[0].media, [youtube]);
+  await database.priceLists({ action: "create", year: 2027, sourceYear: 2026, expectedRevision: 2 }, "owner@example.com");
+  assert.deepEqual((await database.catalogueVersion(2027, 1)).products[0].media, [youtube]);
+  rows[0].media = [];
+  assert.equal((await edit({ action: "save", year: 2026, expectedRevision: 2, products: rows })).status, 200);
+  assert.equal((await database.activeCatalogue()).products[0].media, undefined);
+  assert.deepEqual((await database.catalogueVersion(2026, 2)).products[0].media, [youtube]);
+  assert.deepEqual((await database.catalogueVersion(2027, 1)).products[0].media, [youtube]);
+  const withMedia = { ...base, products: catalogueProducts(products) };
+  withMedia.products[0].media = [youtube];
+  assert.deepEqual(buildOrder(payload(), now, withMedia), buildOrder(payload(), now, base));
+});
+
+test("YouTube media cannot bypass uploaded-asset verification or the one-video limit", async () => {
+  const youtube = { provider: "youtube", resourceType: "video", videoId: "M7lc1UVf-VE", alt: "Synthetic video", credit: "" };
+  const rows = catalogueProducts(products);
+  for (const media of [
+    [{ ...youtube, proof: mediaAsset.proof }],
+    [{ ...youtube, cloudName: mediaAsset.cloudName }],
+    [{ ...youtube, videoId: "../untrusted" }],
+    [youtube, { ...mediaAsset, resourceType: "video", format: "mp4", duration: 30 }],
+    [youtube, { ...mediaAsset, proof: "x".repeat(43) }],
+  ]) {
+    rows[0].media = media;
+    assert.equal((await handleVendorCatalogue(request("/api/vendor-catalogue", {
+      action: "save", year: 2026, expectedRevision: 1, products: rows,
+    }), { ...options, env: cloudEnv })).status, 400);
+    assert.equal((await database.activeCatalogue()).revision, 1);
+  }
 });
 
 test("all 200 products with maximum multilingual media descriptions fit the bounded catalogue request", async () => {

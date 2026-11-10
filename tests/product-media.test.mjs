@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import { handleVendorMedia } from "../netlify/functions/vendor-media.mjs";
 import { vendorSettings, createSession, unseal } from "../netlify/lib/vendor-auth.mjs";
 import { cloudinarySettings, uploadSignature, mediaProof, verifiedMedia } from "../netlify/lib/product-media.mjs";
-import { validMedia, validProductMedia, mediaUrl, MEDIA_LIMITS } from "../vendor-app/media-model.mjs";
+import { validMedia, validProductMedia, mediaUrl, MEDIA_LIMITS, youtubeVideoId, copyMedia } from "../vendor-app/media-model.mjs";
 import { inspectMediaFile, transferMedia } from "../vendor-app/media-upload.mjs";
 import { products } from "../vendor-app/catalog.mjs";
 import { catalogueProducts } from "../vendor-app/catalogue-model.mjs";
@@ -79,6 +79,53 @@ test("signed upload authorization fixes namespace, formats, overwrite and preset
   assert.equal(JSON.stringify(authorization).includes(env.CLOUDINARY_API_SECRET), false);
   assert.equal(JSON.stringify(authorization).includes(env.VENDOR_SESSION_SECRET), false);
   assert.equal(authorization.params.public_id === (await sign()).params.public_id, false);
+});
+
+test("YouTube URLs accept known video forms and discard tracking, timestamps and playlist parameters", () => {
+  const id = "M7lc1UVf-VE";
+  for (const url of [
+    `https://www.youtube.com/watch?v=${id}&list=ignored&t=30&si=ignored`,
+    ` https://youtube.com/watch?v=${id} `,
+    `https://m.youtube.com/watch?v=${id}`,
+    `https://youtu.be/${id}?si=ignored`,
+    `https://www.youtube.com/shorts/${id}`,
+    `https://www.youtube.com/live/${id}`,
+    `https://www.youtube.com/embed/${id}`,
+    `https://www.youtube-nocookie.com/embed/${id}`,
+  ]) assert.equal(youtubeVideoId(url), id, url);
+  for (const url of [null, 123, "", id, "javascript:alert(1)", `http://youtube.com/watch?v=${id}`,
+    `https://youtube.com.evil.example/watch?v=${id}`, `https://evil.example/?v=${id}`,
+    `https://youtube.com@evil.example/watch?v=${id}`, `https://user:password@youtube.com/watch?v=${id}`,
+    `https://youtube.com:444/watch?v=${id}`, `https://youtu.be/${id}/extra`,
+    `https://youtube.com/playlist?list=${id}`, `https://youtube.com/watch?v=${id}&v=${id}`,
+    "https://youtube.com/watch?v=short", `https://youtube.com/watch?v=${id}%0A`,
+    `https://youtube.com/watch?v=${id}\n`, `https://youtu.be/${id}?x=${"x".repeat(2048)}`]) {
+    assert.equal(youtubeVideoId(url), null, String(url));
+  }
+});
+
+test("YouTube descriptors share the one-video limit without accepting Cloudinary proofs or arbitrary URLs", () => {
+  const youtube = { provider: "youtube", resourceType: "video", videoId: "M7lc1UVf-VE",
+    alt: "Illustrative YouTube demo", credit: "Synthetic credit" };
+  assert.equal(validMedia(youtube), true);
+  assert.equal(validProductMedia([asset, youtube]), true);
+  const video = { ...asset, resourceType: "video", format: "mp4", duration: 30 };
+  assert.equal(validProductMedia([youtube, video]), false);
+  assert.equal(validProductMedia([youtube, youtube]), false);
+  for (const change of [{ videoId: "M7lc1UVf-VE\n" }, { videoId: "../anything" },
+    { resourceType: "image" }, { alt: "" }, { provider: "vimeo" }, { proof: "p".repeat(43) },
+    { cloudName: asset.cloudName }, { publicId: asset.publicId }, { url: "https://evil.example" }]) {
+    assert.equal(validMedia({ ...youtube, ...change }), false);
+  }
+  assert.equal(validMedia({ ...asset, provider: "unknown" }), false);
+  assert.equal(verifiedMedia(youtube, cloud, settings.secret), false);
+  assert.deepEqual(copyMedia(youtube, true), youtube);
+  assert.equal(mediaUrl(youtube), "https://i.ytimg.com/vi/M7lc1UVf-VE/hqdefault.jpg");
+  assert.equal(mediaUrl(youtube, "play"), "https://www.youtube-nocookie.com/embed/M7lc1UVf-VE?autoplay=0&playsinline=1");
+  assert.equal(mediaUrl(youtube, "watch"), "https://www.youtube.com/watch?v=M7lc1UVf-VE");
+  assert.throws(() => mediaUrl({ ...youtube, videoId: "../anything" }), /Invalid product media/);
+  const rows = catalogueProducts([{ ...products[0], media: [youtube] }], true);
+  assert.deepEqual(cartLines({ 1: 2 }, rows), cartLines({ 1: 2 }, [products[0]]));
 });
 
 test("upload authorization denies missing login, CSRF, configuration, changed revisions and unsaved products", async () => {
@@ -219,8 +266,9 @@ test("production CSP permits only the required media providers, local metadata b
   assert.ok(policy);
   const directives = Object.fromEntries(policy.split(";").map(value => value.trim().split(/\s+/)).map(([key, ...sources]) => [key, sources]));
   assert.deepEqual(directives["script-src"], ["'self'"]);
-  assert.deepEqual(directives["img-src"], ["'self'", "data:", "https://res.cloudinary.com"]);
+  assert.deepEqual(directives["img-src"], ["'self'", "data:", "https://res.cloudinary.com", "https://i.ytimg.com"]);
   assert.deepEqual(directives["media-src"], ["'self'", "blob:", "https://res.cloudinary.com"]);
   assert.deepEqual(directives["connect-src"], ["'self'", "https://api.cloudinary.com"]);
+  assert.deepEqual(directives["frame-src"], ["https://www.youtube-nocookie.com"]);
   assert.deepEqual(directives["frame-ancestors"], ["'none'"]);
 });
