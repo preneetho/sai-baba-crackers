@@ -28,7 +28,7 @@ test("the homepage has crawlable services, honest fulfilment information and wor
   assert.match(html, /Outside the festival season, call first/);
   assert.match(html, /not a professional fireworks-display or event-operation service/);
   assert.match(html, /A submitted request is not a confirmed sale/);
-  assert.doesNotMatch(html, /<form\b|<video\b|<iframe\b|autoplay|<script[^>]+src="[^"]*app\.mjs"/);
+  assert.doesNotMatch(html, /<form\b|<video\b|autoplay|<script[^>]+src="[^"]*app\.mjs"/);
   for (const [, href] of html.matchAll(/<a\b[^>]*href="([^"]+)"/g)) {
     if (href.startsWith("#")) {
       assert.ok(html.includes(`id="${href.slice(1)}"`), `Missing anchor target: ${href}`);
@@ -41,6 +41,27 @@ test("the homepage has crawlable services, honest fulfilment information and wor
   const maps = html.match(/href="(https:\/\/www\.google\.com\/maps\/search\/[^"]+)"/)?.[1];
   assert.ok(maps);
   assert.match(new URL(maps.replaceAll("&amp;", "&")).searchParams.get("query"), /Industrial Estate, Main Road, Sanath Nagar, Hyderabad/);
+});
+
+test("the homepage embeds the requested Short without autoplay and retains a direct YouTube fallback", async () => {
+  const html = await read("vendor-app/index.html");
+  const frames = [...html.matchAll(/<iframe\b[^>]*>/g)].map(([frame]) => frame);
+  assert.equal(frames.length, 1);
+  const frame = frames[0];
+  const url = new URL(frame.match(/src="([^"]+)"/)[1]);
+  assert.equal(url.origin, "https://www.youtube-nocookie.com");
+  assert.equal(url.pathname, "/embed/hxVU6MC47zU");
+  assert.deepEqual([...url.searchParams], [["rel", "0"]]);
+  assert.match(frame, /title="Sai Baba Crackers Centre in Sanathnagar - YouTube Short"/);
+  assert.match(frame, /loading="lazy"/);
+  assert.match(frame, /width="360" height="640"/);
+  assert.match(frame, /referrerpolicy="strict-origin-when-cross-origin"/);
+  assert.match(frame, /\ballowfullscreen\b/);
+  assert.doesNotMatch(frame, /autoplay/);
+  assert.match(html, /href="https:\/\/www\.youtube\.com\/shorts\/hxVU6MC47zU" target="_blank" rel="noopener noreferrer"/);
+  assert.match(html, /id="shop-video"[^>]*aria-labelledby="shop-video-title"/);
+  assert.match(await read("vendor-app/home.css"), /\.home-video-player\s*\{[^}]*aspect-ratio: 9 \/ 16;/);
+  assert.match(await read("netlify.toml"), /frame-src https:\/\/www\.youtube-nocookie\.com;/);
 });
 
 test("both public pages have distinct canonical/social URLs and the homepage has accurate business data", async () => {

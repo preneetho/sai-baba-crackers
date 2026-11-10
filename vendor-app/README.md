@@ -22,6 +22,11 @@ delivery, store pickup, phone enquiries for events, native FAQ disclosures and
 contact/directions links. Its content works without JavaScript; `home.mjs` preserves
 old catalogue/cart fragments and the existing authentication callback. The separate
 `modern-ui.mjs` initializes decorative fireworks and the catalogue's native cart drawer.
+Below the shop facts, the homepage embeds the supplied YouTube Short
+`hxVU6MC47zU` in a responsive portrait player. It uses YouTube's privacy-enhanced
+domain, lazy loading, manual playback and a direct YouTube fallback link.
+The iframe sends only the site origin as its referrer, as required by YouTube;
+the existing Content Security Policy already permits this player.
 
 The unchanged shopping flow now lives in `order/index.html` at `/order/`, with
 root-relative assets. The saved-cart key, pricing, checkout, APIs and private
@@ -96,7 +101,9 @@ particles, 30 rendered frames per second and 1.5 device-pixel ratio. Animation s
 offscreen, in hidden tabs and on page suspension; a visible Play/Pause control
 preserves the customer's pause choice. Reduced-motion preferences disable animation
 entirely, including live preference changes. A canvas/observer failure logs a warning
-and retains the static artwork. No hero video, GIF, external font or CDN is loaded.
+and retains the static artwork. The hero loads no video, GIF, external font or CDN.
+The separate featured-video section loads the third-party YouTube player lazily
+and never starts playback automatically.
 Older animation assets remain available for cached pages only.
 The native cart dialog opens from the header, mobile shortcut or old `#requirement`
 bookmark. It supports Escape, backdrop dismissal and focus restoration. Checkout

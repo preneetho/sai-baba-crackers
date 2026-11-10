@@ -31,6 +31,11 @@
 .home-facts strong { font-size: 20px; color: var(--brand); }
 .home-facts span { font-size: 13px; color: var(--muted); margin-top: 4px; }
 .home-section { margin-top: 64px; scroll-margin-top: 24px; }
+.home-video { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); align-items: center; gap: 48px; padding: 40px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.home-video-copy { min-width: 0; }
+.home-video-copy > p:not(.eyebrow) { color: var(--muted); font-size: 15px; margin-top: 16px; }
+.home-video-copy a { display: inline-block; min-height: 44px; padding-block: 10px; color: var(--brand); }
+.home-video-player { display: block; width: 100%; max-width: 360px; height: auto; aspect-ratio: 9 / 16; justify-self: center; border: 0; border-radius: var(--radius); background: var(--paper); }
 .home-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 32px; margin-bottom: 24px; }
 .home-section-heading > p { max-width: 360px; color: var(--muted); font-size: 15px; }
 .home-section-heading h2 { margin-bottom: 0; }
@@ -107,8 +112,8 @@
   .home-section { margin-top: 40px; }
   .home-section-heading { display: block; }
   .home-section-heading > p { max-width: none; margin-top: 16px; }
-  .home-service-grid, .home-steps, .home-delivery, .home-enquiry, .home-contact { grid-template-columns: minmax(0, 1fr); gap: 24px; }
-  .home-delivery, .home-contact, .home-enquiry { padding: 24px; }
+  .home-service-grid, .home-steps, .home-delivery, .home-enquiry, .home-contact, .home-video { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .home-delivery, .home-contact, .home-enquiry, .home-video { padding: 24px; }
   .home-enquiry-actions { justify-items: start; }
   .home-steps { gap: 28px; }
   .home-steps li::before { margin-bottom: 16px; }
