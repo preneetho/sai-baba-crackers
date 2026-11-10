@@ -54,5 +54,20 @@ export async function transferMedia(file, authorization, { signal, fetchImpl = f
   const response = await fetchImpl(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
     method: "POST", body, credentials: "omit", signal, redirect: "error",
   });
-  if (!response.ok) throw new Error("Cloudinary rejected the upload. Check the signed preset, file limits and account quota. Your saved list is unchanged.");
+  if (!response.ok) {
+    let detail;
+    try {
+      const result = await response.json();
+      if (typeof result?.error?.message === "string" && result.error.message.trim()) {
+        detail = result.error.message.replace(/[\u0000-\u001f\u007f]/g, " ");
+        for (const value of [apiKey, signature, ticket]) detail = detail.replaceAll(value, "[redacted]");
+        detail = detail.trim().slice(0, 400);
+      } else {
+        detail = "Cloudinary did not provide an error message.";
+      }
+    } catch {
+      detail = "Cloudinary's error response could not be read.";
+    }
+    throw new Error(`Cloudinary rejected the upload (HTTP ${response.status}): ${detail} Your saved list is unchanged.`);
+  }
 }

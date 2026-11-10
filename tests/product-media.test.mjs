@@ -170,6 +170,41 @@ test("browser transfer uses only the signed Cloudinary endpoint and direct multi
   await assert.rejects(transferMedia(file, authorization, { fetchImpl: async () => new Response("quota", { status: 400 }) }), /rejected/);
 });
 
+test("rejected uploads report the provider status and reason without exposing upload credentials", async () => {
+  const authorization = await sign();
+  const file = new File(["synthetic bytes"], "photo.jpg", { type: "image/jpeg" });
+  const message = `Invalid API key ${authorization.apiKey}; signature ${authorization.signature}; ticket ${authorization.ticket}\nCheck the selected product environment.`;
+  await assert.rejects(transferMedia(file, authorization, {
+    fetchImpl: async () => Response.json({ error: { message } }, { status: 401 }),
+  }), error => {
+    assert.match(error.message, /Cloudinary rejected the upload \(HTTP 401\): Invalid API key \[redacted\]/);
+    assert.match(error.message, /Check the selected product environment/);
+    assert.match(error.message, /saved list is unchanged/);
+    for (const value of [authorization.apiKey, authorization.signature, authorization.ticket]) {
+      assert.equal(error.message.includes(value), false);
+    }
+    assert.doesNotMatch(error.message, /[\u0000-\u001f\u007f]/);
+    return true;
+  });
+  await assert.rejects(transferMedia(file, authorization, {
+    fetchImpl: async () => Response.json({ error: { message: "Upload preset not found" } }, { status: 400 }),
+  }), /HTTP 400.*Upload preset not found/);
+  for (const payload of [{}, { error: { message: 123 } }, { error: { message: "   " } }]) {
+    await assert.rejects(transferMedia(file, authorization, {
+      fetchImpl: async () => Response.json(payload, { status: 403 }),
+    }), /HTTP 403.*did not provide an error message/);
+  }
+  await assert.rejects(transferMedia(file, authorization, {
+    fetchImpl: async () => new Response("<html>upstream failure</html>", { status: 502 }),
+  }), /HTTP 502.*error response could not be read/);
+  await assert.rejects(transferMedia(file, authorization, {
+    fetchImpl: async () => Response.json({ error: { message: "x".repeat(10000) } }, { status: 400 }),
+  }), error => {
+    assert.ok(error.message.length < 520);
+    return true;
+  });
+});
+
 test("production CSP permits only the required media providers, local metadata blobs and first-party scripts", async () => {
   const config = await readFile(new URL("../netlify.toml", import.meta.url), "utf8");
   const policy = /Content-Security-Policy = "([^"]+)"/.exec(config)?.[1];

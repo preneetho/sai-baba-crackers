@@ -185,9 +185,13 @@ may still use Cloudinary storage; check references before deleting them there.
 - **Cloudinary is not configured:** Check all four values in production
   Functions scope, confirm they belong to the same product environment,
   then redeploy.
-- **Cloudinary rejected the upload:** Confirm Signed preset mode, formats,
-  file-size constraints, account quota and key permissions. Do not switch to
-  an unsigned preset.
+- **Cloudinary rejected the upload:** The message includes the HTTP status
+  and Cloudinary's error reason, with upload credentials redacted. Use that
+  reason to check Signed preset mode, formats, file-size constraints, account
+  quota or key permissions. If details cannot be read, inspect the failed
+  `/image/upload` or `/video/upload` request's Response in browser DevTools;
+  do not share request headers, payloads, signatures or secrets. Do not switch
+  to an unsigned preset.
 - **Verification not confirmed:** Confirm the key can read resources through
   the Admin API, its quota is available, and the video is within 30 seconds.
   Inspect the Media Library before retrying; a transfer may have succeeded
@@ -197,7 +201,9 @@ may still use Cloudinary storage; check references before deleting them there.
 - **Customer media unavailable:** Check CDN access and whether someone deleted
   or overwrote the Cloudinary asset. Images need `res.cloudinary.com`, uploads
   need `api.cloudinary.com`, and local video inspection needs `blob:` media
-  in the checked-in CSP. Do not relax script or frame restrictions.
+  in the checked-in CSP. For a CSP error, identify the actual blocked URL;
+  unrelated analytics failures do not establish that the upload was blocked.
+  Do not relax script or frame restrictions.
 
 ## Local preview and troubleshooting
 
