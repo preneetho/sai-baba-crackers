@@ -216,7 +216,11 @@ test("the public theme does not load on vendor pages and presentation modules do
     assert.match(html, /href="\/modern\.css"/);
     assert.match(html, /src="\/modern-ui\.mjs"/);
     assert.equal([...html.matchAll(/<canvas\b/g)].length, file === "vendor-app/index.html" ? 1 : 0);
-    assert.match(html, /15% off your cart/);
+    if (file === "vendor-app/index.html") {
+      assert.doesNotMatch(html, /class="festival-ribbon"/);
+    } else {
+      assert.match(html, /15% off your cart/);
+    }
   }
   assert.doesNotMatch(await read("vendor-app/vendor/index.html"), /modern\.css|modern-ui\.mjs/);
   for (const file of ["vendor-app/modern-ui.mjs", "vendor-app/canvas-fireworks.mjs"]) {

@@ -83,7 +83,7 @@ layout and cart drawer. The private vendor dashboard and request pages retain
 their existing shared styles. There is no framework migration
 or new runtime dependency. Both public pages retain their canonical URLs and SEO data.
 The sticky header adapts to narrow screens and its measured height keeps anchor
-targets visible. The offer ribbon describes only the existing automatic 15% discount.
+targets visible. The offer ribbon appears only in the catalogue and describes the existing automatic 15% discount.
 The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon.
 The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
 experience, the 15% discount and delivery/pickup options. Delivery area and timing
