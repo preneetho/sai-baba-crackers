@@ -2,6 +2,7 @@ import { ORDER_STATUSES, PAGE_SIZE, validOrder } from "./vendor-model.mjs";
 import { validCatalogue, validYear, catalogueProducts } from "./catalogue-model.mjs";
 import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "./media-model.mjs";
 import { inspectMediaFile, transferMedia } from "./media-upload.mjs";
+import { validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl } from "./homepage-model.mjs";
 
 const $ = id => document.getElementById(id);
 const money = value => `Rs.${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -30,6 +31,10 @@ let activePriceYear = null;
 let priceDirty = false;
 let priceBusy = false;
 let priceNeedsReload = false;
+let homepageState = null;
+let homepageVersion = 0;
+let homepageBusy = false;
+let homepageNeedsReload = false;
 let expandedProductId = null;
 let mediaController;
 let savedProductIds = new Set();
@@ -59,6 +64,7 @@ function clearPrivateView() {
   clearTimeout(expiryTimer);
   session = null;
   clearPrices();
+  clearHomepage();
   listVersion++;
   detailVersion++;
   listController?.abort();
@@ -125,8 +131,9 @@ function setPriceBusy(value) {
   $("close-prices").disabled = value;
   $("reload-prices").disabled = value;
   $("price-view-message").disabled = value;
-  $("open-prices").disabled = value;
-  $("sign-out").disabled = value;
+  $("open-prices").disabled = value || homepageBusy;
+  $("open-homepage").disabled = value || homepageBusy;
+  $("sign-out").disabled = value || homepageBusy;
   $("activate-prices").disabled = value || priceNeedsReload || priceDirty || !priceList || activePriceYear === priceList.year;
   $("save-prices").disabled = value || priceNeedsReload || !priceDirty;
   $("add-price-product").disabled = value || priceNeedsReload || !priceList || priceList.products.length >= 200;
@@ -135,6 +142,7 @@ function setPriceBusy(value) {
     value ? "Working... Please wait." : priceNeedsReload ? "Reload required. Edits kept." :
       priceDirty ? "Unsaved changes." : "All changes saved."}`;
   if ($("price-save-state").textContent !== state) $("price-save-state").textContent = state;
+  setHomepageBusy(homepageBusy);
 }
 
 function togglePriceProduct(id) {
@@ -548,6 +556,99 @@ async function changePrices(input) {
   }
 }
 
+function homepageDirty() {
+  return homepageState && $("homepage-video-url").value !== homepageVideoUrl(homepageState.video);
+}
+
+function setHomepageBusy(value) {
+  homepageBusy = value;
+  const blocked = value || priceBusy;
+  $("homepage-panel").setAttribute("aria-busy", String(value));
+  $("homepage-video-url").disabled = blocked || homepageNeedsReload || !homepageState;
+  $("save-homepage").disabled = blocked || homepageNeedsReload || !homepageDirty();
+  $("reload-homepage").disabled = blocked;
+  $("close-homepage").disabled = blocked;
+  $("open-homepage").disabled = value || priceBusy;
+  $("open-prices").disabled = value || priceBusy;
+  $("sign-out").disabled = value || priceBusy;
+}
+
+function clearHomepage() {
+  homepageVersion++;
+  homepageState = null;
+  homepageNeedsReload = false;
+  $("homepage-panel").hidden = true;
+  $("open-homepage").setAttribute("aria-expanded", "false");
+  $("homepage-video-url").value = "";
+  $("homepage-message").textContent = "";
+  setHomepageBusy(false);
+}
+
+function acceptHomepage(result) {
+  if (!validHomepageVideo(result.video) || !validHomepageVersion(result.version)) {
+    throw new Error("The saved homepage video settings could not be verified.");
+  }
+  homepageState = { video: { videoId: result.video.videoId }, version: result.version };
+  homepageNeedsReload = false;
+  $("homepage-video-url").value = homepageVideoUrl(result.video);
+}
+
+async function loadHomepage() {
+  if (!session || homepageBusy || priceBusy) return;
+  const version = ++homepageVersion;
+  setHomepageBusy(true);
+  notice("homepage-message", "Loading saved homepage video...");
+  try {
+    const result = await api("/api/vendor-homepage");
+    if (version !== homepageVersion || !session) return;
+    acceptHomepage(result);
+    notice("homepage-message", result.video.videoId === null ?
+      "The homepage video is hidden. Paste a link and save to show a video." :
+      "Saved video loaded. Choose Save homepage video to publish a change.");
+  } catch (error) {
+    if (version !== homepageVersion || !session) return;
+    homepageNeedsReload = true;
+    notice("homepage-message", error.message, true);
+  } finally {
+    if (version === homepageVersion) setHomepageBusy(false);
+  }
+}
+
+async function saveHomepage(event) {
+  event.preventDefault();
+  if (!session || homepageBusy || priceBusy || homepageNeedsReload || !homepageDirty()) return;
+  let video;
+  try { video = homepageVideoFromUrl($("homepage-video-url").value); }
+  catch (error) {
+    notice("homepage-message", error.message, true);
+    $("homepage-video-url").focus();
+    return;
+  }
+  const version = homepageVersion;
+  setHomepageBusy(true);
+  notice("homepage-message", "Saving homepage video...");
+  try {
+    const result = await api("/api/vendor-homepage", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Vendor-CSRF": session.csrf },
+      body: JSON.stringify({ videoUrl: $("homepage-video-url").value, expectedVersion: homepageState.version }),
+    });
+    if (version !== homepageVersion || !session) return;
+    if (result.version === null || result.video?.videoId !== video.videoId) {
+      throw new Error("The homepage video change could not be verified.");
+    }
+    acceptHomepage(result);
+    notice("homepage-message", video.videoId === null ?
+      "Saved. The video section is hidden on new homepage loads." :
+      "Saved. The new video appears on new homepage loads.");
+  } catch (error) {
+    if (version !== homepageVersion || !session) return;
+    homepageNeedsReload = true;
+    notice("homepage-message", `${error.message} Your visible edits have been kept. Reload the saved video to check whether the change was committed before trying again.`, true);
+  } finally {
+    if (version === homepageVersion) setHomepageBusy(false);
+  }
+}
+
 function showAccess(message, error = false, canSignIn = true) {
   clearPrivateView();
   notice("access-message", message, error);
@@ -874,8 +975,25 @@ $("next-page").addEventListener("click", () => { if (page * PAGE_SIZE < total) {
 $("refresh-orders").addEventListener("click", loadOrders);
 $("retry-orders").addEventListener("click", loadOrders);
 $("access-retry").addEventListener("click", initialise);
+$("open-homepage").addEventListener("click", () => {
+  if (!session || homepageBusy || priceBusy || !$("homepage-panel").hidden) return;
+  $("homepage-panel").hidden = false;
+  $("open-homepage").setAttribute("aria-expanded", "true");
+  loadHomepage();
+});
+$("close-homepage").addEventListener("click", () => {
+  if (homepageBusy || (homepageDirty() && !window.confirm("Discard unsaved homepage video edits?"))) return;
+  clearHomepage();
+  $("open-homepage").focus();
+});
+$("reload-homepage").addEventListener("click", () => {
+  if (homepageDirty() && !window.confirm("Reloading discards visible unsaved video edits. Continue?")) return;
+  loadHomepage();
+});
+$("homepage-video-url").addEventListener("input", () => setHomepageBusy(homepageBusy));
+$("homepage-form").addEventListener("submit", saveHomepage);
 $("open-prices").addEventListener("click", () => {
-  if (!session || priceBusy) return;
+  if (!session || priceBusy || homepageBusy) return;
   if (!$("price-panel").hidden) return;
   clearPrices();
   $("price-panel").hidden = false;
@@ -955,7 +1073,7 @@ $("price-form").addEventListener("submit", event => {
   changePrices({ action: "save", year: priceList.year, expectedRevision: priceList.revision, products });
 });
 window.addEventListener("beforeunload", event => {
-  if (priceDirty || priceBusy) { event.preventDefault(); event.returnValue = ""; }
+  if (priceDirty || priceBusy || homepageDirty() || homepageBusy) { event.preventDefault(); event.returnValue = ""; }
 });
 $("close-details").addEventListener("click", () => $("order-dialog").close());
 $("order-dialog").addEventListener("cancel", event => { if (saving) event.preventDefault(); });
@@ -1013,8 +1131,8 @@ $("status-form").addEventListener("submit", async event => {
   }
 });
 $("sign-out").addEventListener("click", async () => {
-  if (!session || priceBusy ||
-      (priceDirty && !window.confirm("Sign out and discard unsaved price-list edits?"))) return;
+  if (!session || priceBusy || homepageBusy ||
+      ((priceDirty || homepageDirty()) && !window.confirm("Sign out and discard unsaved dashboard edits?"))) return;
   $("sign-out").disabled = true;
   try {
     await api("/api/vendor-auth/logout", {

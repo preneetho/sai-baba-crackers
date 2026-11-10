@@ -26,6 +26,16 @@ vendor dashboard unchanged. Hero-only canvas fireworks respect reduced motion,
 offscreen/hidden-page suspension and the customer's pause choice.
 Opening hours and year-round stock are intentionally not promised.
 
+Approved vendors can change the public video through **Homepage video** in
+`/vendor/`: paste a YouTube watch, Shorts or youtu.be URL and save. Save a blank
+field to hide the section. Changes appear on new homepage loads without a
+redeploy or changes to price-list versions. The initial default is the supplied
+shop Short `hxVU6MC47zU`; saved settings persist independently in Netlify Blobs.
+Only a validated video ID is published; vendor account/session data stays private.
+The optional video needs JavaScript and the existing Netlify Blobs connection.
+Loading/saving failures show explicit retry/reload states, and stale-tab edits
+are rejected. See the [video setup details](vendor-app/README.md#public-pages).
+
 The existing catalogue, saved cart, checkout and WhatsApp flow are at `/order/`;
 the vendor dashboard stays at `/vendor/`. Root-relative assets keep the nested
 catalogue working. Old `/#catalogue`, `/#requirement`, `/#products`, `/#search`

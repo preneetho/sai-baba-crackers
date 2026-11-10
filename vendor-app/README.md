@@ -19,14 +19,34 @@ default; no 2026 orders are imported or modified automatically.
 `index.html` is the evergreen marketing homepage at `/`, styled by `home.css`
 and the public-only `modern.css` on top of the shared styles. It includes services, conditional Hyderabad
 delivery, store pickup, phone enquiries for events, native FAQ disclosures and
-contact/directions links. Its content works without JavaScript; `home.mjs` preserves
+contact/directions links. Its marketing content works without JavaScript; `home.mjs` preserves
 old catalogue/cart fragments and the existing authentication callback. The separate
 `modern-ui.mjs` initializes decorative fireworks and the catalogue's native cart drawer.
-Below the shop facts, the homepage embeds the supplied YouTube Short
-`hxVU6MC47zU` in a responsive portrait player. It uses YouTube's privacy-enhanced
+Below the shop facts, the homepage loads its configured YouTube video from
+`GET /api/homepage`. Approved vendors choose **Homepage video** in `/vendor/`,
+paste a YouTube link and select **Save homepage video**. Leave the field blank
+and save to hide the section. The supplied Short `hxVU6MC47zU` is the initial
+default only when no setting has ever been saved.
+
+The shared setting persists in the `site-settings` Netlify Blobs store, under
+`homepage-video`, independently of catalogue years, revisions and carts.
+No new dependency, database migration or YouTube API key is required.
+`GET/POST /api/vendor-homepage` uses the existing approved-vendor session; writes
+require same-origin CSRF validation and conditional ETag writes prevent stale
+dashboard tabs overwriting newer edits. On an uncertain save, edits remain
+visible and a reload is required before another write.
+
+The portrait player uses a compact centred desktop card and the existing stacked
+mobile layout. It uses YouTube's privacy-enhanced
 domain, lazy loading, manual playback and a direct YouTube fallback link.
 The iframe sends only the site origin as its referrer, as required by YouTube;
-the existing Content Security Policy already permits this player.
+the existing Content Security Policy already permits this player. Only validated
+YouTube IDs are stored and used to construct player/fallback URLs. Tracking and
+start-time parameters are discarded. Links do not prove availability or permission
+to embed; use the fallback if YouTube blocks playback. Landscape videos remain
+letterboxed by YouTube. The homepage needs JavaScript and Blobs access for this
+optional section; it shows an explicit retry on settings failure rather than
+quietly loading a stale default. A hidden video never loads an external player.
 
 The unchanged shopping flow now lives in `order/index.html` at `/order/`, with
 root-relative assets. The saved-cart key, pricing, checkout, APIs and private
@@ -47,7 +67,10 @@ npm.cmd run vendor:dev
 Open <http://127.0.0.1:4173> for the homepage or
 <http://127.0.0.1:4173/order/> for the catalogue. Set `VENDOR_PORT` to choose another port.
 The preview binds to loopback only; it is not a public deployment.
-The homepage works without credentials. Catalogue loading and saving a requirement need the
+The marketing homepage works without credentials. Its optional video setting needs
+Netlify Blobs (automatically connected in deployed Functions, or Netlify Dev locally).
+The bare static/local server reports unavailable video settings explicitly.
+Catalogue loading and saving a requirement need the
 order backend configuration described in the setup guides; missing configuration is reported
 explicitly and never treated as a saved order.
 

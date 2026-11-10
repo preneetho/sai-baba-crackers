@@ -31,7 +31,9 @@
 .home-facts strong { font-size: 20px; color: var(--brand); }
 .home-facts span { font-size: 13px; color: var(--muted); margin-top: 4px; }
 .home-section { margin-top: 64px; scroll-margin-top: 24px; }
-.home-video { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); align-items: center; gap: 48px; padding: 40px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.home-video { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 280px); align-items: center; gap: 32px; max-width: 760px; margin-inline: auto; padding: 32px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.home-video-notice { max-width: 760px; margin-inline: auto; color: var(--muted); font-size: 15px; }
+.home-video-notice button { margin-top: 12px; }
 .home-video-copy { min-width: 0; }
 .home-video-copy > p:not(.eyebrow) { color: var(--muted); font-size: 15px; margin-top: 16px; }
 .home-video-copy a { display: inline-block; min-height: 44px; padding-block: 10px; color: var(--brand); }

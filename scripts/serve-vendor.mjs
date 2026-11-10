@@ -12,6 +12,8 @@ import { handleVendorCatalogue } from "../netlify/functions/vendor-catalogue.mjs
 import { handleVendorMedia } from "../netlify/functions/vendor-media.mjs";
 import { handleVendorOrderShare } from "../netlify/functions/vendor-order-share.mjs";
 import { handleOrderShare } from "../netlify/functions/order-share.mjs";
+import { handleHomepage } from "../netlify/functions/homepage.mjs";
+import { handleVendorHomepage } from "../netlify/functions/vendor-homepage.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -23,6 +25,8 @@ const files = new Map([
   ["/order/", ["order/index.html", "text/html; charset=utf-8"]],
   ["/home.css", ["home.css", "text/css; charset=utf-8"]],
   ["/home.mjs", ["home.mjs", "text/javascript; charset=utf-8"]],
+  ["/homepage-model.mjs", ["homepage-model.mjs", "text/javascript; charset=utf-8"]],
+  ["/homepage-video.mjs", ["homepage-video.mjs", "text/javascript; charset=utf-8"]],
   ["/modern.css", ["modern.css", "text/css; charset=utf-8"]],
   ["/modern-ui.mjs", ["modern-ui.mjs", "text/javascript; charset=utf-8"]],
   ["/canvas-fireworks.mjs", ["canvas-fireworks.mjs", "text/javascript; charset=utf-8"]],
@@ -71,6 +75,7 @@ const server = createServer(async (request, response) => {
   }
   if (pathname === "/api/orders" || pathname === "/api/order-pdf" ||
       pathname === "/api/vendor-orders" || pathname === "/api/vendor-import" ||
+      pathname === "/api/homepage" || pathname === "/api/vendor-homepage" ||
       pathname === "/api/catalogue" || pathname === "/api/vendor-catalogue" ||
       pathname === "/api/vendor-media" || pathname === "/api/vendor-order-share" ||
       pathname.startsWith("/request/") || pathname.startsWith("/api/vendor-auth/")) {
@@ -81,7 +86,9 @@ const server = createServer(async (request, response) => {
         init.duplex = "half";
       }
       const url = new URL(request.url, `http://127.0.0.1:${port}`);
-      const handler = pathname === "/api/orders" ? handleOrderRequest :
+      const handler = pathname === "/api/homepage" ? handleHomepage :
+        pathname === "/api/vendor-homepage" ? handleVendorHomepage :
+        pathname === "/api/orders" ? handleOrderRequest :
         pathname === "/api/order-pdf" ? handlePdfRequest :
           pathname === "/api/vendor-orders" ? handleVendorOrders :
             pathname === "/api/vendor-import" ? handleVendorImport :

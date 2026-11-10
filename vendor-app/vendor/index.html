@@ -35,9 +35,21 @@
     <section id="dashboard" hidden aria-labelledby="dashboard-title">
       <div class="vendor-heading">
         <div><p class="eyebrow brand-text">Order register</p><h1 id="dashboard-title">Order requests</h1></div>
-        <div class="vendor-actions"><button id="open-prices" type="button">Manage yearly price lists</button><button id="refresh-orders" type="button">Refresh requests</button></div>
+        <div class="vendor-actions"><button id="open-homepage" type="button" aria-controls="homepage-panel" aria-expanded="false">Homepage video</button><button id="open-prices" type="button">Manage yearly price lists</button><button id="refresh-orders" type="button">Refresh requests</button></div>
       </div>
       <p class="vendor-muted">Requests are not confirmed sales. Status updates do not send a WhatsApp message or notify customers.</p>
+      <section id="homepage-panel" class="vendor-panel vendor-homepage-panel" aria-labelledby="homepage-title" hidden>
+        <div class="vendor-heading"><h2 id="homepage-title">Homepage video</h2><button id="close-homepage" type="button">Close video settings</button></div>
+        <p>Change the video on the public homepage. This setting is shared across all price-list years; prices, carts and order requests are unchanged.</p>
+        <p id="homepage-message" class="vendor-notice" role="status" aria-live="polite"></p>
+        <button id="reload-homepage" type="button">Reload saved video</button>
+        <form id="homepage-form" class="vendor-homepage-form">
+          <label for="homepage-video-url">YouTube video link</label>
+          <input id="homepage-video-url" type="url" maxlength="2048" inputmode="url" autocomplete="off" spellcheck="false" aria-describedby="homepage-video-help" disabled>
+          <p id="homepage-video-help" class="vendor-muted">Paste an HTTPS YouTube watch, Shorts or youtu.be link. Leave blank to hide the video. Only use videos you have permission to publish that allow embedding. Portrait Shorts work best; landscape videos keep YouTube's letterboxing.</p>
+          <div class="vendor-actions"><button id="save-homepage" class="vendor-primary" type="submit" disabled>Save homepage video</button><a href="/" target="_blank" rel="noopener noreferrer">View homepage (new tab)</a></div>
+        </form>
+      </section>
       <section id="price-panel" class="vendor-panel" aria-labelledby="price-title" hidden>
         <div class="vendor-heading"><h2 id="price-title">Yearly price lists</h2><button id="close-prices" type="button">Close price lists</button></div>
         <p>Customers see one active year. Saving changes to the active list updates prices for new requests immediately. Existing orders keep their saved prices. The cart discount remains 15%.</p>

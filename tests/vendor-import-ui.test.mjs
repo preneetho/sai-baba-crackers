@@ -7,6 +7,7 @@ import { validCatalogue, validYear, catalogueProducts } from "../vendor-app/cata
 import { products } from "../vendor-app/catalog.mjs";
 import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "../vendor-app/media-model.mjs";
 import { inspectMediaFile } from "../vendor-app/media-upload.mjs";
+import { validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl } from "../vendor-app/homepage-model.mjs";
 
 const mediaAsset = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
   resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
@@ -42,6 +43,7 @@ async function harness({ navigator = {} } = {}) {
   let focused;
   let resizeBar;
   const styles = new Map();
+  const windowEvents = new Map();
   class Node {
     constructor(tag = "div") {
       Object.assign(this, { tagName: tag.toUpperCase(), value: "", textContent: "", hidden: false,
@@ -106,6 +108,7 @@ async function harness({ navigator = {} } = {}) {
     catalogue: { year: 2026, revision: 1, products: catalogueProducts(products.slice(0, 1)) },
   }));
   let confirmed = true;
+  let respondHomepage = async () => Response.json({ video: { videoId: "hxVU6MC47zU" }, version: null });
   let transfer = async () => {};
   let respondMedia = async body => Response.json(body.action === "sign" ?
     { cloudName: mediaAsset.cloudName, resourceType: "image", params: { public_id: mediaAsset.publicId }, ticket: "synthetic.ticket" } :
@@ -113,6 +116,7 @@ async function harness({ navigator = {} } = {}) {
   const context = vm.createContext({
     ORDER_STATUSES, PAGE_SIZE, validOrder, validCatalogue, validYear, catalogueProducts,
     validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId, inspectMediaFile, transferMedia: (...args) => transfer(...args),
+    validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl,
     AbortController, AbortSignal, URL, URLSearchParams, Intl, console, navigator,
     document: { getElementById: get, createElement: tag => new Node(tag),
       documentElement: { style: { setProperty: (key, value) => styles.set(key, value) } } },
@@ -120,7 +124,7 @@ async function harness({ navigator = {} } = {}) {
       constructor(callback) { resizeBar = callback; }
       observe() {}
     },
-    window: { addEventListener() {}, confirm: () => confirmed }, history: { replaceState() {} },
+    window: { addEventListener: (name, callback) => windowEvents.set(name, callback), confirm: () => confirmed }, history: { replaceState() {} },
     location: { href: "https://vendor.example/vendor/" },
     setTimeout: () => 0, clearTimeout() {},
     fetch: async (path, options) => {
@@ -133,6 +137,7 @@ async function harness({ navigator = {} } = {}) {
       if (path === "/api/vendor-order-share") return respondShare(JSON.parse(options.body), options);
       if (path.startsWith("/api/vendor-catalogue")) return respondPrice(path, options);
       if (path === "/api/vendor-media") return respondMedia(JSON.parse(options.body), options);
+      if (path === "/api/vendor-homepage") return respondHomepage(path, options);
       throw new Error("Unexpected test route");
     },
   });
@@ -144,7 +149,7 @@ async function harness({ navigator = {} } = {}) {
     await tick();
   };
   return {
-    get, requests, emit, context, styles, get focused() { return focused; },
+    get, requests, emit, context, styles, windowEvents, get focused() { return focused; },
     resizeSaveBar(height) {
       get("price-save-bar").height = height;
       resizeBar([{ target: get("price-save-bar") }]);
@@ -153,10 +158,123 @@ async function harness({ navigator = {} } = {}) {
     respondShare(callback) { respondShare = callback; },
     respondPrice(callback) { respondPrice = callback; },
     respondMedia(callback) { respondMedia = callback; },
+    respondHomepage(callback) { respondHomepage = callback; },
     transfer(callback) { transfer = callback; },
     confirm(value) { confirmed = value; },
   };
 }
+
+test("homepage video edits load privately, save explicitly with CSRF/version and can hide the public video", async () => {
+  const ui = await harness();
+  assert.equal(ui.requests.some(request => request.path === "/api/vendor-homepage"), false);
+  await ui.emit("open-homepage");
+  assert.equal(ui.get("homepage-panel").hidden, false);
+  assert.equal(ui.get("homepage-video-url").value, "https://www.youtube.com/watch?v=hxVU6MC47zU");
+  assert.equal(ui.get("save-homepage").disabled, true);
+  ui.get("homepage-video-url").value = "https://youtu.be/abcdefghijk";
+  await ui.emit("homepage-video-url", "input");
+  assert.equal(ui.get("save-homepage").disabled, false);
+  assert.equal(ui.requests.filter(request => request.method === "POST").length, 0);
+  ui.respondHomepage(async (path, options) => {
+    assert.equal(options.headers["X-Vendor-CSRF"], "a".repeat(43));
+    assert.deepEqual(JSON.parse(options.body), { videoUrl: "https://youtu.be/abcdefghijk", expectedVersion: null });
+    return Response.json({ video: { videoId: "abcdefghijk" }, version: "version-1" });
+  });
+  await ui.emit("homepage-form", "submit");
+  assert.match(ui.get("homepage-message").textContent, /Saved.*new video/);
+  assert.equal(ui.get("save-homepage").disabled, true);
+  ui.get("homepage-video-url").value = "";
+  await ui.emit("homepage-video-url", "input");
+  ui.respondHomepage(async (path, options) => {
+    assert.deepEqual(JSON.parse(options.body), { videoUrl: "", expectedVersion: "version-1" });
+    return Response.json({ video: { videoId: null }, version: "version-2" });
+  });
+  await ui.emit("homepage-form", "submit");
+  assert.match(ui.get("homepage-message").textContent, /Saved.*hidden/);
+  assert.equal(ui.requests.some(request => request.path.startsWith("/api/vendor-catalogue")), false);
+  await ui.emit("close-homepage");
+  assert.equal(ui.get("homepage-panel").hidden, true);
+  assert.equal(ui.focused, ui.get("open-homepage"));
+});
+
+test("homepage invalid links, save conflicts and unreadable acknowledgements never claim success or discard edits", async () => {
+  for (const response of [
+    () => Response.json({ error: "Changed in another session." }, { status: 409 }),
+    () => Response.json({ video: { videoId: "wrongwrong1" }, version: "unexpected" }),
+    () => new Response("unreadable"),
+  ]) {
+    const ui = await harness();
+    await ui.emit("open-homepage");
+    ui.get("homepage-video-url").value = "https://evil.example/abcdefghijk";
+    await ui.emit("homepage-video-url", "input");
+    await ui.emit("homepage-form", "submit");
+    assert.match(ui.get("homepage-message").textContent, /Use an HTTPS YouTube/);
+    assert.equal(ui.requests.some(request => request.method === "POST"), false);
+    ui.get("homepage-video-url").value = "https://youtu.be/abcdefghijk";
+    ui.respondHomepage(response);
+    await ui.emit("homepage-form", "submit");
+    assert.equal(ui.get("homepage-video-url").value, "https://youtu.be/abcdefghijk");
+    assert.equal(ui.get("homepage-video-url").disabled, true);
+    assert.equal(ui.get("save-homepage").disabled, true);
+    assert.equal(ui.get("reload-homepage").disabled, false);
+    assert.match(ui.get("homepage-message").textContent, /edits have been kept.*Reload/);
+    assert.equal(ui.get("homepage-message").dataset.error, "true");
+    ui.confirm(false);
+    await ui.emit("close-homepage");
+    assert.equal(ui.get("homepage-panel").hidden, false);
+    ui.confirm(true);
+    ui.respondHomepage(async () => Response.json({ video: { videoId: "zyxwvutsrqp" }, version: "newer" }));
+    await ui.emit("reload-homepage");
+    assert.equal(ui.get("homepage-video-url").value, "https://www.youtube.com/watch?v=zyxwvutsrqp");
+    assert.equal(ui.get("homepage-video-url").disabled, false);
+  }
+});
+
+test("homepage loading failures require reload and expired sessions clear visible settings", async () => {
+  const ui = await harness();
+  ui.respondHomepage(async () => Response.json({ error: "Storage unavailable." }, { status: 503 }));
+  await ui.emit("open-homepage");
+  assert.match(ui.get("homepage-message").textContent, /Storage unavailable/);
+  assert.equal(ui.get("homepage-video-url").disabled, true);
+  assert.equal(ui.get("reload-homepage").disabled, false);
+  ui.respondHomepage(async () => Response.json({ video: { videoId: "abcdefghijk" }, version: "loaded" }));
+  await ui.emit("reload-homepage");
+  assert.equal(ui.get("homepage-video-url").disabled, false);
+  ui.get("homepage-video-url").value = "";
+  ui.respondHomepage(async () => Response.json({ error: "Session expired." }, { status: 401 }));
+  await ui.emit("homepage-form", "submit");
+  assert.equal(ui.get("dashboard").hidden, true);
+  assert.equal(ui.get("homepage-panel").hidden, true);
+  assert.equal(ui.get("homepage-video-url").value, "");
+  assert.match(ui.get("access-message").textContent, /Session expired/);
+});
+
+test("homepage unsaved edits warn before leaving/signing out and late saves cannot restore an expired private view", async () => {
+  const ui = await harness();
+  await ui.emit("open-homepage");
+  ui.get("homepage-video-url").value = "";
+  await ui.emit("homepage-video-url", "input");
+  let warned = false;
+  ui.windowEvents.get("beforeunload")({ preventDefault() { warned = true; } });
+  assert.equal(warned, true);
+  ui.confirm(false);
+  await ui.emit("sign-out");
+  assert.equal(ui.requests.some(request => request.path === "/api/vendor-auth/logout"), false);
+  assert.equal(ui.get("homepage-video-url").value, "");
+  let resolveSave;
+  ui.respondHomepage(() => new Promise(resolve => { resolveSave = resolve; }));
+  const pending = ui.emit("homepage-form", "submit");
+  await tick();
+  assert.equal(ui.get("sign-out").disabled, true);
+  assert.equal(ui.get("save-homepage").disabled, true);
+  vm.runInContext('showAccess("Session expired.", true)', ui.context);
+  resolveSave(Response.json({ video: { videoId: null }, version: "late-version" }));
+  await pending;
+  assert.equal(ui.get("dashboard").hidden, true);
+  assert.equal(ui.get("homepage-panel").hidden, true);
+  assert.equal(ui.get("homepage-video-url").value, "");
+  assert.equal(ui.get("homepage-message").textContent, "");
+});
 
 test("sharing is explicitly created for the selected saved request and exposes WhatsApp, native sharing and copying without automatic sends", async () => {
   const copied = [];

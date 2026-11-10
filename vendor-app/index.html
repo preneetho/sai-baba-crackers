@@ -90,15 +90,20 @@
       <li><strong>Your choice</strong><span>pickup or confirmed delivery</span></li>
     </ul>
 
-    <section id="shop-video" class="home-section home-video" aria-labelledby="shop-video-title">
+    <section id="shop-video" class="home-section home-video" aria-labelledby="shop-video-title" hidden>
       <div class="home-video-copy">
         <p class="eyebrow brand-text">MEET SAI BABA CRACKERS</p>
         <h2 id="shop-video-title">Take a look at the shop.</h2>
-        <p>Watch a short video of Sai Baba Crackers Centre in Sanathnagar.</p>
-        <p class="home-video-fallback">Video not playing? <a href="https://www.youtube.com/shorts/hxVU6MC47zU" target="_blank" rel="noopener noreferrer">Watch on YouTube (new tab)</a>.</p>
+        <p>Watch a video from Sai Baba Crackers Centre in Sanathnagar.</p>
+        <p class="home-video-fallback">Video not playing? <a id="home-video-link" target="_blank" rel="noopener noreferrer">Watch on YouTube (new tab)</a>.</p>
       </div>
-      <iframe class="home-video-player" src="https://www.youtube-nocookie.com/embed/hxVU6MC47zU?rel=0" title="Sai Baba Crackers Centre in Sanathnagar - YouTube Short" width="360" height="640" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <iframe id="home-video-player" class="home-video-player" title="Sai Baba Crackers Centre - YouTube video" width="360" height="640" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
     </section>
+    <div id="home-video-status" class="home-section home-video-notice" hidden>
+      <p id="home-video-message" role="status" aria-live="polite"></p>
+      <button id="retry-home-video" class="button secondary" type="button" hidden>Retry video</button>
+    </div>
+    <noscript><p class="home-section-note">Enable JavaScript to load the shop's current video.</p></noscript>
 
     <section id="celebrations" class="home-section" aria-labelledby="celebrations-title">
       <div class="home-section-heading">

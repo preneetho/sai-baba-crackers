@@ -43,23 +43,23 @@ test("the homepage has crawlable services, honest fulfilment information and wor
   assert.match(new URL(maps.replaceAll("&amp;", "&")).searchParams.get("query"), /Industrial Estate, Main Road, Sanath Nagar, Hyderabad/);
 });
 
-test("the homepage embeds the requested Short without autoplay and retains a direct YouTube fallback", async () => {
+test("the homepage waits for video settings, preserves player privacy and keeps a direct YouTube fallback", async () => {
   const html = await read("vendor-app/index.html");
   const frames = [...html.matchAll(/<iframe\b[^>]*>/g)].map(([frame]) => frame);
   assert.equal(frames.length, 1);
   const frame = frames[0];
-  const url = new URL(frame.match(/src="([^"]+)"/)[1]);
-  assert.equal(url.origin, "https://www.youtube-nocookie.com");
-  assert.equal(url.pathname, "/embed/hxVU6MC47zU");
-  assert.deepEqual([...url.searchParams], [["rel", "0"]]);
-  assert.match(frame, /title="Sai Baba Crackers Centre in Sanathnagar - YouTube Short"/);
+  assert.doesNotMatch(frame, /\bsrc=/, "Do not load a stale/default player before the saved setting is known");
+  assert.match(frame, /title="Sai Baba Crackers Centre - YouTube video"/);
   assert.match(frame, /loading="lazy"/);
   assert.match(frame, /width="360" height="640"/);
   assert.match(frame, /referrerpolicy="strict-origin-when-cross-origin"/);
   assert.match(frame, /\ballowfullscreen\b/);
   assert.doesNotMatch(frame, /autoplay/);
-  assert.match(html, /href="https:\/\/www\.youtube\.com\/shorts\/hxVU6MC47zU" target="_blank" rel="noopener noreferrer"/);
-  assert.match(html, /id="shop-video"[^>]*aria-labelledby="shop-video-title"/);
+  assert.match(html, /id="home-video-link" target="_blank" rel="noopener noreferrer"/);
+  assert.match(html, /id="shop-video"[^>]*aria-labelledby="shop-video-title" hidden/);
+  assert.match(html, /id="retry-home-video"/);
+  assert.match(html, /<noscript>.*Enable JavaScript.*current video/);
+  assert.match(await read("vendor-app/home.mjs"), /import "\.\/homepage-video\.mjs"/);
   assert.match(await read("vendor-app/home.css"), /\.home-video-player\s*\{[^}]*aspect-ratio: 9 \/ 16;/);
   assert.match(await read("netlify.toml"), /frame-src https:\/\/www\.youtube-nocookie\.com;/);
 });
@@ -183,6 +183,8 @@ test("local preview serves the public routes, assets, redirects and vendor page"
     ["/sitemap.xml", "application/xml", "<urlset"],
     ["/home.css", "text/css", ".home-hero"],
     ["/home.mjs", "text/javascript", "restoreCatalogueBookmark"],
+    ["/homepage-model.mjs", "text/javascript", "validHomepageVideo"],
+    ["/homepage-video.mjs", "text/javascript", "/api/homepage"],
     ["/modern.css", "text/css", ".modern"],
     ["/modern-ui.mjs", "text/javascript", "restoreCartBookmark"],
     ["/canvas-fireworks.mjs", "text/javascript", "prefers-reduced-motion"],
