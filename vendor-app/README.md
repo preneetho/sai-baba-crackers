@@ -74,10 +74,13 @@ npm.cmd run vendor:test
 
 ## Appearance
 
-The public pages use the Modern Fireworks theme: midnight navy `#080D1F`,
+Only the homepage uses the Modern Fireworks colour theme: midnight navy `#080D1F`,
 electric purple `#8B5CF6`, orange `#FF6B35` and gold `#FFC857`. Semantic colours
-and responsive overrides live in `modern.css`, scoped to `body.modern`; the private
-vendor dashboard retains its existing shared styles. There is no framework migration
+and responsive overrides live in `modern.css`. The vibrant palette is scoped to
+`body.modern.home`; shopping, cart, checkout and product media retain the original
+light blue-and-white palette. Shared `body.modern` rules preserve the responsive
+layout and cart drawer. The private vendor dashboard and request pages retain
+their existing shared styles. There is no framework migration
 or new runtime dependency. Both public pages retain their canonical URLs and SEO data.
 The sticky header adapts to narrow screens and its measured height keeps anchor
 targets visible. The offer ribbon describes only the existing automatic 15% discount.
@@ -85,9 +88,9 @@ The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon
 The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
 experience, the 15% discount and delivery/pickup options. Delivery area and timing
 remain subject to shop confirmation.
-The hero uses the original, bundled `modern-fireworks.svg` static fallback (under 5 KB)
-in the requested purple, orange and gold palette. The older `diwali-fireworks.png`
-remains available to cached pages.
+The homepage hero uses the original, bundled `modern-fireworks.svg` static fallback
+(under 5 KB) in the requested purple, orange and gold palette. The shopping hero
+uses the original `diwali-fireworks.png` artwork without canvas animation.
 `canvas-fireworks.mjs` adds hero-only decorative canvas fireworks, capped at 96
 particles, 30 rendered frames per second and 1.5 device-pixel ratio. Animation stops
 offscreen, in hidden tabs and on page suspension; a visible Play/Pause control

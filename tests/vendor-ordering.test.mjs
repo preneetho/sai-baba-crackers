@@ -95,13 +95,15 @@ test("clear cart is available above and below the cart items", async () => {
   assert.ok(html.indexOf('id="cart-items"') < html.indexOf('id="clear-cart"'));
 });
 
-test("the header retains a lightweight static fallback and adds optional hero-only canvas fireworks", async () => {
+test("shopping retains its original static artwork and only the homepage adds canvas fireworks", async () => {
   const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
-  assert.match(html, /<img class="hero-fireworks" src="\/modern-fireworks\.svg" alt="" width="420" height="340"/);
+  assert.match(html, /<img class="hero-fireworks" src="\/diwali-fireworks\.png" alt="" width="420" height="340"/);
   assert.doesNotMatch(html, /<video\b|\.gif\b|\.mp4\b/);
-  assert.equal([...html.matchAll(/<canvas\b/g)].length, 1);
-  assert.match(html, /class="fireworks-stage" aria-hidden="true">[\s\S]*?<canvas[^>]*data-fireworks/);
-  assert.match(html, /<button[^>]*data-fireworks-toggle hidden>Pause fireworks/);
+  assert.doesNotMatch(html, /<canvas\b|data-fireworks-toggle/);
+  const home = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  assert.equal([...home.matchAll(/<canvas\b/g)].length, 1);
+  assert.match(home, /class="fireworks-stage" aria-hidden="true">[\s\S]*?<canvas[^>]*data-fireworks/);
+  assert.match(home, /<button[^>]*data-fireworks-toggle hidden>Pause fireworks/);
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(app, /initializeFireworks|hero-fireworks\.mjs/);
   const image = await readFile(new URL("../vendor-app/diwali-fireworks.png", import.meta.url));

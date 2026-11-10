@@ -215,11 +215,24 @@ test("the public theme does not load on vendor pages and presentation modules do
     assert.match(html, /class="[^"]*\bmodern\b/);
     assert.match(html, /href="\/modern\.css"/);
     assert.match(html, /src="\/modern-ui\.mjs"/);
-    assert.equal([...html.matchAll(/<canvas\b/g)].length, 1);
+    assert.equal([...html.matchAll(/<canvas\b/g)].length, file === "vendor-app/index.html" ? 1 : 0);
     assert.match(html, /15% off your cart/);
   }
   assert.doesNotMatch(await read("vendor-app/vendor/index.html"), /modern\.css|modern-ui\.mjs/);
   for (const file of ["vendor-app/modern-ui.mjs", "vendor-app/canvas-fireworks.mjs"]) {
     assert.doesNotMatch(await read(file), /fetch\(|localStorage|sessionStorage|order\.mjs|catalog\.mjs|\/api\/|whatsapp/i);
   }
+});
+
+test("the vibrant palette is homepage-only while shopping inherits the original light palette", async () => {
+  const home = await read("vendor-app/index.html");
+  const shop = await read("vendor-app/order/index.html");
+  const css = await read("vendor-app/modern.css");
+  assert.match(home, /<body class="home modern">/);
+  assert.match(home, /name="theme-color" content="#080D1F"/);
+  assert.match(shop, /name="theme-color" content="#1e4f91"/);
+  assert.doesNotMatch(shop, /<body[^>]*\bhome\b|data-fireworks|modern-fireworks\.svg/);
+  assert.match(css, /\.modern\.home\s*\{\s*--paper: #080D1F;/);
+  assert.doesNotMatch(css, /\.modern\s*\{\s*--paper:/);
+  assert.match(css, /\.modern:not\(\.home\) dialog \{ color-scheme: light; \}/);
 });

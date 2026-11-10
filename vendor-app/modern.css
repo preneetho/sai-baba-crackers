@@ -1,5 +1,6 @@
-html:has(> body.modern) { color-scheme: dark; background: #080D1F; scroll-padding-top: var(--modern-header-height, 160px); }
-.modern {
+html:has(> body.modern) { scroll-padding-top: var(--modern-header-height, 160px); }
+html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
+.modern.home {
   --paper: #080D1F;
   --surface: #111A30;
   --ink: #F4F3FF;
@@ -20,6 +21,8 @@ html:has(> body.modern) { color-scheme: dark; background: #080D1F; scroll-paddin
   --on-brand-muted: #C4C8DC;
   --focus-ring: #FFC857;
   --radius: 18px;
+}
+.modern {
   background: var(--paper);
   color: var(--ink);
   line-height: 1.65;
@@ -164,6 +167,35 @@ html:has(> body.modern) { color-scheme: dark; background: #080D1F; scroll-paddin
 .modern .contact-section p:not(.eyebrow), .modern .contact-details p { font-size: 13px !important; }
 .modern .fine-print { font-size: 12px; }
 .modern .mobile-cart { background: var(--electric-purple); color: var(--paper); border-color: var(--brand); font-weight: 750; }
+.modern:not(.home) { --electric-purple: var(--brand); --orange: var(--brand); }
+.modern:not(.home) .site-header { background: var(--paper); }
+.modern:not(.home) .nav-active { border-color: var(--brand); }
+.modern:not(.home) .header-cart span, .modern:not(.home) .skip-link { background: var(--brand); color: var(--on-brand); }
+.modern:not(.home) .hero { border-color: var(--brand); background: var(--brand); color: var(--on-brand); }
+.modern:not(.home) .hero-highlights li { border-color: var(--on-brand-muted); background: transparent; }
+.modern:not(.home) .hero-link { border-color: var(--on-brand-muted); background: transparent; color: var(--on-brand); }
+.modern:not(.home) .primary { background: var(--brand); color: var(--on-brand); }
+.modern:not(.home) .primary:hover { background: var(--brand-hover); color: var(--on-brand); }
+.modern:not(.home) .primary:disabled { background: var(--soft-strong); color: var(--muted); border-color: var(--line); }
+.modern:not(.home) .festival-ribbon { background: var(--soft); border-color: var(--line); }
+.modern:not(.home) .festival-ribbon strong, .modern:not(.home) .catalogue-year, .modern:not(.home) .discount-row { color: var(--brand); }
+.modern:not(.home) .how-it-works b { color: var(--brand); }
+.modern:not(.home) .category-chip.selected { color: var(--on-brand); }
+.modern:not(.home) .product-card:hover { border-color: var(--control-border); }
+.modern:not(.home) .product-art { background: var(--soft); color: var(--brand); }
+.modern:not(.home) .art-1 { background: #edf4ff; color: #3a70b5; }
+.modern:not(.home) .art-2 { background: #e5effb; color: #4d74a8; }
+.modern:not(.home) .art-3 { background: #f0f3ff; color: #5b6fb3; }
+.modern:not(.home) .product-card.in-cart .product-art { background: var(--selected-art); }
+.modern:not(.home) .product-cover { background: var(--surface); }
+.modern:not(.home) .product-number { background: var(--surface); color: var(--muted); }
+.modern:not(.home) .notice, .modern:not(.home) .noscript { background: #fff1d5; color: #6b4814; border-color: #d9b477; }
+.modern:not(.home) .error { background: #fff0ed; color: #9a3025; border-color: #d49c91; }
+.modern:not(.home) dialog { color-scheme: light; }
+.modern:not(.home) dialog::backdrop { background: #102341b3; }
+.modern:not(.home) .count-pill { background: var(--brand); color: var(--on-brand); }
+.modern:not(.home) .contact-section { background: var(--soft); }
+.modern:not(.home) .mobile-cart { background: var(--brand); color: var(--on-brand); }
 @media (max-width: 1100px) {
   .modern .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .modern .site-header { gap: 16px; }
@@ -241,7 +273,9 @@ html:has(> body.modern) { color-scheme: dark; background: #080D1F; scroll-paddin
 }
 @media (forced-colors: active) {
   .modern .button, .modern .category-chip, .modern .product-card, .modern .header-cart { border: 1px solid ButtonText; }
-  .modern .primary, .modern .category-chip.selected, .modern .mobile-cart { background: Highlight; color: HighlightText; }
+  .modern .primary, .modern .category-chip.selected, .modern .mobile-cart,
+  .modern:not(.home) .primary, .modern:not(.home) .primary:hover, .modern:not(.home) .primary:disabled,
+  .modern:not(.home) .category-chip.selected, .modern:not(.home) .mobile-cart { background: Highlight; color: HighlightText; }
   .modern .product-card.in-cart { outline: 2px solid Highlight; }
   .fireworks-stage { display: none; }
 }
