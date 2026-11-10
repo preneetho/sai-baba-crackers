@@ -184,7 +184,10 @@ may still use Cloudinary storage; check references before deleting them there.
 
 - **Cloudinary is not configured:** Check all four values in production
   Functions scope, confirm they belong to the same product environment,
-  then redeploy.
+  then redeploy. The value of `CLOUDINARY_CLOUD_NAME` must be the actual
+  cloud name shown in your Cloudinary Console, not the literal text
+  `CLOUDINARY_CLOUD_NAME`. An `Invalid cloud_name` upload error indicates
+  Cloudinary does not recognize the supplied cloud name.
 - **Cloudinary rejected the upload:** The message includes the HTTP status
   and Cloudinary's error reason, with upload credentials redacted. Use that
   reason to check Signed preset mode, formats, file-size constraints, account

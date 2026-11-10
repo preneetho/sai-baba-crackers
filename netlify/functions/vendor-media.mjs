@@ -19,7 +19,7 @@ export async function handleVendorMedia(request, {
   if (!sameOriginMutation(request, settings, session)) return vendorJson({ error: "Refresh the dashboard before uploading media." }, 403);
   if (orderBackend(env)?.name !== "netlify-db") return vendorJson({ error: "Product media requires Netlify Database." }, 503);
   const cloud = cloudinarySettings(env);
-  if (!cloud) return vendorJson({ error: "Cloudinary is not configured. Check all four CLOUDINARY variables for production Functions and redeploy." }, 503);
+  if (!cloud) return vendorJson({ error: "Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME to your actual Cloudinary cloud name, not the variable label. Check all four CLOUDINARY values for production Functions and redeploy." }, 503);
   if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
     return vendorJson({ error: "Send upload details as JSON, not the file." }, 415);
   }

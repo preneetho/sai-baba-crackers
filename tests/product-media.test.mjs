@@ -89,6 +89,14 @@ test("upload authorization denies missing login, CSRF, configuration, changed re
   assert.equal((await handleVendorMedia(request(signInput, { Origin: "https://another.example" }), guarded)).status, 403);
   assert.equal(opened, 0);
   assert.equal((await handleVendorMedia(request(signInput), { ...options, env: { ...env, CLOUDINARY_API_SECRET: "" } })).status, 503);
+  for (const placeholder of ["CLOUDINARY_CLOUD_NAME", "cloudinary_cloud_name"]) {
+    const invalidEnv = { ...env, CLOUDINARY_CLOUD_NAME: placeholder };
+    assert.equal(cloudinarySettings(invalidEnv), null);
+    const response = await handleVendorMedia(request(signInput), { ...guarded, env: invalidEnv });
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /actual Cloudinary cloud name, not the variable label/);
+  }
+  assert.equal(opened, 0);
   for (const change of [{ revision: 2 }, { productId: 99 }]) {
     assert.equal((await handleVendorMedia(request({ ...signInput, ...change }), options)).status, 409);
   }

@@ -3,6 +3,7 @@ import { validMedia, MEDIA_FORMATS, MEDIA_LIMITS } from "../../vendor-app/media-
 
 export function cloudinarySettings(env) {
   if (!/^[a-z0-9_-]{1,64}$/i.test(env.CLOUDINARY_CLOUD_NAME ?? "") ||
+      /^CLOUDINARY_CLOUD_NAME$/i.test(env.CLOUDINARY_CLOUD_NAME ?? "") ||
       !/^\d{5,30}$/.test(env.CLOUDINARY_API_KEY ?? "") ||
       typeof env.CLOUDINARY_API_SECRET !== "string" || env.CLOUDINARY_API_SECRET.length < 16 ||
       !/^[a-z0-9_-]{1,100}$/i.test(env.CLOUDINARY_UPLOAD_PRESET ?? "")) return null;
