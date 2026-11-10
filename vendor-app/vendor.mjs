@@ -75,6 +75,7 @@ function clearPrivateView() {
   $("account").hidden = true;
   $("account-email").textContent = "";
   $("order-list").replaceChildren();
+  $("order-table-wrap").hidden = true;
   $("order-stats").hidden = true;
   $("pagination").hidden = true;
   $("detail-content").hidden = true;
@@ -698,6 +699,7 @@ async function loadOrders() {
   listController = new AbortController();
   const signal = AbortSignal.any([listController.signal, AbortSignal.timeout(25000)]);
   $("order-list").replaceChildren();
+  $("order-table-wrap").hidden = true;
   $("order-list").setAttribute("aria-busy", "true");
   $("order-stats").hidden = true;
   $("pagination").hidden = true;
@@ -724,21 +726,36 @@ async function loadOrders() {
     $("stat-value").textContent = money(result.stats.requestValue);
     $("order-stats").hidden = false;
     for (const order of result.orders) {
-      const card = element("article", undefined, "vendor-panel vendor-order-card");
-      const heading = element("div", undefined, "vendor-heading");
-      const status = element("span", order.status, "vendor-status");
-      status.dataset.status = order.status;
-      heading.append(element("h2", order.name), status);
-      const meta = element("div", undefined, "vendor-card-meta");
-      meta.append(element("span", order.fulfilment), element("strong", money(order.total)));
-      const button = element("button", "View request details");
+      const row = element("tr", undefined, "vendor-order-row");
+      const customer = element("th");
+      customer.scope = "row";
+      const button = element("button", undefined, "vendor-order-open");
+      button.id = `order-open-${order.orderId}`;
       button.type = "button";
       button.setAttribute("aria-label", `View request for ${order.name}, ${order.orderId}`);
+      button.setAttribute("aria-haspopup", "dialog");
+      const customerText = element("span");
+      customerText.append(element("span", order.name), element("small", order.phone));
+      button.append(customerText);
       button.addEventListener("click", () => openDetails(order.orderId));
-      card.append(heading, element("p", order.orderId, "vendor-request-id"),
-        element("p", orderTime(order.createdAt), "vendor-muted"), element("p", order.phone), meta, button);
-      $("order-list").append(card);
+      customer.append(button);
+      const request = element("td", undefined, "vendor-order-secondary");
+      request.append(element("p", order.orderId, "vendor-request-id"),
+        element("p", orderTime(order.createdAt), "vendor-muted"));
+      const status = element("span", order.status, "vendor-status");
+      status.dataset.status = order.status;
+      const statusCell = element("td");
+      statusCell.append(status);
+      row.append(customer, request, element("td", order.fulfilment, "vendor-order-secondary"),
+        statusCell, element("td", money(order.total), "vendor-order-total"));
+      row.addEventListener("click", event => {
+        if (event.target.closest("button")) return;
+        button.focus({ preventScroll: true });
+        openDetails(order.orderId);
+      });
+      $("order-list").append(row);
     }
+    $("order-table-wrap").hidden = result.orders.length === 0;
     notice("list-message", total ? `${total} matching request${total === 1 ? "" : "s"}. Latest requests first.` :
       filters.query || filters.status ? "No requests match these filters. Clear the filters to see all requests." :
         "No order requests yet. Recorded customer requests will appear here.");
@@ -970,6 +987,7 @@ $("commit-import").addEventListener("click", () => submitImport(true));
 $("close-details").addEventListener("click", () => $("order-dialog").close());
 $("order-dialog").addEventListener("cancel", event => { if (saving) event.preventDefault(); });
 $("order-dialog").addEventListener("close", () => {
+  const trigger = $(`order-open-${detailId}`);
   detailVersion++;
   detailController?.abort();
   selected = null;
@@ -978,6 +996,7 @@ $("order-dialog").addEventListener("close", () => {
   $("detail-customer").replaceChildren();
   $("detail-amounts").replaceChildren();
   $("detail-items").textContent = "";
+  if (session) (trigger ?? $("refresh-orders")).focus({ preventScroll: true });
 });
 $("reload-detail").addEventListener("click", () => openDetails(detailId));
 $("detail-status").addEventListener("change", () => {

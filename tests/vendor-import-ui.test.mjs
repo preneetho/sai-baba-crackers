@@ -18,6 +18,19 @@ const result = {
   statusCounts: { Completed: 1 }, unverifiedSourceHashes: 0,
 };
 const tick = () => new Promise(resolve => setImmediate(resolve));
+const sampleOrder = {
+  orderId: "SBC-00000000-0000-4000-8000-000000000001", createdAt: "2026-11-10T05:30:00.000Z",
+  status: "New", name: "<script>Synthetic customer</script>", phone: "9876543210", fulfilment: "Pickup",
+  total: 85, subtotal: 100, discountPercent: 15, discount: 15, deliveryCharge: 0,
+  address: "Synthetic address", preferredDate: "", items: "Synthetic product x 1", notes: "",
+};
+function orderListing(orders = [], page = 1) {
+  return {
+    orders: orders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total: orders.length, page,
+    stats: { requestValue: orders.filter(order => order.status !== "Cancelled").reduce((sum, order) => sum + order.total, 0),
+      ...Object.fromEntries(ORDER_STATUSES.map(status => [status, orders.filter(order => order.status === status).length])) },
+  };
+}
 async function harness() {
   const nodes = new Map();
   let focused;
@@ -61,8 +74,8 @@ async function harness() {
     focus() { focused = this; }
     scrollIntoView() { this.scrolled = true; }
     getBoundingClientRect() { return { height: this.height ?? 0 }; }
-    close() {}
-    showModal() {}
+    close() { this.open = false; }
+    showModal() { this.open = true; }
     pause() { this.paused = true; }
     load() { this.unloaded = true; }
   }
@@ -78,6 +91,7 @@ async function harness() {
   get("price-form").append(get("price-save-bar"), get("price-products"));
   get("price-save-bar").append(...["price-save-state", "price-view-message", "save-prices", "add-price-product"].map(get));
   const requests = [];
+  let respondOrders = async () => Response.json(orderListing());
   let respondImport = async () => new Response(JSON.stringify({
     ...result, previewed: true, rolledBack: true, receipt: "signed.preview",
   }));
@@ -108,10 +122,7 @@ async function harness() {
       if (path === "/api/vendor-auth/session") return new Response(JSON.stringify({
         email: "owner@example.com", csrf: "a".repeat(43), expiresAt: Date.now() + 600000,
       }));
-      if (path.startsWith("/api/vendor-orders")) return new Response(JSON.stringify({
-        orders: [], total: 0, page: 1,
-        stats: { requestValue: 0, ...Object.fromEntries(ORDER_STATUSES.map(status => [status, 0])) },
-      }));
+      if (path.startsWith("/api/vendor-orders")) return respondOrders(path, options);
       if (path === "/api/vendor-import" && !options.method) return new Response(JSON.stringify({
         enabled: true, maxFileBytes: 512000, message: "Owner-approved file only.",
       }));
@@ -136,6 +147,7 @@ async function harness() {
       resizeBar([{ target: get("price-save-bar") }]);
     },
     respond(callback) { respondImport = callback; },
+    respondOrders(callback) { respondOrders = callback; },
     respondPrice(callback) { respondPrice = callback; },
     respondMedia(callback) { respondMedia = callback; },
     transfer(callback) { transfer = callback; },
@@ -147,6 +159,127 @@ async function harness() {
     },
   };
 }
+
+test("order table rows open the existing details and keep status updates and focus restoration working", async () => {
+  const ui = await harness();
+  let order = { ...sampleOrder };
+  ui.respondOrders(async (path, options) => {
+    if (options.method === "POST") {
+      const body = JSON.parse(options.body);
+      assert.equal(body.orderId, order.orderId);
+      assert.equal(body.expectedStatus, "New");
+      assert.equal(body.status, "Confirmed");
+      order = { ...order, status: body.status };
+      return Response.json({ order });
+    }
+    return Response.json(path.includes("orderId=") ? { order } : orderListing([order]));
+  });
+  await ui.emit("refresh-orders");
+  assert.equal(ui.get("order-table-wrap").hidden, false);
+  const row = ui.get("order-list").children[0];
+  assert.equal(row.tagName, "TR");
+  assert.deepEqual(row.children.map(cell => cell.tagName), ["TH", "TD", "TD", "TD", "TD"]);
+  assert.equal(row.children[0].scope, "row");
+  const button = row.children[0].children[0];
+  assert.equal(button.type, "button");
+  assert.equal(button.getAttribute("aria-haspopup"), "dialog");
+  assert.match(button.getAttribute("aria-label"), new RegExp(order.orderId));
+  assert.equal(button.children[0].children[0].textContent, order.name);
+  assert.equal(button.children[0].children[1].textContent, order.phone);
+  assert.equal(row.children[1].children[0].textContent, order.orderId);
+  assert.match(row.children[1].children[1].textContent, /11:00 am IST$/i);
+  assert.equal(row.children[2].textContent, order.fulfilment);
+  assert.equal(row.children[3].children[0].dataset.status, "New");
+  assert.equal(row.children[4].textContent, "Rs.85.00");
+  row.events.get("click")({ target: { closest: () => null } });
+  await tick();
+  assert.equal(ui.focused, button);
+  assert.equal(ui.get("order-dialog").open, true);
+  assert.equal(ui.get("detail-items").textContent, order.items);
+  const detailReads = () => ui.requests.filter(request => request.path.includes("orderId=")).length;
+  assert.equal(detailReads(), 1);
+  row.events.get("click")({ target: { closest: () => button } });
+  assert.equal(detailReads(), 1);
+  ui.get("detail-status").value = "Confirmed";
+  await ui.emit("detail-status", "change");
+  assert.equal(ui.get("save-status").disabled, false);
+  await ui.emit("status-form", "submit");
+  assert.equal(ui.get("order-list").children[0].children[3].children[0].dataset.status, "Confirmed");
+  assert.match(ui.get("detail-message").textContent, /Status saved: Confirmed/);
+  await ui.emit("close-details");
+  await ui.emit("order-dialog", "close");
+  assert.equal(ui.focused, ui.get(button.id));
+  await ui.emit(button.id);
+  assert.equal(ui.get("order-dialog").open, true);
+  assert.equal(detailReads(), 2);
+});
+
+test("order table preserves filtering and pagination and clears customer rows on sign-out", async () => {
+  const ui = await harness();
+  const orders = Array.from({ length: PAGE_SIZE + 1 }, (_, index) => ({
+    ...sampleOrder, name: `Synthetic customer ${index + 1}`,
+    orderId: `SBC-00000000-0000-4000-8000-${(index + 1).toString(16).toUpperCase().padStart(12, "0")}`,
+  }));
+  ui.respondOrders(async path => {
+    const params = new URL(path, "https://vendor.example").searchParams;
+    const matches = orders.filter(order => (!params.get("query") || order.name.includes(params.get("query"))) &&
+      (!params.get("status") || order.status === params.get("status")));
+    return Response.json(orderListing(matches, Number(params.get("page"))));
+  });
+  await ui.emit("refresh-orders");
+  assert.equal(ui.get("order-list").children.length, PAGE_SIZE);
+  assert.equal(ui.get("pagination").hidden, false);
+  await ui.emit("next-page");
+  assert.equal(ui.get("order-list").children.length, 1);
+  assert.equal(ui.get("page-label").textContent, "Page 2 of 2");
+  assert.equal(ui.get("next-page").disabled, true);
+  ui.get("order-search").value = "customer 26";
+  ui.get("status-filter").value = "New";
+  await ui.emit("filter-form", "submit");
+  assert.equal(ui.get("page-label").textContent, "Page 1 of 1");
+  assert.equal(ui.get("order-list").children.length, 1);
+  assert.equal(ui.get("pagination").hidden, true);
+  assert.match(ui.requests.at(-1).path, /query=customer\+26&status=New&page=1/);
+  await ui.emit("clear-filters");
+  assert.equal(ui.get("order-list").children.length, PAGE_SIZE);
+  await ui.emit("sign-out");
+  assert.equal(ui.get("order-list").children.length, 0);
+  assert.equal(ui.get("order-table-wrap").hidden, true);
+  assert.equal(ui.get("dashboard").hidden, true);
+});
+
+test("order table hides stale rows during loading, empty results, errors and expired access", async () => {
+  const ui = await harness();
+  assert.equal(ui.get("order-table-wrap").hidden, true);
+  assert.match(ui.get("list-message").textContent, /No order requests yet/);
+  ui.respondOrders(async () => Response.json(orderListing([sampleOrder])));
+  await ui.emit("refresh-orders");
+  let finish;
+  ui.respondOrders(() => new Promise(resolve => { finish = resolve; }));
+  const pending = ui.emit("refresh-orders");
+  assert.equal(ui.get("order-table-wrap").hidden, true);
+  assert.equal(ui.get("order-list").children.length, 0);
+  assert.equal(ui.get("order-list").getAttribute("aria-busy"), "true");
+  finish(Response.json({ error: "Synthetic order outage" }, { status: 503 }));
+  await pending;
+  assert.equal(ui.get("order-table-wrap").hidden, true);
+  assert.equal(ui.get("order-list").getAttribute("aria-busy"), "false");
+  assert.equal(ui.get("retry-orders").hidden, false);
+  assert.match(ui.get("list-message").textContent, /Synthetic order outage/);
+  ui.respondOrders(async () => Response.json(orderListing()));
+  await ui.emit("retry-orders");
+  assert.equal(ui.get("retry-orders").hidden, true);
+  assert.equal(ui.get("order-table-wrap").hidden, true);
+  assert.equal(ui.get("list-message").dataset.error, "false");
+  ui.respondOrders(async () => Response.json(orderListing([sampleOrder])));
+  await ui.emit("refresh-orders");
+  ui.respondOrders(async () => Response.json({ error: "Session expired" }, { status: 401 }));
+  await ui.emit("refresh-orders");
+  assert.equal(ui.get("order-table-wrap").hidden, true);
+  assert.equal(ui.get("order-list").children.length, 0);
+  assert.equal(ui.get("dashboard").hidden, true);
+  assert.match(ui.get("access-message").textContent, /Session expired/);
+});
 
 test("vendor uploads remain drafts, require explicit save and retain descriptions, credits, cover order and removal", async () => {
   const ui = await harness();

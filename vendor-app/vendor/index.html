@@ -93,7 +93,19 @@
       </div>
       <p id="list-message" class="vendor-notice" role="status" aria-live="polite"></p>
       <button id="retry-orders" type="button" hidden>Retry loading requests</button>
-      <div id="order-list" class="vendor-order-list" aria-label="Order requests" aria-busy="false"></div>
+      <div id="order-table-wrap" class="vendor-order-table-wrap" hidden>
+        <table class="vendor-order-table">
+          <caption class="sr-only">Order requests, latest first. Select a customer to view full details and update status.</caption>
+          <thead><tr>
+            <th scope="col">Customer</th>
+            <th scope="col" class="vendor-order-secondary">Request / recorded</th>
+            <th scope="col" class="vendor-order-secondary">Fulfilment</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="vendor-order-total">Estimated total</th>
+          </tr></thead>
+          <tbody id="order-list" aria-busy="false"></tbody>
+        </table>
+      </div>
       <div id="pagination" class="vendor-pagination" hidden>
         <button id="previous-page" type="button">Previous page</button>
         <span id="page-label"></span>

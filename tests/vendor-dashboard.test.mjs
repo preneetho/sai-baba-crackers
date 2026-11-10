@@ -374,6 +374,11 @@ test("dashboard uses safe text rendering, no browser persistence and independent
   assert.match(html, /Sign in with Google/);
   assert.match(html, /role="status"/);
   assert.match(html, /<dialog[^>]+aria-labelledby="detail-title"/);
+  const table = html.match(/<table class="vendor-order-table">([\s\S]*?)<\/table>/)?.[1];
+  assert.ok(table);
+  assert.match(table, /<caption class="sr-only">Order requests/);
+  assert.equal((table.match(/scope="col"/g) ?? []).length, 5);
+  assert.match(table, /<tbody id="order-list" aria-busy="false"><\/tbody>/);
   assert.doesNotMatch(app, /innerHTML|localStorage|sessionStorage/);
   assert.match(app, /textContent/);
   assert.match(app, /expectedStatus: selected.status/);

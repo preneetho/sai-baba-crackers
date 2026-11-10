@@ -96,7 +96,13 @@ non-production Sheet for testing rather than copying production access.
 3. Search by customer name, phone or request ID. Apply a status filter.
    Pages contain 25 requests, newest recorded first. **Refresh requests** checks
    for new requests; the dashboard does not poll automatically.
+   Requests appear in a compact table showing customer/mobile, reference and IST
+   timestamp, fulfilment, status and estimated total. On narrow screens the
+   reference/timestamp and fulfilment columns move out of the summary; all remain
+   available in request details.
 4. Open a request, choose a different status, and click **Save status**.
+   Select the customer name (Enter/Space also works) or click anywhere on its row
+   to open the existing details and actions.
    Only column C changes. If another vendor changed it since you opened it,
    the save is rejected; reload before deciding the next status.
 5. Verify that an unchanged customer submission retry still retains the
