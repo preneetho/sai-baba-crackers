@@ -15,6 +15,18 @@
 [functions.orders]
   included_files = ["netlify/assets/fonts/**"]
 
+[[redirects]]
+  from = "/index.html"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/order/index.html"
+  to = "/order/"
+  status = 301
+  force = true
+
 [[headers]]
   for = "/*"
   [headers.values]

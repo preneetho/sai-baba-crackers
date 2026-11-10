@@ -1,6 +1,7 @@
 # Sai Baba Crackers Centre
 
-Mobile-friendly yearly catalogue, initially seeded with the 68 original 2026 products, a saved cart, an automatic
+An evergreen Hyderabad marketing homepage and mobile-friendly yearly catalogue,
+initially seeded with the 68 original 2026 products, a saved cart, an automatic
 15% discount, free home delivery or store pickup, and a customer-reviewed
 order request including the customer's name, mobile number and address.
 Order requests are saved to the vendor's private order register before WhatsApp is prepared.
@@ -13,6 +14,51 @@ Netlify Database when explicitly configured. Server-only npm dependencies
 use private Netlify Blobs and retain PDF support for older cached checkout pages.
 No frontend dependencies, customer accounts or payments are required.
 
+## Public homepage and catalogue
+
+`/` is the static marketing homepage for Sai Baba Crackers Centre in Sanathnagar,
+Hyderabad. It describes wedding/function, festival and bulk product requirements,
+delivery subject to confirmation, store pickup, phone-based event enquiries,
+FAQs and the existing address/phone numbers. It uses the existing blue/gold brand
+and lightweight illustrative artwork, not invented shop photos or testimonials.
+Opening hours and year-round stock are intentionally not promised.
+
+The existing catalogue, saved cart, checkout and WhatsApp flow are at `/order/`;
+the vendor dashboard stays at `/vendor/`. Root-relative assets keep the nested
+catalogue working. Old `/#catalogue`, `/#requirement`, `/#products`, `/#search`
+and `/#checkout` bookmarks redirect in the browser to the corresponding
+`/order/` fragment, retaining query strings and the same origin's saved cart.
+The homepage also preserves the existing telemetry invitation/recovery callback.
+Netlify redirects `/index.html` and `/order/index.html` to their canonical
+public routes. Keep Netlify's default Pretty URLs enabled to normalize `/order`
+to `/order/`; do not add slash-only redirect rules, which can loop after CDN
+normalization. The local preview mirrors these canonical routes. No catch-all rewrite
+intercepts APIs, authentication callbacks or private request pages.
+
+Both public pages have canonical/social metadata. The homepage contains static
+`Store` JSON-LD matching its visible contact details; no ratings, opening hours,
+coordinates or licence claims are invented. `robots.txt` links to `sitemap.xml`,
+which contains only `/` and `/order/`. Vendor/telemetry pages and private request
+copies retain their no-index protections. Robots directives are not access control.
+Anonymous shopping telemetry remains in the catalogue; the homepage does not add
+tracking or collect a new enquiry form.
+
+Before public release, confirm the vendor's current licensing and the applicable
+rules for online fireworks requests/sales, transport and Hyderabad delivery.
+An enquiry label is not an exemption or legal clearance. Verify seasonal stock,
+the existing 35-year history claim, the address and phone ownership. The Google
+Maps link is an address search, not a verified Business Profile or precise pin.
+Confirm Business Profile eligibility separately; do not repurpose the printing
+business's listing. Google Ads restricts firecracker advertising; this is organic
+website SEO work, not an ads campaign or a ranking guarantee.
+
+After a Git-connected deployment, submit the sitemap in Google Search Console
+and claim/verify an eligible, accurate Google Business Profile. A custom domain
+is optional: when changing domains, update canonical/OG/Twitter/JSON-LD URLs in
+both HTML pages, `robots.txt`, `sitemap.xml` and applicable server origin settings
+together. No Google account ownership, Search Console verification or domain
+registration is performed by these source changes.
+
 ## Local preview
 
 With Node.js 22.12 or later:
@@ -24,8 +70,9 @@ npm.cmd run dev
 npm.cmd test
 ```
 
-Open <http://127.0.0.1:4173>. Install the isolated server dependencies as shown above.
-Order submission requires a configured order backend. The database tests run
+Open <http://127.0.0.1:4173> for the homepage or
+<http://127.0.0.1:4173/order/> for the catalogue. Install the isolated server dependencies as shown above.
+Catalogue loading and order submission require a configured order backend. The database tests run
 against an isolated embedded PostgreSQL engine with synthetic data and need no
 Netlify account, hosted database or credits.
 

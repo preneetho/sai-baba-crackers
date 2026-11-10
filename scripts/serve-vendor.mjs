@@ -20,6 +20,12 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 const files = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
   ["/index.html", ["index.html", "text/html; charset=utf-8"]],
+  ["/order/", ["order/index.html", "text/html; charset=utf-8"]],
+  ["/home.css", ["home.css", "text/css; charset=utf-8"]],
+  ["/home.mjs", ["home.mjs", "text/javascript; charset=utf-8"]],
+  ["/auth-callback.mjs", ["auth-callback.mjs", "text/javascript; charset=utf-8"]],
+  ["/robots.txt", ["robots.txt", "text/plain; charset=utf-8"]],
+  ["/sitemap.xml", ["sitemap.xml", "application/xml; charset=utf-8"]],
   ["/vendor", ["vendor/index.html", "text/html; charset=utf-8"]],
   ["/vendor/", ["vendor/index.html", "text/html; charset=utf-8"]],
   ["/vendor/index.html", ["vendor/index.html", "text/html; charset=utf-8"]],
@@ -49,8 +55,11 @@ const server = createServer(async (request, response) => {
   response.setHeader("Referrer-Policy", "no-referrer");
   response.setHeader("Cache-Control", "no-store");
   let pathname;
+  let search;
   try {
-    pathname = new URL(request.url, "http://localhost").pathname;
+    const url = new URL(request.url, "http://localhost");
+    pathname = url.pathname;
+    search = url.search;
   } catch {
     response.writeHead(400);
     response.end("Invalid URL");
@@ -90,6 +99,14 @@ const server = createServer(async (request, response) => {
     }
     return;
   }
+  const redirect = pathname === "/index.html" ? "/" :
+    pathname === "/order" || pathname === "/order/index.html" ? "/order/" : null;
+  if (redirect) {
+    response.writeHead(301, { Location: `${redirect}${search}` });
+    response.end();
+    return;
+  }
+  if (pathname.startsWith("/vendor/")) response.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.writeHead(405, { Allow: "GET, HEAD" });
     response.end("Method not allowed");

@@ -265,7 +265,7 @@ test("all product numbers share the original plain top-left label styling withou
   assert.doesNotMatch(label, /(?:border|background|padding)\s*:/);
   assert.doesNotMatch(css, /\.media-cover-number/);
   assert.doesNotMatch(css, /\.media-cover-play/);
-  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   assert.doesNotMatch(html, /id="media-icon-play"/);
 });
 

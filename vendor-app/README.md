@@ -1,4 +1,4 @@
-# Sai Baba Crackers Centre catalogue
+# Sai Baba Crackers Centre website and catalogue
 
 A standalone, mobile-friendly enquiry app with a static frontend, a Netlify
 order-recording function and a configurable Google Sheets or Netlify Database integration. No frontend
@@ -14,6 +14,20 @@ For isolated Netlify Database development, follow the
 [database setup](../README.md#netlify-database-development). Sheets remains the
 default; no 2026 orders are imported or modified automatically.
 
+## Public pages
+
+`index.html` is the evergreen marketing homepage at `/`, styled by `home.css`
+on top of the existing brand styles. It includes services, conditional Hyderabad
+delivery, store pickup, phone enquiries for events, native FAQ disclosures and
+contact/directions links. It works without JavaScript; `home.mjs` only preserves
+old catalogue/cart fragments and the existing authentication callback.
+
+The unchanged shopping flow now lives in `order/index.html` at `/order/`, with
+root-relative assets. The saved-cart key, pricing, checkout, APIs and private
+vendor/request routes are unchanged. Link to `/order/` for the catalogue and to
+`/` for the business homepage. See the [public-page guide](../README.md#public-homepage-and-catalogue)
+for SEO, old-bookmark handling, privacy and pre-launch checks.
+
 ## Run
 
 From the repository root, using Node.js 22.12 or later:
@@ -24,9 +38,10 @@ npm.cmd ci --prefix netlify
 npm.cmd run vendor:dev
 ```
 
-Open <http://127.0.0.1:4173>. Set `VENDOR_PORT` to choose another port.
+Open <http://127.0.0.1:4173> for the homepage or
+<http://127.0.0.1:4173/order/> for the catalogue. Set `VENDOR_PORT` to choose another port.
 The preview binds to loopback only; it is not a public deployment.
-Catalogue and cart work without credentials. Saving a requirement needs the
+The homepage works without credentials. Catalogue loading and saving a requirement need the
 order backend configuration described in the setup guides; missing configuration is reported
 explicitly and never treated as a saved order.
 
@@ -42,7 +57,8 @@ npm.cmd run vendor:test
   fractional feet notation; product 63 is the 1 1/4 inch Comet.
 - `vendor.whatsapp` defaults to **919849293951**, the first number on the PDF,
   not a verified WhatsApp account. Confirm ownership and WhatsApp availability.
-  Update the phone links in `index.html` too if either shop number changes.
+  Update the phone links and business JSON-LD in `index.html`, and the phone
+  links in `order/index.html`, too if either shop number changes.
 - Confirm actual delivery and pickup arrangements and any local restrictions.
   Customers explicitly choose **free home delivery** or **store pickup**.
   The vendor confirms delivery service area, availability and timing.
@@ -59,7 +75,7 @@ npm.cmd run vendor:test
 
 The app uses a blue theme across the catalogue, cart, checkout and mobile controls,
 with gold accents for the festive artwork. Shared colours are defined in
-`styles.css`; the browser theme colour in `index.html` matches the brand.
+`styles.css`; both pages' browser theme colours match the brand.
 The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon.
 The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
 experience, the 15% discount and delivery/pickup options. Delivery area and timing
@@ -93,17 +109,19 @@ not the Sai Baba portrait used in the header and favicon. The editable artwork i
 artwork centres the crackers and has no embedded text, keeping it recognisable
 in WhatsApp's small square thumbnails instead of cropping a wide banner.
 Open Graph and square Twitter summary-card tags are included directly in
-`index.html`, so crawlers do not need to run JavaScript. Keep the image publicly
+`index.html` and `order/index.html`, with distinct homepage and catalogue URLs,
+so crawlers do not need to run JavaScript. Keep the image publicly
 accessible. The older wide image is retained for previously cached image URLs.
 
 The metadata uses the deployed site's absolute HTTPS URL,
-`https://saibabacrackers.netlify.app/`. Update the metadata URLs if the domain
-changes. Deploy the HTML and PNG together through the Git-connected Netlify site;
+`https://saibabacrackers.netlify.app/`. If the domain changes, update metadata in
+both HTML pages, business JSON-LD, `robots.txt` and `sitemap.xml` together.
+Deploy the HTML and PNG together through the Git-connected Netlify site;
 this image change does not require updating Apps Script or environment variables.
 
 WhatsApp may cache previews independently of Netlify. After deployment, check the
 public PNG URL and try sharing a fresh URL such as
-`https://saibabacrackers.netlify.app/?share=diwali-square-v2` if the original link still
+`https://saibabacrackers.netlify.app/order/?share=diwali-square-v2` if the catalogue link still
 shows the old portrait. A fresh query can trigger a new fetch, but cache refresh
 timing and card layout are controlled by WhatsApp. This change cannot force a
 full-width preview or update images already shown in existing messages.

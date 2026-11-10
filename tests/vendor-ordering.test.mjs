@@ -16,7 +16,7 @@ const customer = {
 const today = "2026-11-02";
 
 test("shopping, cart and checkout use familiar ecommerce labels without implying confirmation", async () => {
-  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   assert.match(html, /<a class="header-cart" href="#requirement">Cart /);
   assert.match(html, /id="requirement-title">Your cart<\/h2>/);
   assert.match(html, /id="mobile-cart"[^>]*>[\s\S]*?<span>View cart &#8594;<\/span><\/a>/);
@@ -29,7 +29,7 @@ test("shopping, cart and checkout use familiar ecommerce labels without implying
 });
 
 test("the store-pickup option displays the collection address without preselecting fulfilment", async () => {
-  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   const pickup = html.match(/<label class="fulfilment-option"><input id="fulfilment-pickup"[\s\S]*?<\/label>/)?.[0];
   assert.ok(pickup);
   assert.match(pickup, /value="pickup" required/);
@@ -40,7 +40,7 @@ test("the store-pickup option displays the collection address without preselecti
 });
 
 test("the WhatsApp action explicitly explains the customer's final Send step", async () => {
-  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   assert.match(html, /id="submit-requirement"[^>]*aria-describedby="whatsapp-send-help">Send order request via WhatsApp<\/button>/);
   assert.match(html, /id="whatsapp-send-help"[^>]*><strong>Tap Send in WhatsApp to finish\.<\/strong><br>Opening the chat alone does not send your order request\./);
@@ -50,7 +50,7 @@ test("the WhatsApp action explicitly explains the customer's final Send step", a
 });
 
 test("the active checkout uses one WhatsApp message and retains the complete request for copy/download", async () => {
-  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   assert.match(app, /prepareOrderMessage\(result\.summary\)/);
   assert.match(app, /link\.target = "_self"/);
@@ -73,7 +73,7 @@ test("long-cart totals and checkout product names can wrap on narrow screens", a
 });
 
 test("WhatsApp recovery reuses the prepared details-link summary and offers a phone-only chat without resubmitting", async () => {
-  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   assert.match(html, /id="whatsapp-recovery"[^>]*>[\s\S]*?<summary>WhatsApp closed or did not open\?<\/summary>/);
   assert.match(html, /id="copy-whatsapp-message"[^>]*type="button"/);
@@ -88,7 +88,7 @@ test("WhatsApp recovery reuses the prepared details-link summary and offers a ph
 });
 
 test("clear cart is available above and below the cart items", async () => {
-  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   assert.match(html, /<button id="clear-cart-top" class="text-button" type="button" hidden>Clear cart<\/button>/);
   assert.match(html, /<button id="clear-cart" class="text-button" type="button" hidden>Clear cart<\/button>/);
   assert.ok(html.indexOf('id="clear-cart-top"') < html.indexOf('id="cart-items"'));
@@ -96,8 +96,8 @@ test("clear cart is available above and below the cart items", async () => {
 });
 
 test("the header uses only a lightweight static fireworks image", async () => {
-  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
-  assert.match(html, /<img class="hero-fireworks" src="\.\/diwali-fireworks\.png" alt="" width="420" height="340"/);
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
+  assert.match(html, /<img class="hero-fireworks" src="\/diwali-fireworks\.png" alt="" width="420" height="340"/);
   assert.doesNotMatch(html, /<video\b|fireworks-toggle|\.gif\b|\.mp4\b/);
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(app, /initializeFireworks|hero-fireworks\.mjs/);
@@ -312,20 +312,20 @@ test("legacy GIF URLs retain a small finite animation and matching fallback", as
 });
 
 test("social previews use a square Diwali PNG without changing the website logo", async () => {
-  const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   const metadata = new Map([...html.matchAll(/<meta (?:property|name)="([^"]+)" content="([^"]*)"[^>]*>/g)]
     .map(([, name, content]) => [name, content]));
   const image = new URL(metadata.get("og:image"));
   assert.equal(image.href, "https://saibabacrackers.netlify.app/diwali-crackers-square.png");
-  assert.equal(metadata.get("og:url"), "https://saibabacrackers.netlify.app/");
+  assert.equal(metadata.get("og:url"), "https://saibabacrackers.netlify.app/order/");
   assert.equal(metadata.get("og:type"), "website");
   assert.equal(metadata.get("og:image:type"), "image/png");
   assert.equal(metadata.get("twitter:card"), "summary");
   assert.equal(metadata.get("twitter:image"), image.href);
   assert.ok(metadata.get("og:image:alt").includes("Diwali crackers"));
   assert.equal(metadata.get("twitter:image:alt"), metadata.get("og:image:alt"));
-  assert.match(html, /<img class="brand-mark" src="\.\/sai-baba-logo\.png"/);
-  assert.match(html, /<link rel="icon" type="image\/png" href="\.\/sai-baba-logo\.png"/);
+  assert.match(html, /<img class="brand-mark" src="\/sai-baba-logo\.png"/);
+  assert.match(html, /<link rel="icon" type="image\/png" href="\/sai-baba-logo\.png"/);
   const png = await readFile(new URL(`../vendor-app${image.pathname}`, import.meta.url));
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.equal(png.toString("ascii", 12, 16), "IHDR");
