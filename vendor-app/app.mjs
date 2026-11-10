@@ -192,7 +192,7 @@ function renderProducts() {
     card.dataset.id = product.id;
     const hasMedia = Boolean(product.media?.length);
     const art = element(hasMedia ? "button" : "div", `product-art art-${categories.indexOf(product.category) % 4}${hasMedia ? " media-cover" : ""}`);
-    const number = element("span", hasMedia ? "media-cover-number" : "product-number", `NO. ${String(product.id).padStart(2, "0")}`);
+    const number = element("span", "product-number", `NO. ${String(product.id).padStart(2, "0")}`);
     number.setAttribute("aria-hidden", "true");
     if (hasMedia) {
       art.type = "button";

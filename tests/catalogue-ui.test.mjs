@@ -104,7 +104,7 @@ test("customer media covers and gallery preserve cart controls, render credits s
   assert.equal(cover.children.some(child => child.className === "media-cover-caption"), false);
   assert.equal(cover.children.filter(child => child.className?.includes("media-cover-icon")).length, 1);
   assert.equal(cover.children[1].getAttribute("aria-hidden"), "true");
-  assert.equal(cover.children.find(child => child.className === "media-cover-number").textContent, "NO. 01");
+  assert.equal(cover.children.find(child => child.className === "product-number").textContent, "NO. 01");
   assert.match(cover.getAttribute("aria-label"), /product 1$/);
   await cover.events.get("click")();
   assert.equal(ui.get("#product-media-dialog").open, true);
@@ -137,7 +137,7 @@ test("customer media covers and gallery preserve cart controls, render credits s
   assert.match(cover.children.find(child => child.className === "media-cover-error").textContent, /Preview unavailable/);
   assert.match(cover.getAttribute("aria-label"), /Preview unavailable.*View photos/);
   assert.equal(cover.children.filter(child => child.className?.includes("media-cover-icon")).length, 1);
-  assert.equal(cover.children.find(child => child.className === "media-cover-number").textContent, "NO. 01");
+  assert.equal(cover.children.find(child => child.className === "product-number").textContent, "NO. 01");
 });
 
 test("photo-only covers have one expand icon without a video badge or caption", async () => {
@@ -224,13 +224,15 @@ test("product numbers remain stable on photo, uploaded-video, YouTube and icon c
   await ui.emit("#reload-catalogue", "click");
   for (const [index, card] of ui.get("#products").children.entries()) {
     const cover = card.children[0];
-    const badge = cover.children.find(node => ["media-cover-number", "product-number"].includes(node.className));
+    const badge = cover.children.find(node => node.className === "product-number");
+    assert.ok(badge);
+    assert.equal(cover.children.filter(node => node.className === "product-number").length, 1);
     assert.equal(badge.textContent, `NO. ${rows[index].id}`);
     if (index < 3) {
       assert.equal(cover.children.some(node => node.className?.includes("media-cover-play")), false);
       assert.equal(cover.children.filter(node => node.className?.includes("media-cover-icon")).length, 1);
       cover.children[0].events.get("error")();
-      assert.equal(cover.children.find(node => node.className === "media-cover-number"), badge);
+      assert.equal(cover.children.find(node => node.className === "product-number"), badge);
       assert.equal(cover.children.some(node => node.className?.includes("media-cover-play")), false);
       assert.equal(cover.children.filter(node => node.className?.includes("media-cover-icon")).length, 1);
     }
@@ -240,12 +242,17 @@ test("product numbers remain stable on photo, uploaded-video, YouTube and icon c
   assert.equal(ui.get("#products").children[0].children[0].children.at(-1).textContent, "NO. 11");
 });
 
-test("media number badges use the leading corner without the removed play overlay", async () => {
+test("all product numbers share the original plain top-left label styling without media badges", async () => {
   const css = await readFile(new URL("../vendor-app/styles.css", import.meta.url), "utf8");
-  const badge = css.match(/\.media-cover-number\s*\{([^}]+)\}/)?.[1];
-  assert.ok(badge);
-  assert.match(badge, /inset-inline-start:\s*8px/);
-  assert.doesNotMatch(badge, /inset-inline-end/);
+  const label = css.match(/\.product-number\s*\{([^}]+)\}/)?.[1];
+  assert.ok(label);
+  assert.match(label, /top:\s*12px/);
+  assert.match(label, /left:\s*12px/);
+  assert.match(label, /font-size:\s*8px/);
+  assert.match(label, /letter-spacing:\s*1\.4px/);
+  assert.match(label, /color:\s*var\(--muted\)/);
+  assert.doesNotMatch(label, /(?:border|background|padding)\s*:/);
+  assert.doesNotMatch(css, /\.media-cover-number/);
   assert.doesNotMatch(css, /\.media-cover-play/);
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
   assert.doesNotMatch(html, /id="media-icon-play"/);

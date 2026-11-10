@@ -215,8 +215,9 @@ gallery's **Watch on YouTube** fallback or replace the link. The app validates
 the link, not the video's availability, ownership or embedding permission.
 Without media, existing category/name icons remain. Preview errors offer retry
 or the icon fallback without blocking quantity controls or checkout.
-Product numbers remain visible on photo/video covers and preview-error
-fallbacks as compact top-left thumbnail badges, without a separate caption strip.
+Product numbers use the same plain top-left label on every card, including
+photo/video covers and preview-error fallbacks, with no badge border, background
+or separate caption strip.
 
 **Retention and privacy:** Files use public Cloudinary delivery, even before
 their draft is saved. Upload only permitted product media, never customer data
