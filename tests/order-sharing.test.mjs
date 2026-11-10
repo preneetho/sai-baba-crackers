@@ -6,6 +6,9 @@ import { handleVendorOrderShare, config as createConfig } from "../netlify/funct
 import { handleOrderShare, config as pageConfig } from "../netlify/functions/order-share.mjs";
 import { config as cleanupConfig } from "../netlify/functions/expire-order-shares.mjs";
 import { SHARE_TTL_MS, shareKey, saveOrderShare, readOrderShare, removeExpiredOrderShares } from "../netlify/lib/order-shares.mjs";
+import { handleOrderRequest } from "../netlify/functions/orders.mjs";
+import { products } from "../vendor-app/catalog.mjs";
+import { validateOrderShareLink, whatsappUrl, MAX_WHATSAPP_URL_LENGTH } from "../vendor-app/order.mjs";
 
 const origin = "https://vendor.example";
 const now = new Date("2026-11-10T07:00:00.000Z");
@@ -283,4 +286,183 @@ test("invalid, missing, expired and failed page lookups have explicit private-da
     assert.equal(response.status, status);
     assert.ok(!(await response.text()).includes(order.phone));
   }
+});
+
+const checkout = {
+  requestId: "00000000-0000-4000-8000-000000000001",
+  catalogue: { year: 2026, revision: 1 }, cart: { 1: 1 }, consent: true, shareConsent: true,
+  customer: {
+    name: "Synthetic Customer", phone: "9876543210", address: "Synthetic address only",
+    fulfilment: "pickup", preferredDate: "", notes: "",
+  },
+};
+function checkoutRequest(input = checkout) {
+  return new Request(`${origin}/api/orders`, {
+    method: "POST", headers: { Origin: origin, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+function checkoutBackend(save, overrides = {}) {
+  return {
+    env, now: () => now,
+    databaseFactory: async () => ({
+      catalogueVersion: async () => ({ year: 2026, revision: 1, products }),
+      save,
+    }),
+    ...overrides,
+  };
+}
+
+test("small and large submissions prepare name, amount and a full-details web link only after Database or Sheets acknowledges saving", async () => {
+  for (const database of [true, false]) {
+    for (const large of [false, true]) {
+      const store = memoryStore();
+      const input = {
+        ...checkout, ...(large ? {
+          cart: Object.fromEntries(products.map(product => [product.id, 99])),
+          customer: { ...checkout.customer, name: String.fromCharCode(0x800).repeat(80),
+            address: "A".repeat(500), notes: "N".repeat(500), fulfilment: "delivery" },
+        } : {}),
+      };
+      let recorded;
+      const acknowledge = value => {
+        recorded = structuredClone(value);
+        assert.equal(store.writes, 0);
+        return { ok: true, orderId: value.orderId, createdAt: value.createdAt };
+      };
+      const options = checkoutBackend(acknowledge, {
+        saveShare: (args, timing) => {
+          assert.ok(recorded);
+          return saveOrderShare(args, { store, ...timing });
+        },
+        savePdf: () => { throw new Error("Web-link submissions must not generate a PDF"); },
+        ...(database ? {} : {
+          env: { ...env, ORDER_BACKEND: "sheets",
+            GOOGLE_SHEETS_WEBHOOK_URL: "https://script.google.com/macros/s/test/exec",
+            ORDER_TRACKING_SECRET: "synthetic-sheet-secret-".repeat(3) },
+          fetchImpl: async (_, options) => Response.json(acknowledge(JSON.parse(options.body).order)),
+        }),
+      });
+      const response = await handleOrderRequest(checkoutRequest(input), options);
+      assert.equal(response.status, 200);
+      const result = await response.json();
+      assert.equal(result.pdf, undefined);
+      assert.equal(result.share.orderId, recorded.orderId);
+      validateOrderShareLink(result.share, origin, recorded.orderId, now.getTime());
+      assert.ok(result.summary.includes(`Customer: ${input.customer.name}`));
+      assert.ok(result.summary.includes(`Estimated total: Rs.${recorded.amounts.total.toFixed(2)}`));
+      assert.ok(result.summary.includes(`Mobile: +91 ${input.customer.phone}`));
+      assert.ok(result.summary.includes(result.share.url));
+      assert.ok(!result.summary.includes("#1 "));
+      assert.ok(!result.summary.includes(input.customer.address));
+      assert.ok(whatsappUrl(result.summary).length <= MAX_WHATSAPP_URL_LENGTH);
+      const snapshot = (await readOrderShare(tokenOf(result.share), { store, now: () => now })).snapshot;
+      assert.equal(snapshot.source, "submission");
+      assert.equal(snapshot.order.createdAt, recorded.createdAt);
+      assert.equal(snapshot.order.name, input.customer.name);
+      assert.equal(snapshot.order.address, input.customer.address);
+      assert.equal(snapshot.order.notes, input.customer.notes);
+      assert.equal(snapshot.order.total, recorded.amounts.total);
+      assert.equal(snapshot.order.status, "New");
+      assert.equal(snapshot.order.fingerprint, undefined);
+      for (const item of recorded.items) {
+        assert.ok(snapshot.order.items.includes(`#${item.id} ${item.name} | ${item.brand}`));
+        assert.ok(snapshot.order.items.includes(`Pack: ${item.unit}`));
+        assert.ok(snapshot.order.items.includes(`Rs.${item.amount.toFixed(2)}`));
+        assert.ok(result.message.includes(`#${item.id} ${item.name}`));
+      }
+      const page = await handleOrderShare(new Request(result.share.url), {
+        readShare: token => readOrderShare(token, { store, now: () => now }),
+      });
+      assert.equal(page.status, 200);
+      const html = await page.text();
+      assert.match(html, /original submitted request, not live updates/);
+      assert.match(html, /Status at submission<\/dt><dd>New/);
+      assert.equal(store.writes, 1);
+    }
+  }
+});
+
+test("a retried submission preserves its recorded timestamp and creates a fresh link even after the first link expires", async () => {
+  const store = memoryStore();
+  const records = new Map();
+  let instant = now;
+  const options = checkoutBackend(value => {
+    if (!records.has(value.orderId)) records.set(value.orderId, value);
+    return { ok: true, orderId: value.orderId, createdAt: records.get(value.orderId).createdAt };
+  }, {
+    now: () => instant,
+    saveShare: (args, timing) => saveOrderShare(args, { store, ...timing }),
+  });
+  const first = await (await handleOrderRequest(checkoutRequest(), options)).json();
+  instant = new Date(now.getTime() + 8 * 86400000);
+  const response = await handleOrderRequest(checkoutRequest(), options);
+  assert.equal(response.status, 200);
+  const retry = await response.json();
+  assert.equal(retry.orderId, first.orderId);
+  assert.equal(records.size, 1);
+  assert.notEqual(retry.share.url, first.share.url);
+  assert.equal(Date.parse(retry.share.expiresAt), instant.getTime() + SHARE_TTL_MS);
+  const snapshot = (await readOrderShare(tokenOf(retry.share), { store, now: () => instant })).snapshot;
+  assert.equal(snapshot.order.createdAt, now.toISOString());
+  assert.equal(snapshot.sharedAt, instant.toISOString());
+  assert.ok(retry.summary.includes("2026-11-10 12:30:00 IST"));
+  assert.equal((await readOrderShare(tokenOf(first.share), { store, now: () => instant })).status, 410);
+});
+
+test("submission storage failures report a saved request and safe retry, while unacknowledged or unconsented requests never create links", async () => {
+  let writes = 0;
+  const options = checkoutBackend(value => ({ ok: true, orderId: value.orderId, createdAt: value.createdAt }), {
+    saveShare: async () => { writes++; throw new Error("Private synthetic storage detail"); },
+  });
+  const failed = await handleOrderRequest(checkoutRequest(), options);
+  assert.equal(failed.status, 503);
+  const result = await failed.json();
+  assert.match(result.error, /is saved.*details link.*retry with the same details/);
+  assert.doesNotMatch(result.error, /Private synthetic/);
+  assert.equal(result.share, undefined);
+  assert.equal(result.summary, undefined);
+  assert.equal(writes, 1);
+  writes = 0;
+  const rejected = await handleOrderRequest(checkoutRequest({ ...checkout, consent: false }), options);
+  assert.equal(rejected.status, 400);
+  const unacknowledged = await handleOrderRequest(checkoutRequest(), checkoutBackend(() => ({ ok: false }), {
+    saveShare: options.saveShare,
+  }));
+  assert.equal(unacknowledged.status, 503);
+  const legacy = await handleOrderRequest(checkoutRequest({ ...checkout, shareConsent: false }), options);
+  assert.equal(legacy.status, 200);
+  assert.equal((await legacy.json()).share, undefined);
+  assert.equal(writes, 0);
+});
+
+test("checkout rejects missing, mismatched, foreign, tampered, noncanonical and expired detail links", () => {
+  const expiresAt = new Date(now.getTime() + SHARE_TTL_MS).toISOString();
+  const valid = { orderId: order.orderId, url: `${origin}/request/20261117.${"a".repeat(43)}`, expiresAt };
+  assert.deepEqual(validateOrderShareLink(valid, origin, order.orderId, now.getTime()),
+    { url: valid.url, expiresAt });
+  for (const share of [
+    null, {}, { ...valid, orderId: "another-request" }, { ...valid, url: "not a URL" },
+    { ...valid, url: valid.url.replace(origin, "https://elsewhere.example") },
+    { ...valid, url: valid.url.replace("vendor.example", "user:password@vendor.example") },
+    { ...valid, url: valid.url + "?other=1" }, { ...valid, url: valid.url + "#other" },
+    { ...valid, url: valid.url.replace("/request/", "/vendor/") },
+    { ...valid, url: valid.url.slice(0, -1) },
+    { ...valid, expiresAt: now.toISOString() },
+    { ...valid, expiresAt: "not a date" },
+    { ...valid, expiresAt: expiresAt.replace(".000Z", "Z") },
+    { ...valid, expiresAt: new Date(now.getTime() + 6 * 86400000).toISOString() },
+    { ...valid, expiresAt: new Date(now.getTime() + SHARE_TTL_MS + 60001).toISOString() },
+  ]) assert.throws(() => validateOrderShareLink(share, origin, order.orderId, now.getTime()), /details link/);
+});
+
+test("snapshot source is validated while existing vendor snapshots without a source remain readable", async () => {
+  const store = memoryStore();
+  const link = await save(store);
+  const entry = store.entries.get(shareKey(tokenOf(link)));
+  delete entry.data.source;
+  assert.equal((await readOrderShare(tokenOf(link), { store, now: () => now })).status, 200);
+  entry.data.source = "invalid";
+  await assert.rejects(() => readOrderShare(tokenOf(link), { store, now: () => now }), /snapshot/);
+  await assert.rejects(() => saveOrderShare({ order, origin, source: "invalid" }, { store }), /snapshot/);
 });

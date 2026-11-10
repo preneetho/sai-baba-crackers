@@ -48,13 +48,16 @@ export async function handleOrderShare(request, { readShare = readOrderShare } =
       "<h1>Request link unavailable</h1><p>This link is invalid or has expired. Ask the shop to share a new link. The original request remains in the shop's private register.</p>",
       result.status);
     const { order, sharedAt, expiresAt } = result.snapshot;
+    const submitted = result.snapshot.source === "submission";
     return reply(`<h1>Order request</h1>
 <p class="vendor-request-id">${escape(order.orderId)}</p>
 <p class="vendor-muted">Recorded ${escape(time(order.createdAt))}</p>
-<p class="vendor-notice">Read-only snapshot shared ${escape(time(sharedAt))}. Status and amounts are as shared, not live updates.</p>
+<p class="vendor-notice">Read-only snapshot shared ${escape(time(sharedAt))}. ${submitted ?
+        "This is the original submitted request, not live updates." : "Status and amounts are as shared, not live updates."}</p>
 <p class="vendor-muted">Anyone with this link can view these customer details until ${escape(time(expiresAt))}. Share only with trusted recipients.</p>
 ${fields([["Customer", order.name], ["Mobile", order.phone], ["Fulfilment", order.fulfilment],
-      ["Address", order.address], ["Preferred date", order.preferredDate], ["Status when shared", order.status], ["Notes", order.notes]])}
+      ["Address", order.address], ["Preferred date", order.preferredDate],
+      [submitted ? "Status at submission" : "Status when shared", order.status], ["Notes", order.notes]])}
 <h2>Requested items</h2><pre class="vendor-items">${escape(order.items)}</pre>
 ${fields([["Subtotal", money(order.subtotal)], ["Discount", `${order.discountPercent}% (${money(order.discount)})`],
       ["Delivery charge", money(order.deliveryCharge)], ["Estimated total", money(order.total)]])}

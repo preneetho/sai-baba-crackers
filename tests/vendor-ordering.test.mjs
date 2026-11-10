@@ -52,16 +52,17 @@ test("the WhatsApp action explicitly explains the customer's final Send step", a
 test("the active checkout uses one WhatsApp message and retains the complete request for copy/download", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
-  assert.match(app, /prepareOrderMessage\(fullMessage, result\.summary\)/);
+  assert.match(app, /prepareOrderMessage\(result\.summary\)/);
   assert.match(app, /link\.target = "_self"/);
   assert.match(app, /replaceChildren\(link\)/);
-  assert.match(app, /one short summary, your request ID and a PDF link valid for 7 days/);
+  assert.match(app, /your name, estimated total, request ID and a link to all order details, valid for 7 days/);
   assert.doesNotMatch(app, /prepareMessages|Send part|Send every part|split into/);
   assert.match(app, /\$\("#full-message"\)\.value = fullMessage/);
   assert.match(app, /clipboard\.writeText\(fullMessage\)/);
-  assert.match(html, /For long orders, a PDF is also stored privately on Netlify/);
-  assert.match(app, /pdfConsent: true/);
-  assert.match(app, /validatePdfLink\(result\.pdf, window\.location\.origin\)/);
+  assert.match(html, /A read-only copy is stored privately on Netlify/);
+  assert.match(app, /shareConsent: true/);
+  assert.doesNotMatch(app, /pdfConsent: true/);
+  assert.match(app, /validateOrderShareLink\(result\.share, window\.location\.origin, orderId\)/);
   assert.match(html, /id="copy-message"[^>]*>Copy full order request<\/button>/);
 });
 
@@ -71,7 +72,7 @@ test("long-cart totals and checkout product names can wrap on narrow screens", a
   assert.match(css, /\.review-line > span\s*\{[^}]*min-width: 0;[^}]*overflow-wrap: anywhere;/);
 });
 
-test("WhatsApp recovery reuses the prepared PDF summary and offers a phone-only chat without resubmitting", async () => {
+test("WhatsApp recovery reuses the prepared details-link summary and offers a phone-only chat without resubmitting", async () => {
   const html = await readFile(new URL("../vendor-app/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   assert.match(html, /id="whatsapp-recovery"[^>]*>[\s\S]*?<summary>WhatsApp closed or did not open\?<\/summary>/);

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { DISCOUNT_PERCENT, MAX_WHATSAPP_URL_LENGTH, sanitizeCart, cartLines, pricing, validateCustomer, createRequirement, whatsappUrl } from "../../vendor-app/order.mjs";
 import { saveOrderPdf } from "../lib/order-pdfs.mjs";
+import { saveOrderShare } from "../lib/order-shares.mjs";
 import { orderBackend } from "../lib/order-backend.mjs";
 import { validYear } from "../../vendor-app/catalogue-model.mjs";
 
@@ -56,7 +57,28 @@ function orderTime(createdAt) {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} IST`;
 }
 
-function orderSummary(order, savedAt, pdf, backend) {
+function submittedDetails(order, savedAt) {
+  return {
+    orderId: order.orderId, createdAt: savedAt.toISOString(), status: "New",
+    ...order.customer, ...order.amounts,
+    phone: `+91 ${order.customer.phone}`,
+    fulfilment: order.customer.fulfilment === "delivery" ? "Free home delivery" : "Store pickup",
+    items: order.items.map(item => `#${item.id} ${item.name} | ${item.brand}\nPack: ${item.unit}\n${item.quantity} pack${item.quantity === 1 ? "" : "s"} x Rs.${item.price.toFixed(2)} = Rs.${item.amount.toFixed(2)}`).join("\n\n"),
+  };
+}
+
+function orderSummary(order, savedAt, pdf, backend, share) {
+  if (share) return [
+    `Order ID: ${order.orderId}`,
+    `Order date & time: ${orderTime(savedAt)}`,
+    `Customer: ${order.customer.name}`,
+    `Mobile: +91 ${order.customer.phone}`,
+    `Estimated total: Rs.${order.amounts.total.toFixed(2)}`,
+    "",
+    `Full order details (read-only): ${share.url}`,
+    `Link expires: ${orderTime(new Date(share.expiresAt))}`,
+    "Request only, not a confirmed order. No payment made.",
+  ].join("\n");
   const register = backend === "netlify-db" ? "private order register" : "Google Sheet";
   const packs = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const lines = [
@@ -86,6 +108,7 @@ function orderSummary(order, savedAt, pdf, backend) {
 
 export async function handleOrderRequest(request, {
   env = process.env, fetchImpl = fetch, now = () => new Date(), savePdf = saveOrderPdf,
+  saveShare = saveOrderShare,
   databaseFactory = async () => (await import("../lib/order-database.mjs")).getOrderDatabase(),
 } = {}) {
   if (request.method !== "GET" && request.method !== "POST") {
@@ -199,8 +222,19 @@ export async function handleOrderRequest(request, {
     return json({ error: "We could not confirm the recorded order request time. Keep checkout open and retry, or contact the shop." }, 503);
   }
   const message = order.message.replace("\n", `\nOrder date & time: ${orderTime(savedAt)}\n`);
+  let share;
+  if (input.shareConsent === true) {
+    try {
+      share = await saveShare({
+        order: submittedDetails(order, savedAt), origin: new URL(request.url).origin, source: "submission",
+      }, { now });
+    } catch {
+      console.error("Order detail link storage failed after the order was recorded.");
+      return json({ error: `Your order request ${order.orderId} is saved, but its details link could not be prepared. Keep checkout open and retry with the same details to avoid duplicate records.` }, 503);
+    }
+  }
   let pdf;
-  if (input.pdfConsent === true && new URL(whatsappUrl(message)).href.length > MAX_WHATSAPP_URL_LENGTH) {
+  if (!share && input.pdfConsent === true && new URL(whatsappUrl(message)).href.length > MAX_WHATSAPP_URL_LENGTH) {
     try {
       pdf = await savePdf({ order, message, savedAt, origin: new URL(request.url).origin, secret: backend.secret });
     } catch (error) {
@@ -212,7 +246,10 @@ export async function handleOrderRequest(request, {
       return json({ error: `Your order request ${order.orderId} is saved. ${detail}` }, 503);
     }
   }
-  return json({ orderId: order.orderId, message, summary: orderSummary(order, savedAt, pdf, backend.name), ...(pdf ? { pdf } : {}) });
+  return json({
+    orderId: order.orderId, message, summary: orderSummary(order, savedAt, pdf, backend.name, share),
+    ...(share ? { share } : {}), ...(pdf ? { pdf } : {}),
+  });
 }
 
 export default async request => handleOrderRequest(request);

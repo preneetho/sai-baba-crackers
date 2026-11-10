@@ -8,7 +8,7 @@ import { mediaUrl, isYouTubeMedia } from "../vendor-app/media-model.mjs";
 import * as order from "../vendor-app/order.mjs";
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
-async function harness({ stored, unavailableStorage = false, price = 70 } = {}) {
+async function harness({ stored, unavailableStorage = false, price = 70, navigator = {} } = {}) {
   class Node {
     constructor(tag = "div") { this.tagName = tag.toUpperCase(); this.children = []; this.events = new Map(); this.dataset = {}; this.value = ""; this.attributes = {}; }
     append(...children) { this.children.push(...children); }
@@ -18,7 +18,8 @@ async function harness({ stored, unavailableStorage = false, price = 70 } = {}) 
     getAttribute(key) { return this.attributes[key]; }
     removeAttribute(key) { delete this.attributes[key]; delete this[key]; }
     focus() { this.focused = true; }
-    click() {}
+    click() { this.clicks = (this.clicks ?? 0) + 1; }
+    select() { this.selected = true; }
     replaceWith() {}
     reset() {}
     showModal() { this.open = true; }
@@ -38,9 +39,9 @@ async function harness({ stored, unavailableStorage = false, price = 70 } = {}) 
   }));
   const context = vm.createContext({
     ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "DISCOUNT_PERCENT", "money", "localDate", "validateCustomer",
-      "prepareOrderMessage", "validatePdfLink"].map(key => [key, order[key]])),
+      "prepareOrderMessage", "validateOrderShareLink"].map(key => [key, order[key]])),
     checkCart: order.sanitizeCart, getLines: order.cartLines, getPricing: order.pricing, getTotal: order.total,
-    vendor, validCatalogue, mediaUrl, isYouTubeMedia, track() {}, URL, AbortSignal, console, Intl,
+    vendor, validCatalogue, mediaUrl, isYouTubeMedia, track() {}, URL, AbortSignal, console, Intl, navigator,
     setTimeout, clearTimeout, crypto: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
     FormData: class {
       *[Symbol.iterator]() {
@@ -333,7 +334,22 @@ test("maximum order amount is checked before quantity changes mutate the cart", 
   assert.match(ui.get("#catalogue-status").textContent, /exceeds the supported request value/);
 });
 
-test("checkout submits catalogue metadata and server returns the authoritative WhatsApp message", async () => {
+function submittedResult(overrides = {}) {
+  const orderId = "SBC-00000000-0000-4000-8000-000000000001";
+  const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+  const share = {
+    orderId, expiresAt,
+    url: `https://vendor.example/request/${expiresAt.slice(0, 10).replaceAll("-", "")}.${"a".repeat(43)}`,
+  };
+  return {
+    orderId, share,
+    message: `Order ID: ${orderId}\nSynthetic saved message from server.\n#1 Full product details.`,
+    summary: `Order ID: ${orderId}\nCustomer: Synthetic Customer\nEstimated total: Rs.59.50\nFull order details: ${share.url}`,
+    ...overrides,
+  };
+}
+
+test("checkout submits catalogue metadata and link consent, and even a short order sends only name, amount and details link", async () => {
   const ui = await harness();
   ui.run("updateQuantity(1, 1, false)");
   ui.respond(async (path, options) => {
@@ -341,10 +357,10 @@ test("checkout submits catalogue metadata and server returns the authoritative W
     const body = JSON.parse(options.body);
     assert.deepEqual(body.catalogue, { year: 2026, revision: 1 });
     assert.deepEqual(body.cart, { 1: 1 });
-    return new Response(JSON.stringify({
-      orderId: `SBC-${body.requestId.toUpperCase()}`,
-      message: `Order ID: SBC-${body.requestId.toUpperCase()}\nSynthetic saved message from server.`,
-    }));
+    assert.equal(body.consent, true);
+    assert.equal(body.shareConsent, true);
+    assert.equal(body.pdfConsent, undefined);
+    return Response.json(submittedResult());
   });
   await ui.emit("#customer-form", "submit");
   assert.match(ui.get("#full-message").value, /Synthetic saved message from server/);
@@ -354,22 +370,101 @@ test("checkout submits catalogue metadata and server returns the authoritative W
   assert.equal(links.length, 1);
   assert.equal(links[0].target, "_self");
   assert.match(links[0].href, /^https:\/\/wa\.me\//);
+  assert.equal(links[0].clicks, 1);
+  const text = new URL(links[0].href).searchParams.get("text");
+  assert.match(text, /Customer: Synthetic Customer/);
+  assert.match(text, /Estimated total: Rs\.59\.50/);
+  assert.ok(text.includes(ui.get("#order-link").href));
+  assert.doesNotMatch(text, /Full product details/);
+  assert.equal(ui.get("#order-details").hidden, false);
+  assert.match(ui.get("#order-expiry").textContent, /IST.*Anyone with the link/);
+  assert.match(ui.get("#handoff-instructions").textContent, /name, estimated total, request ID and a link/);
 });
 
-test("large yearly catalogues retain the full request and use a single PDF summary in WhatsApp", async () => {
+test("large yearly catalogues retain the full request and use the same single web-link summary in WhatsApp", async () => {
   const ui = await harness();
   ui.run("updateQuantity(1, 1, false)");
   const id = "SBC-00000000-0000-4000-8000-000000000001";
-  const pdf = { url: `https://vendor.example/api/order-pdf?token=20261116.${"a".repeat(43)}`,
-    expiresAt: "2026-11-16T00:00:00.000Z" };
   const message = `Order ID: ${id}\n${"Synthetic long product details. ".repeat(2500)}`;
   assert.ok(message.length > 65536);
-  ui.respond(async () => new Response(JSON.stringify({
-    orderId: id, message, summary: `Order ID: ${id}\nComplete request: ${pdf.url}`, pdf,
-  })));
+  const result = submittedResult({ message });
+  ui.respond(async () => Response.json(result));
   await ui.emit("#customer-form", "submit");
   assert.equal(ui.get("#full-message").value, message);
   assert.equal(ui.get("#message-preview").hidden, false);
-  assert.equal(ui.get("#pdf-link").href, pdf.url);
-  assert.equal(ui.get("#whatsapp-message").value.includes(pdf.url), true);
+  assert.equal(ui.get("#order-link").href, result.share.url);
+  assert.equal(ui.get("#whatsapp-message").value, result.summary);
+  assert.equal(ui.get("#message-links").children.length, 1);
+  assert.equal(new URL(ui.get("#message-links").children[0].href).searchParams.get("text"), result.summary);
+});
+
+test("checkout never offers an unverified, missing or omitted-from-summary details link", async () => {
+  const valid = submittedResult();
+  for (const change of [
+    { share: undefined }, { share: { ...valid.share, url: "https://elsewhere.example/request/private" } },
+    { share: { ...valid.share, orderId: "another-order" } },
+    { share: { ...valid.share, expiresAt: new Date(Date.now() - 1).toISOString() } },
+    { summary: `Order ID: ${valid.orderId}\nNo details link.` }, { summary: undefined },
+  ]) {
+    const ui = await harness();
+    ui.run("updateQuantity(1, 1, false)");
+    ui.respond(async () => Response.json({ ...valid, ...change }));
+    await ui.emit("#customer-form", "submit");
+    assert.equal(ui.get("#form-error").hidden, false);
+    assert.equal(ui.get("#message-links").children.length, 0);
+    assert.notEqual(ui.get("#customer-form").hidden, true);
+    assert.equal(ui.run("saving"), false);
+  }
+});
+
+test("failed link preparation keeps the same request ID for retry before creating a WhatsApp handoff", async () => {
+  const ui = await harness();
+  ui.run("updateQuantity(1, 1, false)");
+  const attempts = [];
+  ui.respond(async (_, options) => {
+    attempts.push(JSON.parse(options.body));
+    return attempts.length === 1 ?
+      Response.json({ error: "Your request is saved, but its details link could not be prepared. Retry." }, { status: 503 }) :
+      Response.json(submittedResult());
+  });
+  await ui.emit("#customer-form", "submit");
+  assert.match(ui.get("#form-error").textContent, /is saved.*details link/);
+  assert.equal(ui.get("#message-links").children.length, 0);
+  await ui.emit("#customer-form", "submit");
+  assert.equal(attempts.length, 2);
+  assert.equal(attempts[0].requestId, attempts[1].requestId);
+  assert.equal(ui.get("#message-links").children.length, 1);
+});
+
+test("WhatsApp recovery copies the concise link summary without resubmitting and closing clears the detail URL", async () => {
+  const copied = [];
+  const ui = await harness({ navigator: { clipboard: { writeText: async text => copied.push(text) } } });
+  ui.run("updateQuantity(1, 1, false)");
+  const result = submittedResult();
+  ui.respond(async () => Response.json(result));
+  await ui.emit("#customer-form", "submit");
+  const count = ui.requests.length;
+  await ui.emit("#copy-whatsapp-message", "click");
+  assert.deepEqual(copied, [result.summary]);
+  assert.equal(ui.requests.length, count);
+  const chat = new URL(ui.get("#open-shop-chat").href);
+  assert.equal(chat.pathname, `/${vendor.whatsapp}`);
+  assert.equal(chat.search, "");
+  await ui.emit("#checkout", "close");
+  assert.equal(ui.get("#order-details").hidden, true);
+  assert.equal(ui.get("#order-link").href, undefined);
+  assert.equal(ui.get("#order-expiry").textContent, "");
+  assert.equal(ui.get("#whatsapp-message").value, "");
+});
+
+test("blocked clipboard recovery selects the existing concise message with its detail link", async () => {
+  const ui = await harness();
+  ui.run("updateQuantity(1, 1, false)");
+  const result = submittedResult();
+  ui.respond(async () => Response.json(result));
+  await ui.emit("#customer-form", "submit");
+  await ui.emit("#copy-whatsapp-message", "click");
+  assert.match(ui.get("#whatsapp-copy-status").textContent, /Clipboard access is unavailable/);
+  assert.equal(ui.get("#whatsapp-message").selected, true);
+  assert.equal(ui.get("#whatsapp-message").value, result.summary);
 });

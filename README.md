@@ -4,13 +4,13 @@ Mobile-friendly yearly catalogue, initially seeded with the 68 original 2026 pro
 15% discount, free home delivery or store pickup, and a customer-reviewed
 order request including the customer's name, mobile number and address.
 Order requests are saved to the vendor's private order register before WhatsApp is prepared.
-Short orders share the complete WhatsApp message. Long orders send one short
-summary with the request ID and a seven-day link to the complete order PDF;
+Every order sends one short WhatsApp summary with the customer's name, mobile,
+estimated total, request ID and a seven-day link to a read-only order details page;
 all items and customer details remain in the
 shop's order register and in the complete request available on the page.
 The frontend is static; Netlify Functions use Google Sheets by default or
 Netlify Database when explicitly configured. Server-only npm dependencies
-generate PDFs and use private Netlify Blobs.
+use private Netlify Blobs and retain PDF support for older cached checkout pages.
 No frontend dependencies, customer accounts or payments are required.
 
 ## Local preview
@@ -45,16 +45,27 @@ Complete the [Google Sheets setup](integrations/google-sheets/README.md) before
 deploying. The spreadsheet stays private; never commit the shared secret.
 Remove old Netlify dashboard overrides that still use `vendor-app` as the base.
 Netlify Functions receive the private Blobs connection automatically. In the
-default Sheets mode, PDF links need no new environment variables or Apps Script
+default Sheets mode, order details links need no new environment variables or Apps Script
 changes. For database mode, use the development setup below instead.
 
-Long-order PDFs are created only after the selected backend acknowledges saving and the
-customer explicitly consents. Anyone with a PDF link can open or forward it.
+Current checkout explicitly requests consent to store and share a read-only
+copy of every submitted request. Only after the selected backend acknowledges
+saving does `/api/orders` create its private `order-shares` snapshot and return
+the concise WhatsApp summary. Anyone with its link can view customer contact
+details, address, notes and all items without signing in for seven days after
+link creation. It is the original submitted request, not a live status page.
+Expiry is enforced on access and hourly cleanup deletes only expired snapshots.
+If link preparation fails, checkout reports that the request is saved and
+allows retry with the same reference. A retry preserves the recorded timestamp
+and can create a new seven-day link without changing the saved order.
+
+**Legacy PDF compatibility:** older cached pages with explicit PDF consent can
+still create long-order PDFs after saving. Anyone with a PDF link can open or forward it.
 Links expire exactly seven days after the original saved time; retries do not
 extend them. Downloads deny expired access immediately, and a published hourly
 function removes expired files. Short orders do not create PDFs. Downloaded
 copies cannot be revoked. Storage and function limits depend on the Netlify plan.
-If PDF creation fails after saving, the app clearly reports that the order was
+If legacy PDF creation fails after saving, the API clearly reports that the order was
 saved and allows retry using the same reference.
 
 The server bundles open Noto fonts for Latin, Telugu, Devanagari, Arabic and
@@ -67,7 +78,7 @@ message; customers must press Send in WhatsApp.
 
 If WhatsApp closes or fails to open, expand **WhatsApp closed or did not open?**
 on the saved screen. Copy the prepared message, open the phone-only shop chat,
-paste and tap Send. Long-order copies include the PDF link. This optional
+paste and tap Send. Copies include the same concise summary and order details link. This optional
 recovery does not save another order; the normal automatic handoff is unchanged.
 
 See [the app guide](vendor-app/README.md) for configuration, hosting, privacy
@@ -309,7 +320,7 @@ Use the existing loopback server on port 4173 when matching the documented
 local Google OAuth callback.
 
 Verify a synthetic submission, original-ID retry, vendor status change/conflict
-and long-order PDF before enabling real traffic. Keep sleep-on-inactivity
+and read-only order details link before enabling real traffic. Keep sleep-on-inactivity
 enabled and avoid polling/telemetry traffic that prevents sleep. Deploy previews
 can copy production data into their database branches, so protect access and
 use synthetic-only development data. Preview database and Functions usage still
@@ -325,6 +336,13 @@ and a production migration. PDF retention remains seven days. No automatic
 WhatsApp API messaging is added.
 
 ## Sharing a request
+
+Customer checkout also creates a read-only link after saving, using explicit
+`shareConsent`. Its WhatsApp message includes name, mobile, estimated total,
+reference, original IST timestamp and that link for every cart size. The page
+labels its status as **Status at submission**, since a retry must not imply that
+the original "New" status is current. The older PDF API remains available to
+cached clients that send `pdfConsent` instead.
 
 Open a request in `/vendor/` and choose **Create share link**. Then choose
 **WhatsApp (new tab)**, **Share...** (where supported by the browser), or

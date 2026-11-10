@@ -4,7 +4,8 @@ A standalone, mobile-friendly enquiry app with a static frontend, a Netlify
 order-recording function and a configurable Google Sheets or Netlify Database integration. No frontend
 framework, frontend npm dependencies, customer accounts, payments or automatic
 WhatsApp messaging. The existing Product Memory Graph application is unchanged.
-Server-only dependencies generate PDFs and store them in private Netlify Blobs.
+Server-only dependencies store read-only request copies in private Netlify Blobs
+and retain PDF support for older cached checkout pages.
 The separate `/vendor/` dashboard uses approved vendor Google sign-in to view
 requests and update statuses in the selected order backend. Customers do not need accounts.
 See the [vendor dashboard setup](../integrations/google-sheets/VENDOR-DASHBOARD.md)
@@ -131,7 +132,7 @@ Subsequent pushes to `main` trigger a new deployment once the GitHub integration
 is connected.
 
 Deployed Netlify Functions automatically receive the private Blobs connection.
-No new public bucket or Apps Script change is needed for PDF links. Database
+No new public bucket or Apps Script change is needed for order details links. Database
 mode requires the server-only `ORDER_PDF_SECRET` documented in its setup guide.
 The hourly cleanup runs on the published deployment, not deploy previews.
 Storage and function usage depend on the site's Netlify plan and limits.
@@ -142,7 +143,7 @@ function. Use the GitHub-connected deployment with the root `netlify.toml`.
 ### Other static hosts
 
 The catalogue can be previewed as static files, but submission now requires the
-Netlify `/api/orders` and `/api/order-pdf` functions, private PDF storage and
+Netlify `/api/orders` and `/request/*` functions, private snapshot storage and
 expiry cleanup. Another host needs equivalent server endpoints and retention controls;
 uploading only `vendor-app` will not provide working order recording. Never put
 the server function, shared secret or spreadsheet credentials in public files.
@@ -162,7 +163,7 @@ the server function, shared secret or spreadsheet credentials in public files.
   Calculations use integer paise and round the discount once at subtotal level.
   Catalogue and individual line prices remain the original printed rates.
 - Delivery or pickup is a required choice with no preselected option. Home
-  delivery has **zero charge**, shown as the delivery fee in checkout and WhatsApp; the
+  delivery has **zero charge**, shown as the delivery fee in checkout and full order details; the
   15% discounted total is unchanged. The full request includes the selected method,
   address and optional preferred delivery/pickup date. Address remains required
   for both options. No delivery radius, minimum order or delivery date guarantee
@@ -174,10 +175,12 @@ the server function, shared secret or spreadsheet credentials in public files.
   Required name, mobile number and full address (10-500 characters) are recorded
   in the vendor's Google Sheet after explicit consent. Multiline addresses are
   preserved. Closing checkout clears the local form and message, not sheet rows.
-- The customer agrees to Sheets recording, WhatsApp sharing and temporary PDF
-  storage for long orders. The server
+- The customer agrees to private order recording, WhatsApp sharing and temporary
+  read-only snapshot storage for every order. Anyone with the link can see all
+  customer details and line items for seven days. The server
   recalculates amounts, then records an order request with an `SBC-` reference before
-  returning a WhatsApp message containing that reference. Failures are shown and
+  creating the details link and returning a WhatsApp summary containing that reference,
+  the customer's name, mobile and estimated total. Failures are shown and
   keep details available for retry; no failed save is represented as success.
   Retries of unchanged details in the same checkout reuse the reference.
 - The order's original date and time appear in IST in the sheet's column Q and
@@ -202,19 +205,17 @@ the server function, shared secret or spreadsheet credentials in public files.
   message was sent or delivered.
 - If WhatsApp immediately closes or does not open, the saved screen includes
   **WhatsApp closed or did not open?** as an optional recovery panel. It copies
-  the exact prepared WhatsApp message: the short PDF-linked summary for long
-  orders, or the unchanged full message for short orders. **Open shop chat**
+  the exact prepared WhatsApp message: the short summary with the order details
+  link for every cart size. **Open shop chat**
   uses a phone-only link without prefilled text; customers paste and tap Send.
   If that link also fails, the shop number and selectable message are available
   for opening WhatsApp manually. Clipboard failures are explicit. These actions
   never submit another order or replace the original automatic handoff.
 - Each encoded WhatsApp URL is capped at a conservative 1,800 characters.
-  Short requests keep the complete WhatsApp message unchanged. Only requests
-  exceeding that limit use one short summary instead: request ID, original IST
-  date/time, customer mobile, product/pack counts, delivery/pickup choice,
-  the server-calculated estimated total and a link to the complete order PDF.
-  Customer name is included when it fits the URL budget; the PDF and Sheet
-  always retain the complete name. The vendor can also look up all items,
+  Every request uses one short summary: request ID, original IST
+  date/time, complete customer name, mobile, the server-calculated estimated
+  total and a link to a read-only order details page, including its expiry.
+  The vendor can also look up all items,
   address and notes in its Google Sheet using the request ID.
   No order data is removed from the sheet or the complete message available on
   the page. Summary data is generated by the server only after acknowledgement;
@@ -223,20 +224,23 @@ the server function, shared secret or spreadsheet credentials in public files.
   `prepareMessages` export remains compatible with cached older pages.
   The URL cap is an implementation safeguard, not a guarantee across every
   WhatsApp client.
-- Only long orders with explicit PDF consent create a PDF, after Sheets confirms
-  the save. PDFs contain all line items, customer details, notes and totals.
+- Read-only request copies are created only after the configured backend acknowledges
+  saving. They contain every line item, customer details, notes and totals.
   Private Netlify Blobs storage uses an unguessable bearer link: **anyone with
   the link can open it**, including someone to whom it is forwarded. Links expire
-  exactly seven days after the original saved time; retries do not extend expiry.
-  Expired access is denied immediately, and an hourly job removes expired files.
-  Already downloaded copies cannot be revoked. Short orders do not create PDFs.
-  Older cached clients without PDF consent retain their previous summary behavior.
-- If PDF generation or storage fails after Sheets saves the order, the app
+  exactly seven days after link creation. Expired access is denied immediately,
+  and an hourly job removes expired snapshots without deleting original orders.
+  The page identifies the original submitted status, not later vendor changes.
+- If snapshot storage fails after the backend saves the order, the app
   explicitly reports that the order was saved and retains its reference for
-  retry. It does not open WhatsApp with a missing PDF. Retrying unchanged details
-  reuses the saved reference and the same PDF link, without duplicating sheet
-  rows. After the seven-day window, a new request is needed for a new PDF.
-- PDFs embed the bundled Noto Sans, Telugu, Devanagari, Arabic and Emoji fonts.
+  retry. It does not open WhatsApp with a missing details link. Retrying unchanged
+  details reuses the saved reference and timestamp without duplicating records,
+  and creates a fresh seven-day link. Previously shared links remain valid
+  snapshots until their own expiry; signing out or closing checkout does not revoke them.
+- Older cached checkout pages with explicit PDF consent retain their long-order
+  PDF API. Those PDFs expire seven days after the original saved time; retries
+  do not extend them. Already downloaded copies cannot be revoked.
+  PDFs embed the bundled Noto Sans, Telugu, Devanagari, Arabic and Emoji fonts.
   Unsupported characters produce an explicit error rather than being dropped.
   Fonts and their SIL Open Font Licences are under `netlify/assets/fonts`;
   `SOURCES.json` records the pinned upstream revision. These server assets are

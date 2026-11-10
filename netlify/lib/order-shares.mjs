@@ -23,12 +23,12 @@ function validMetadata(metadata, key) {
   return iso(metadata?.expiresAt) && key.startsWith(`shares/${day(new Date(metadata.expiresAt))}/`);
 }
 
-export async function saveOrderShare({ order, origin }, { store = shareStore(), now = () => new Date() } = {}) {
-  if (!validOrder(order, true)) throw new Error("The shared request snapshot is invalid.");
+export async function saveOrderShare({ order, origin, source = "vendor" }, { store = shareStore(), now = () => new Date() } = {}) {
+  if (!validOrder(order, true) || !["vendor", "submission"].includes(source)) throw new Error("The shared request snapshot is invalid.");
   const sharedAt = now().toISOString();
   const expiresAt = new Date(Date.parse(sharedAt) + SHARE_TTL_MS).toISOString();
   const token = `${day(new Date(expiresAt))}.${randomBytes(32).toString("base64url")}`;
-  const snapshot = { order: Object.fromEntries(FIELDS.map(key => [key, order[key]])), sharedAt, expiresAt };
+  const snapshot = { order: Object.fromEntries(FIELDS.map(key => [key, order[key]])), sharedAt, expiresAt, source };
   const { modified } = await store.setJSON(shareKey(token), snapshot, { metadata: { expiresAt }, onlyIfNew: true });
   if (!modified) throw new Error("The shared request write was not acknowledged.");
   return { orderId: order.orderId, url: new URL(`/request/${token}`, origin).href, expiresAt };
@@ -47,6 +47,7 @@ export async function readOrderShare(token, { store = shareStore(), now = () => 
   }
   const snapshot = entry.data;
   if (!snapshot || !validOrder(snapshot.order, true) || !iso(snapshot.sharedAt) ||
+      (snapshot.source !== undefined && !["vendor", "submission"].includes(snapshot.source)) ||
       snapshot.expiresAt !== entry.metadata.expiresAt ||
       Date.parse(snapshot.expiresAt) - Date.parse(snapshot.sharedAt) !== SHARE_TTL_MS) {
     throw new Error("Invalid shared request snapshot.");

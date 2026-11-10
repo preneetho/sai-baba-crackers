@@ -154,6 +154,27 @@ export function validatePdfLink(pdf, origin) {
   return { url: url.href, expiresAt: pdf.expiresAt };
 }
 
+export function validateOrderShareLink(share, origin, orderId, now = Date.now()) {
+  const error = "Your order request is saved, but its details link could not be confirmed. Keep checkout open and retry.";
+  if (!share || share.orderId !== orderId || typeof share.url !== "string" ||
+      typeof share.expiresAt !== "string") throw new Error(error);
+  let url;
+  try {
+    url = new URL(share.url);
+  } catch {
+    throw new Error(error);
+  }
+  const expiry = Date.parse(share.expiresAt);
+  if (url.origin !== origin || url.username || url.password || url.search || url.hash ||
+      !/^\/request\/\d{8}\.[A-Za-z0-9_-]{43}$/.test(url.pathname) ||
+      !Number.isFinite(expiry) || new Date(expiry).toISOString() !== share.expiresAt ||
+      expiry <= now || expiry > now + 7 * 86400000 + 60000 ||
+      url.pathname.slice(9, 17) !== share.expiresAt.slice(0, 10).replaceAll("-", "")) {
+    throw new Error(error);
+  }
+  return { url: url.href, expiresAt: share.expiresAt };
+}
+
 // Bound the encoded URL, not character count; Unicode can expand substantially.
 export function prepareMessages(text, phone = vendor.whatsapp, maxLength = MAX_WHATSAPP_URL_LENGTH) {
   if (!text) throw new Error("The order request message is empty.");

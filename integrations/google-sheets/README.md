@@ -186,10 +186,15 @@ for this small vendor workflow, not an authenticated order-management database.
 The vendor owns access control, retention, corrections and deletion of customer
 records. The site clears contact details from the review when closed, but this
 does not delete previously saved spreadsheet rows or copies in WhatsApp.
-Consented long orders also have a complete PDF in private Netlify Blobs storage.
-Its unguessable link is included in the WhatsApp summary; anyone who has or
-receives the link can open it. Links expire seven days after the original saved
-time, with immediate download-time enforcement and hourly file cleanup.
-Downloaded copies cannot be revoked. PDF links use the existing server secret
-and Netlify's automatic Blobs connection; no Sheet columns or Apps Script
-changes are needed. Netlify storage and function usage depend on the site's plan.
+Consented submissions also create a read-only copy in private Netlify Blobs storage.
+Every WhatsApp message includes the customer's name, mobile, estimated total,
+request reference and an unguessable link to all order details. Anyone who has
+or receives the link can view contact details, address, notes and every item.
+Links expire seven days after creation, with immediate access enforcement and
+hourly snapshot cleanup. Retrying the same request preserves its original
+recorded time and can create a fresh link. The page identifies the original
+submission, not live vendor status changes.
+Older cached pages can still use the PDF API, whose links expire seven days
+after the original saved time. Downloaded copies cannot be revoked.
+Netlify's automatic Blobs connection handles private storage; no Sheet columns
+or Apps Script changes are needed. Storage and function usage depend on the site's plan.
