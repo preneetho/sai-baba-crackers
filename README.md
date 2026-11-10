@@ -200,7 +200,8 @@ and 30-second limits apply only to uploaded files. Links can be added to new
 products before their first save. Only link videos you are permitted to publish.
 
 Customers open the keyboard-accessible gallery by selecting the thumbnail,
-marked with a compact expand icon and a play badge when video is available.
+marked with a compact expand icon. Catalogue cards do not show a play badge;
+video playback controls are available inside the gallery.
 There is no repeated caption strip; descriptions and credits stay inside the
 gallery. Covers are lazy optimized images. Video loads on play, never automatically.
 For YouTube, select **Load YouTube player**, then use the embedded player to play
@@ -215,7 +216,7 @@ the link, not the video's availability, ownership or embedding permission.
 Without media, existing category/name icons remain. Preview errors offer retry
 or the icon fallback without blocking quantity controls or checkout.
 Product numbers remain visible on photo/video covers and preview-error
-fallbacks as compact thumbnail badges, without a separate caption strip.
+fallbacks as compact top-left thumbnail badges, without a separate caption strip.
 
 **Retention and privacy:** Files use public Cloudinary delivery, even before
 their draft is saved. Upload only permitted product media, never customer data

@@ -99,8 +99,7 @@ h2 { font-family: Georgia, "Times New Roman", serif; font-size: 27px; font-weigh
 .media-cover-icon { position: absolute; display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); color: var(--brand); pointer-events: none; }
 .media-cover-icon svg { width: 20px; height: 20px; }
 .media-cover-expand { inset-inline-end: 8px; bottom: 8px; }
-.media-cover-play { inset-inline-start: 8px; top: 8px; }
-.media-cover-number { position: absolute; top: 8px; inset-inline-end: 8px; padding: 4px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 10px; line-height: 1.4; letter-spacing: 1px; pointer-events: none; }
+.media-cover-number { position: absolute; top: 8px; inset-inline-start: 8px; padding: 4px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 10px; line-height: 1.4; letter-spacing: 1px; pointer-events: none; }
 .media-cover:hover .media-cover-expand { background: var(--soft-strong); }
 .media-cover-error { position: absolute; inset-inline-start: 8px; bottom: 8px; max-width: calc(100% - 52px); padding: 4px; background: var(--surface); font-size: 10px; line-height: 1.4; text-align: start; }
 .media-cover:focus-visible { outline-offset: -4px; }

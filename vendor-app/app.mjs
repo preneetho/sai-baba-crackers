@@ -202,7 +202,6 @@ function renderProducts() {
       art.setAttribute("aria-haspopup", "dialog");
       art.title = "View photos & videos";
       const expand = mediaIcon("expand");
-      const play = product.media.some(asset => asset.resourceType === "video") ? mediaIcon("play") : null;
       const cover = element("img", "product-cover");
       cover.src = mediaUrl(product.media[0]);
       cover.alt = "";
@@ -212,9 +211,9 @@ function renderProducts() {
         art.setAttribute("aria-label", `Preview unavailable. ${label}`);
         const failure = element("span", "media-cover-error", "Preview unavailable");
         failure.setAttribute("aria-hidden", "true");
-        art.replaceChildren(productIllustration(product), failure, expand, ...(play ? [play] : []), number);
+        art.replaceChildren(productIllustration(product), failure, expand, number);
       }, { once: true });
-      art.append(cover, expand, ...(play ? [play] : []), number);
+      art.append(cover, expand, number);
       art.addEventListener("click", () => openMedia(product, art));
     } else {
       art.setAttribute("aria-hidden", "true");
