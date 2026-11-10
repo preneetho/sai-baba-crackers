@@ -154,16 +154,16 @@ test("malformed acknowledgements fail and private adapter fields are excluded", 
   assert.equal(conflict.status, 409);
 });
 
-test("private upload UI includes explicit rollback preview, acknowledgement, pending states and no persistence", async () => {
+test("vendor page has no historical-import controls or client requests while retaining normal dashboard actions", async () => {
   const html = await readFile(new URL("../vendor-app/vendor/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../vendor-app/vendor.mjs", import.meta.url), "utf8");
-  assert.match(html, /accept="\.sql"/);
-  assert.match(html, /Preview without saving/);
-  assert.match(html, /Confirm and import/);
-  assert.match(html, /id="import-message"[^>]*role="status"/);
-  assert.match(app, /clearImport\(\)/);
-  assert.match(app, /importController\?\.abort\(\)/);
-  assert.match(app, /result\.rolledBack !== true/);
-  assert.match(app, /result\.imported !== true/);
+  const css = await readFile(new URL("../vendor-app/vendor.css", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /historical import|Import historical|id="(?:open-import|close-import|import-[^"]+|preview-import|commit-import)"|accept="\.sql"/);
+  assert.doesNotMatch(app, /vendor-import|clearImport|setImportBusy|submitImport|importBusy|importController|importReceipt|importSql|validImportSummary/);
+  assert.doesNotMatch(css, /vendor-import-/);
+  assert.match(html, /id="open-prices"/);
+  assert.match(html, /id="refresh-orders"/);
+  assert.match(html, /id="order-list"/);
+  assert.match(css, /\.vendor-page \.vendor-price-visibility input/);
   assert.doesNotMatch(app, /innerHTML|localStorage|sessionStorage/);
 });

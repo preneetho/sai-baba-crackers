@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFile } from "node:fs/promises";
-import { ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary } from "../vendor-app/vendor-model.mjs";
+import { ORDER_STATUSES, PAGE_SIZE, validOrder } from "../vendor-app/vendor-model.mjs";
 import { validCatalogue, validYear, catalogueProducts } from "../vendor-app/catalogue-model.mjs";
 import { products } from "../vendor-app/catalog.mjs";
 import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "../vendor-app/media-model.mjs";
@@ -12,11 +12,6 @@ const mediaAsset = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/
   resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
   duration: 0, alt: "Synthetic product photo", credit: "", proof: "p".repeat(43) };
 
-const result = {
-  requests: 1, items: 1, totalPaise: 8500, newRequests: 1, newItems: 1,
-  existingRequestsUnchanged: 0, statusDifferencesPreserved: 0,
-  statusCounts: { Completed: 1 }, unverifiedSourceHashes: 0,
-};
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const sampleOrder = {
   orderId: "SBC-00000000-0000-4000-8000-000000000001", createdAt: "2026-11-10T05:30:00.000Z",
@@ -81,6 +76,7 @@ async function harness() {
   }
   const find = (node, id) => node.id === id ? node : node.children.map(child => find(child, id)).find(Boolean);
   const get = id => {
+    if (/(?:^|-)import(?:-|$)/.test(id)) throw new Error(`Removed historical-import control accessed: ${id}`);
     const found = [...nodes.values()].map(node => find(node, id)).find(Boolean);
     if (found) return found;
     if (!nodes.has(id)) nodes.set(id, new Node());
@@ -92,9 +88,6 @@ async function harness() {
   get("price-save-bar").append(...["price-save-state", "price-view-message", "save-prices", "add-price-product"].map(get));
   const requests = [];
   let respondOrders = async () => Response.json(orderListing());
-  let respondImport = async () => new Response(JSON.stringify({
-    ...result, previewed: true, rolledBack: true, receipt: "signed.preview",
-  }));
   let respondPrice = async () => new Response(JSON.stringify({
     activeYear: 2026, years: [{ year: 2026, revision: 1 }],
     catalogue: { year: 2026, revision: 1, products: catalogueProducts(products.slice(0, 1)) },
@@ -105,7 +98,7 @@ async function harness() {
     { cloudName: mediaAsset.cloudName, resourceType: "image", params: { public_id: mediaAsset.publicId }, ticket: "synthetic.ticket" } :
     { media: { ...mediaAsset } });
   const context = vm.createContext({
-    ORDER_STATUSES, PAGE_SIZE, validOrder, validImportSummary, validCatalogue, validYear, catalogueProducts,
+    ORDER_STATUSES, PAGE_SIZE, validOrder, validCatalogue, validYear, catalogueProducts,
     validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId, inspectMediaFile, transferMedia: (...args) => transfer(...args),
     AbortController, AbortSignal, URL, URLSearchParams, Intl, console,
     document: { getElementById: get, createElement: tag => new Node(tag),
@@ -123,10 +116,6 @@ async function harness() {
         email: "owner@example.com", csrf: "a".repeat(43), expiresAt: Date.now() + 600000,
       }));
       if (path.startsWith("/api/vendor-orders")) return respondOrders(path, options);
-      if (path === "/api/vendor-import" && !options.method) return new Response(JSON.stringify({
-        enabled: true, maxFileBytes: 512000, message: "Owner-approved file only.",
-      }));
-      if (path === "/api/vendor-import") return respondImport(JSON.parse(options.body));
       if (path === "/api/vendor-auth/logout") return new Response("{}");
       if (path.startsWith("/api/vendor-catalogue")) return respondPrice(path, options);
       if (path === "/api/vendor-media") return respondMedia(JSON.parse(options.body), options);
@@ -146,17 +135,11 @@ async function harness() {
       get("price-save-bar").height = height;
       resizeBar([{ target: get("price-save-bar") }]);
     },
-    respond(callback) { respondImport = callback; },
     respondOrders(callback) { respondOrders = callback; },
     respondPrice(callback) { respondPrice = callback; },
     respondMedia(callback) { respondMedia = callback; },
     transfer(callback) { transfer = callback; },
     confirm(value) { confirmed = value; },
-    async choose() {
-      await emit("open-import");
-      get("import-file").files = [{ name: "approved.sql", size: 16, text: async () => "approved-fixture" }];
-      await emit("import-file", "change");
-    },
   };
 }
 
@@ -455,31 +438,20 @@ test("visibility edits remain in drafts across rows and save hidden products wit
   assert.equal(ui.get("price-visible-1").disabled, true);
 });
 
-test("import loads on demand, requires rolled-back preview and acknowledgement, then refreshes the register", async () => {
+test("dashboard access, price lists, refresh and sign-out work without historical-import controls or requests", async () => {
   const ui = await harness();
-  assert.equal(ui.requests.some(req => req.path === "/api/vendor-import"), false);
-  await ui.choose();
-  assert.equal(ui.get("preview-import").disabled, false);
-  assert.equal(ui.get("commit-import").disabled, true);
-  await ui.emit("import-form", "submit");
-  assert.match(ui.get("import-message").textContent, /Preview rolled back; nothing saved/);
-  assert.equal(ui.get("commit-import").disabled, true);
-  ui.get("import-ack").checked = true;
-  await ui.emit("import-ack", "change");
-  assert.equal(ui.get("commit-import").disabled, false);
+  assert.equal(ui.get("dashboard").hidden, false);
+  await ui.emit("open-prices");
+  assert.equal(ui.get("price-controls").hidden, false);
+  assert.equal(ui.get("open-prices").disabled, false);
+  assert.equal(ui.get("sign-out").disabled, false);
+  await ui.emit("close-prices");
   const listBefore = ui.requests.filter(req => req.path.startsWith("/api/vendor-orders")).length;
-  ui.respond(async body => {
-    assert.equal(body.action, "import");
-    assert.equal(body.receipt, "signed.preview");
-    assert.equal(body.acknowledge, true);
-    return new Response(JSON.stringify({ ...result, imported: true }));
-  });
-  await ui.emit("commit-import");
-  assert.match(ui.get("import-message").textContent, /Import confirmed/);
-  assert.equal(ui.get("preview-import").disabled, true);
-  assert.equal(ui.get("commit-import").disabled, true);
-  assert.equal(ui.get("import-file").value, "");
+  await ui.emit("refresh-orders");
   assert.equal(ui.requests.filter(req => req.path.startsWith("/api/vendor-orders")).length, listBefore + 1);
+  await ui.emit("sign-out");
+  assert.equal(ui.get("dashboard").hidden, true);
+  assert.equal(ui.requests.some(req => req.path.startsWith("/api/vendor-import")), false);
 });
 
   test("yearly prices load on demand, protect dirty edits and send an authenticated optimistic save", async () => {
@@ -657,50 +629,4 @@ test("sticky controls reserve their measured height for focus scrolling and rest
     ui.resizeSaveBar(height);
     assert.equal(ui.styles.get("--vendor-save-offset"), offset);
   }
-});
-test("pending imports cannot duplicate or close; logout clears private data and suppresses late responses", async () => {
-  const ui = await harness();
-  await ui.choose();
-  let finish;
-  ui.respond(() => new Promise(resolve => { finish = resolve; }));
-  await ui.emit("import-form", "submit");
-  const calls = ui.requests.length;
-  assert.equal(ui.get("import-file").disabled, true);
-  assert.equal(ui.get("close-import").disabled, true);
-  assert.equal(ui.get("sign-out").disabled, true);
-  await ui.emit("import-form", "submit");
-  await ui.emit("close-import");
-  assert.equal(ui.requests.length, calls);
-  assert.equal(ui.get("import-panel").hidden, false);
-  vm.runInContext("clearPrivateView()", ui.context);
-  finish(new Response(JSON.stringify({ ...result, previewed: true, rolledBack: true, receipt: "signed.preview" })));
-  await tick();
-  assert.equal(ui.get("import-panel").hidden, true);
-  assert.equal(ui.get("import-message").textContent, "");
-  assert.equal(ui.get("commit-import").disabled, true);
-  assert.equal(vm.runInContext("importSql", ui.context), "");
-  assert.equal(vm.runInContext("importReceipt", ui.context), "");
-});
-
-test("changed files invalidate approvals; malformed or uncertain replies require a new preview", async () => {
-  const ui = await harness();
-  await ui.choose();
-  await ui.emit("import-form", "submit");
-  ui.get("import-ack").checked = true;
-  await ui.emit("import-ack", "change");
-  await ui.emit("import-file", "change");
-  assert.equal(ui.get("commit-import").disabled, true);
-  assert.equal(ui.get("import-ack").checked, false);
-  ui.respond(async () => new Response(JSON.stringify({ ...result, previewed: true, receipt: "signed.preview" })));
-  await ui.emit("import-form", "submit");
-  assert.match(ui.get("import-message").textContent, /acknowledgement could not be verified/);
-  assert.equal(ui.get("commit-import").disabled, true);
-  ui.respond(async () => { throw new Error("Network unavailable"); });
-  await ui.emit("import-form", "submit");
-  assert.match(ui.get("import-message").textContent, /Check the register/);
-  assert.equal(ui.get("preview-import").disabled, false);
-  ui.get("import-file").files = [{ name: "orders.xlsx", size: 10, text: async () => "not SQL" }];
-  await ui.emit("import-file", "change");
-  assert.equal(ui.get("preview-import").disabled, true);
-  assert.match(ui.get("import-message").textContent, /original approved .sql file/);
 });

@@ -90,6 +90,10 @@ non-production Sheet for testing rather than copying production access.
 
 ## 4. Use and verify the dashboard
 
+The vendor page is for order requests and yearly price lists; it has no
+historical-import action or SQL-upload panel. Previously imported requests
+remain in the register and can still be viewed and updated normally.
+
 1. Open `/vendor/` and choose **Sign in with Google** using an approved account.
 2. Check a known request's ID, original IST timestamp, customer details, full
    line-item text and estimated totals against the Sheet.
