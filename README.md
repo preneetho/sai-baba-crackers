@@ -203,10 +203,11 @@ Customers open the keyboard-accessible gallery by selecting the thumbnail,
 marked with a compact expand icon. Catalogue cards do not show a play badge;
 video playback controls are available inside the gallery.
 There is no repeated caption strip; descriptions and credits stay inside the
-gallery. Covers are lazy optimized images. Video loads on play, never automatically.
-For YouTube, select **Load YouTube player**, then use the embedded player to play
-inside the gallery. The privacy-enhanced player is not loaded until requested;
-thumbnails are requested from YouTube's image CDN. Loading the player sends only
+gallery. Covers are lazy optimized images. Uploaded videos load on play.
+For YouTube, the privacy-enhanced player loads when its gallery slide opens;
+press play inside the player to start playback. No video plays automatically,
+and no YouTube player loads on catalogue cards or photo-only gallery slides.
+Thumbnails are requested from YouTube's image CDN. Loading the player sends only
 the site's origin as its identifying Referer, not the page path or customer details.
 Closing, changing media or retrying unloads the embedded player. YouTube may show
 ads and restrict playback. The video must be available and allow embedding; if

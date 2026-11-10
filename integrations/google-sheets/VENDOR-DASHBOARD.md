@@ -197,8 +197,9 @@ before saving a new product. The one-video limit includes both YouTube links and
 uploaded videos; remove the current video before adding a replacement. Link only
 permitted videos that allow embedding. Tracking, playlist and timestamp parameters
 are not retained. Upload size/duration limits do not apply to YouTube links.
-Customers load the privacy-enhanced player explicitly and play inside the gallery,
-with **Watch on YouTube** available if embedding or playback is unavailable.
+The privacy-enhanced player loads when customers open the YouTube gallery slide.
+Playback still requires pressing play; nothing plays automatically.
+**Watch on YouTube** is available if embedding or playback is unavailable.
 The application does not verify video availability or embedding permission.
 
 Files are public in Cloudinary, so do not upload private information. Publish

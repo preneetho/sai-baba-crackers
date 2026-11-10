@@ -286,44 +286,30 @@ function renderMedia() {
     retry.hidden = false;
   });
   if (youtube) {
-    status.textContent = "Load the YouTube player, then press play. Nothing plays automatically. YouTube content is loaded from YouTube.";
-    const poster = element("img", "gallery-youtube-poster");
-    poster.alt = asset.alt;
-    poster.src = mediaUrl(asset);
-    poster.addEventListener("error", () => {
-      if (galleryProduct?.media[galleryIndex] !== asset || galleryFrame) return;
-      poster.hidden = true;
-      status.textContent = "Thumbnail unavailable. You can still load the YouTube player or watch on YouTube.";
-    });
-    const watch = element("a", "", "Video unavailable? Watch on YouTube (new tab)");
+    status.textContent = "Loading YouTube player...";
+    const watch = element("a", "", "Watch on YouTube (new tab)");
     watch.href = mediaUrl(asset, "watch");
     watch.target = "_blank";
     watch.rel = "noopener noreferrer";
-    const load = element("button", "", "Load YouTube player");
-    load.type = "button";
-    load.addEventListener("click", () => {
-      const frame = element("iframe");
-      frame.title = `YouTube video: ${asset.alt}`;
-      frame.allow = "encrypted-media; picture-in-picture; fullscreen";
-      frame.allowFullscreen = true;
-      // YouTube requires an identifying Referer; disclose only this site's origin.
-      frame.referrerPolicy = "strict-origin-when-cross-origin";
-      frame.addEventListener("load", () => {
-        if (galleryFrame !== frame) return;
-        status.textContent = "Press play in the YouTube player. If playback is unavailable, use Watch on YouTube.";
-      });
-      frame.addEventListener("error", () => {
-        if (galleryFrame !== frame) return;
-        status.textContent = "The YouTube player could not load. Retry or use Watch on YouTube.";
-      });
-      frame.src = mediaUrl(asset, "play");
-      galleryFrame = frame;
-      status.textContent = "Loading YouTube player... If unavailable, use Watch on YouTube.";
-      retry.hidden = false;
-      node.replaceChildren(frame, watch);
-      frame.focus();
+    const frame = element("iframe");
+    frame.title = `YouTube video: ${asset.alt}`;
+    frame.allow = "encrypted-media; picture-in-picture; fullscreen";
+    frame.allowFullscreen = true;
+    // YouTube requires an identifying Referer; disclose only this site's origin.
+    frame.referrerPolicy = "strict-origin-when-cross-origin";
+    frame.addEventListener("load", () => {
+      if (galleryFrame !== frame) return;
+      status.textContent = "Press play to watch.";
+      retry.hidden = true;
     });
-    node.append(poster, load, watch);
+    frame.addEventListener("error", () => {
+      if (galleryFrame !== frame) return;
+      status.textContent = "The YouTube player could not load. Retry or use Watch on YouTube.";
+      retry.hidden = false;
+    });
+    frame.src = mediaUrl(asset, "play");
+    galleryFrame = frame;
+    node.append(frame, watch);
   } else if (asset.resourceType === "image") {
     status.textContent = "Loading photo...";
     node.alt = asset.alt;

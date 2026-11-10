@@ -153,7 +153,7 @@ test("photo-only covers have one expand icon without a video badge or caption", 
   assert.equal(cover.children[2].textContent, "NO. 01");
 });
 
-test("YouTube galleries require explicit loading, retain fallback links and unload frames on retry, navigation and close", async () => {
+test("YouTube galleries load players on opening without autoplay and unload frames on retry, navigation and close", async () => {
   const ui = await harness();
   const youtube = { provider: "youtube", resourceType: "video", videoId: "M7lc1UVf-VE",
     alt: "Illustrative YouTube video", credit: "<script>safe text only</script>" };
@@ -167,13 +167,13 @@ test("YouTube galleries require explicit loading, retain fallback links and unlo
   assert.equal(cover.children[1].className, "media-cover-icon media-cover-expand");
   assert.equal(cover.children.length, 3);
   assert.equal(cover.children.at(-1).textContent, "NO. 01");
+  assert.equal(ui.run("galleryFrame"), null);
   await cover.events.get("click")();
   let stage = ui.get("#product-media-stage").children[0];
-  assert.deepEqual(stage.children.map(node => node.tagName), ["IMG", "BUTTON", "A"]);
+  assert.deepEqual(stage.children.map(node => node.tagName), ["IFRAME", "A"]);
   assert.match(ui.get("#product-media-credit").textContent, /<script>safe text only<\/script>/);
-  stage.children[0].events.get("error")();
-  assert.equal(stage.children[0].hidden, true);
-  await stage.children[1].events.get("click")();
+  assert.equal(ui.get("#product-media-status").textContent, "Loading YouTube player...");
+  assert.equal(ui.get("#retry-product-media").hidden, true);
   let frame = stage.children[0];
   assert.equal(frame.tagName, "IFRAME");
   assert.equal(frame.src, mediaUrl(youtube, "play"));
@@ -182,29 +182,39 @@ test("YouTube galleries require explicit loading, retain fallback links and unlo
   assert.equal(frame.allowFullscreen, true);
   assert.equal(frame.referrerPolicy, "strict-origin-when-cross-origin");
   assert.match(frame.title, /Illustrative YouTube video/);
-  assert.equal(frame.focused, true);
+  assert.equal(frame.focused, undefined);
+  frame.events.get("load")();
+  assert.equal(ui.get("#product-media-status").textContent, "Press play to watch.");
   const link = stage.children[1];
+  assert.equal(link.textContent, "Watch on YouTube (new tab)");
   assert.equal(link.href, mediaUrl(youtube, "watch"));
   assert.equal(link.target, "_blank");
   assert.equal(link.rel, "noopener noreferrer");
   frame.events.get("error")();
   assert.match(ui.get("#product-media-status").textContent, /could not load.*Watch on YouTube/);
+  assert.equal(ui.get("#retry-product-media").hidden, false);
   await ui.emit("#retry-product-media", "click");
   assert.equal(frame.src, undefined);
   stage = ui.get("#product-media-stage").children[0];
-  await stage.children[1].events.get("click")();
+  assert.notEqual(stage.children[0], frame);
+  assert.equal(stage.children[0].src, mediaUrl(youtube, "play"));
+  assert.equal(ui.get("#retry-product-media").hidden, true);
   frame = stage.children[0];
   await ui.emit("#next-product-media", "click");
   assert.equal(frame.src, undefined);
   assert.equal(ui.get("#product-media-stage").children[0].tagName, "IMG");
   frame.events.get("load")();
+  frame.events.get("error")();
   assert.equal(ui.get("#product-media-status").textContent, "Loading photo...");
+  assert.equal(ui.get("#retry-product-media").hidden, true);
   await ui.emit("#previous-product-media", "click");
   stage = ui.get("#product-media-stage").children[0];
-  await stage.children[1].events.get("click")();
   frame = stage.children[0];
+  assert.equal(frame.src, mediaUrl(youtube, "play"));
   await ui.emit("#product-media-dialog", "close");
   assert.equal(frame.src, undefined);
+  frame.events.get("error")();
+  assert.equal(ui.get("#retry-product-media").hidden, true);
   assert.equal(ui.get("#product-media-stage").children.length, 0);
   ui.run("updateQuantity(1, 1, false)");
   assert.equal(ui.run("cart[1]"), 1);
