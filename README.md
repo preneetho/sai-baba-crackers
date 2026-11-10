@@ -119,6 +119,19 @@ At `/vendor/`, sign in and choose **Manage yearly price lists**:
 4. Choose **Make this the active year** to switch the customer catalogue.
    There is one selected year, with no automatic calendar rollover.
 
+**Out-of-stock products:** Expand a product row, uncheck **Visible to customers**
+and **Save price list**. The vendor row shows **Hidden from customers** and the
+sticky save bar counts hidden products. Hidden products keep their number,
+price and media in that year's list but are omitted from the public catalogue;
+checkout rejects hidden items rather than silently dropping them from an order.
+Recheck and save when restocked. Visibility is independent for each year;
+copying a year copies its saved visibility too. All products may be hidden, in
+which case customers see a no-products-available message rather than an error.
+This is manual availability, not quantity tracking or automatic stock depletion.
+Visibility changes create a revision and invalidate older carts like price edits.
+Previously saved orders and their retries are unchanged. No new migration or
+environment variable is required.
+
 The 15% discount and free-delivery/pickup rules are unchanged. Each save retains
 an immutable revision with the authenticated editor and timestamp. Concurrent
 edits are rejected rather than overwritten. If a response is uncertain, visible
@@ -201,6 +214,8 @@ gallery's **Watch on YouTube** fallback or replace the link. The app validates
 the link, not the video's availability, ownership or embedding permission.
 Without media, existing category/name icons remain. Preview errors offer retry
 or the icon fallback without blocking quantity controls or checkout.
+Product numbers remain visible on photo/video covers and preview-error
+fallbacks as compact thumbnail badges, without a separate caption strip.
 
 **Retention and privacy:** Files use public Cloudinary delivery, even before
 their draft is saved. Upload only permitted product media, never customer data

@@ -133,6 +133,15 @@ fields and actions. Closing or switching rows keeps unsaved edits. The sticky
 working, saved and reload-required states. **View error** takes you to the
 full message when an action fails. Saving an incomplete product reopens it.
 
+For sold-out products, expand the row, uncheck **Visible to customers** and
+**Save price list**. The row stays available to the vendor, marked **Hidden from
+customers**, with its number, price and media intact. Recheck and save when
+restocked. Visibility belongs to the selected year and is copied with a saved
+list; it does not track stock quantities or deplete automatically. Hidden items
+are excluded from the public API and rejected at checkout. Hiding every product
+shows a friendly empty catalogue. Existing orders are unaffected; unsent carts
+from an older revision must be reviewed again.
+
 There is exactly one active year and no automatic rollover. Saving an active
 list updates new-request prices immediately after confirmation. Existing order
 snapshots are unchanged, and the 15% customer discount remains in place.

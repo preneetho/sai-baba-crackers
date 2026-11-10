@@ -20,6 +20,9 @@ export function sanitizeCart(value, catalogue = products) {
         !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
       throw new Error("The saved cart contains an invalid product or quantity. Start a new cart.");
     }
+    if (byId.get(Number(id)).hidden === true) {
+      throw new Error("A selected product is no longer available. Reload the catalogue and review your cart before submitting.");
+    }
     cart[id] = quantity;
   }
   return cart;
@@ -28,7 +31,7 @@ export function sanitizeCart(value, catalogue = products) {
 export function cartLines(cart, catalogue = products) {
   const byId = new Map(catalogue.map(product => [product.id, product]));
   return Object.entries(sanitizeCart(cart, catalogue)).map(([id, quantity]) => {
-    const { media, ...product } = byId.get(Number(id));
+    const { media, hidden, ...product } = byId.get(Number(id));
     return { ...product, quantity, amount: Math.round(product.price * 100) * quantity / 100 };
   });
 }

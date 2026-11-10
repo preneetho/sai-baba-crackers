@@ -282,6 +282,46 @@ test("stale upload authorization forces a saved-list reload without discarding v
   assert.match(ui.get("price-message").textContent, /saved list changed.*existing edits/);
 });
 
+test("visibility edits remain in drafts across rows and save hidden products without deleting their details or media", async () => {
+  const ui = await harness();
+  await ui.emit("open-prices");
+  vm.runInContext("priceList.products.push({ ...priceList.products[0], id: 2 }); priceList.products[0].media = [asset]",
+    Object.assign(ui.context, { asset: mediaAsset }));
+  await ui.emit("price-toggle-1");
+  assert.equal(ui.get("price-visible-1").checked, true);
+  ui.get("price-visible-1").checked = false;
+  await ui.emit("price-visible-1", "change");
+  assert.equal(vm.runInContext("priceList.products[0].hidden", ui.context), true);
+  assert.match(ui.get("price-toggle-1").getAttribute("aria-label"), /Hidden from customers/);
+  assert.match(ui.get("price-save-state").textContent, /2 products, 1 hidden.*Unsaved changes/);
+  const status = ui.get("price-toggle-1").querySelectorAll("small").find(node => node.textContent === "Hidden from customers");
+  assert.equal(status.hidden, false);
+  await ui.emit("price-toggle-2");
+  await ui.emit("price-toggle-1");
+  assert.equal(ui.get("price-visible-1").checked, false);
+  assert.equal(ui.get("save-prices").disabled, false);
+  let saved;
+  ui.respondPrice(async (_path, options) => {
+    const body = JSON.parse(options.body);
+    saved = body.products;
+    return Response.json({ activeYear: 2026, years: [{ year: 2026, revision: 2 }],
+      catalogue: { year: 2026, revision: 2, products: body.products } });
+  });
+  await ui.emit("price-form", "submit");
+  assert.equal(saved.length, 2);
+  assert.equal(saved[0].hidden, true);
+  assert.deepEqual(saved[0].media, [mediaAsset]);
+  assert.equal(ui.get("save-prices").disabled, true);
+  assert.equal(ui.get("price-visible-1").checked, false);
+  ui.get("price-visible-1").checked = true;
+  await ui.emit("price-visible-1", "change");
+  assert.equal(vm.runInContext("priceList.products[0].hidden", ui.context), false);
+  assert.equal(ui.get("price-toggle-1").getAttribute("aria-label").includes("Hidden from customers"), false);
+  assert.match(ui.get("price-save-state").textContent, /2 products\. Unsaved changes/);
+  vm.runInContext("priceNeedsReload = true; setPriceBusy(false)", ui.context);
+  assert.equal(ui.get("price-visible-1").disabled, true);
+});
+
 test("import loads on demand, requires rolled-back preview and acknowledgement, then refreshes the register", async () => {
   const ui = await harness();
   assert.equal(ui.requests.some(req => req.path === "/api/vendor-import"), false);

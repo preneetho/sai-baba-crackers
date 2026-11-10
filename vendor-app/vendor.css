@@ -50,8 +50,10 @@
 .vendor-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .vendor-import-form { display: grid; gap: 16px; margin-top: 16px; }
 .vendor-import-form button { justify-self: start; }
-.vendor-page .vendor-import-ack { display: flex; align-items: start; gap: 12px; }
-.vendor-page .vendor-import-ack input { flex: 0 0 22px; width: 22px; min-height: 22px; margin-top: 2px; }
+.vendor-page .vendor-import-ack, .vendor-page .vendor-price-visibility { display: flex; align-items: start; gap: 12px; }
+.vendor-page .vendor-import-ack input, .vendor-page .vendor-price-visibility input { flex: 0 0 22px; width: 22px; min-height: 22px; margin-top: 2px; }
+.vendor-price-visibility { grid-column: 1 / -1; min-height: 44px; }
+.vendor-price-visibility small { display: block; color: var(--muted); font-weight: 400; }
 .vendor-price-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 20px 0; }
 .vendor-price-toolbar label { flex: 1 1 180px; }
 .vendor-price-save-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-block: 12px; background: var(--surface); border-block: 1px solid var(--line); }

@@ -160,7 +160,8 @@ function setPriceBusy(value) {
   $("activate-prices").disabled = value || priceNeedsReload || priceDirty || !priceList || activePriceYear === priceList.year;
   $("save-prices").disabled = value || priceNeedsReload || !priceDirty;
   $("add-price-product").disabled = value || priceNeedsReload || !priceList || priceList.products.length >= 200;
-  const state = !priceList ? "" : `${priceList.year} - ${priceList.products.length} products. ${
+  const hiddenCount = priceList?.products.filter(product => product.hidden === true).length ?? 0;
+  const state = !priceList ? "" : `${priceList.year} - ${priceList.products.length} products${hiddenCount ? `, ${hiddenCount} hidden` : ""}. ${
     value ? "Working... Please wait." : priceNeedsReload ? "Reload required. Edits kept." :
       priceDirty ? "Unsaved changes." : "All changes saved."}`;
   if ($("price-save-state").textContent !== state) $("price-save-state").textContent = state;
@@ -192,7 +193,8 @@ function renderPriceProducts() {
     const nameText = element("span");
     const productName = element("span", product.name.trim() || `New product #${product.id}`);
     const brand = element("small", product.brand);
-    nameText.append(productName, brand);
+    const hidden = element("small", "Hidden from customers");
+    nameText.append(productName, brand, hidden);
     toggle.append(nameText);
     toggle.addEventListener("click", () => togglePriceProduct(product.id));
     name.append(toggle);
@@ -205,7 +207,8 @@ function renderPriceProducts() {
       category.textContent = product.category;
       pack.textContent = product.unit;
       price.textContent = Number.isFinite(product.price) ? money(product.price).slice(3) : "Not set";
-      toggle.setAttribute("aria-label", `${expanded ? "Collapse" : "Edit"} product #${product.id}: ${productName.textContent}`);
+      hidden.hidden = product.hidden !== true;
+      toggle.setAttribute("aria-label", `${expanded ? "Collapse" : "Edit"} product #${product.id}: ${productName.textContent}${product.hidden === true ? ". Hidden from customers" : ""}`);
     };
     updateSummary();
     const media = element("td", `${product.media?.length ?? 0}/4`, "vendor-price-number");
@@ -250,6 +253,22 @@ function renderPriceProducts() {
       label.append(input);
       row.append(label);
     }
+    const visibility = element("label", undefined, "vendor-price-visibility");
+    const visible = element("input");
+    visible.id = `price-visible-${product.id}`;
+    visible.type = "checkbox";
+    visible.checked = product.hidden !== true;
+    const visibilityText = element("span", "Visible to customers");
+    visibilityText.append(element("small", "Uncheck when out of stock. Save price list to apply; hidden products stay in this year's list."));
+    visible.addEventListener("change", () => {
+      if (priceBusy || priceNeedsReload) return;
+      product.hidden = !visible.checked;
+      updateSummary();
+      priceDirty = true;
+      setPriceBusy(false);
+    });
+    visibility.append(visible, visibilityText);
+    row.append(visibility);
     const remove = element("button", `Remove product #${product.id}`);
     remove.type = "button";
     remove.addEventListener("click", () => {

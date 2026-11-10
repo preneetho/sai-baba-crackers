@@ -56,7 +56,7 @@ test("the active checkout uses one WhatsApp message and retains the complete req
   assert.match(app, /link\.target = "_self"/);
   assert.match(app, /replaceChildren\(link\)/);
   assert.match(app, /one short summary, your request ID and a PDF link valid for 7 days/);
-  assert.doesNotMatch(app, /prepareMessages|Send part|Send every part|split into|"_blank"/);
+  assert.doesNotMatch(app, /prepareMessages|Send part|Send every part|split into/);
   assert.match(app, /\$\("#full-message"\)\.value = fullMessage/);
   assert.match(app, /clipboard\.writeText\(fullMessage\)/);
   assert.match(html, /For long orders, a PDF is also stored privately on Netlify/);

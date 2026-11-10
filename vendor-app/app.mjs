@@ -183,15 +183,21 @@ function renderProducts() {
   if (sort === "name") filtered.sort((a, b) => a.name.localeCompare(b.name));
   $("#results-count").textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"}${category === "All products" ? "" : ` in ${category.toLowerCase()}`}`;
   $("#no-results").hidden = filtered.length !== 0;
+  $("#no-results-title").textContent = products.length ? "No products found" : "No products currently available";
+  $("#no-results-message").textContent = products.length ? "Try a different product name or category." :
+    "Please check back later or contact the shop.";
+  $("#reset-filters").hidden = products.length === 0;
   $("#products").replaceChildren(...filtered.map(product => {
     const card = element("article", `product-card${cart[product.id] ? " in-cart" : ""}`);
     card.dataset.id = product.id;
     const hasMedia = Boolean(product.media?.length);
     const art = element(hasMedia ? "button" : "div", `product-art art-${categories.indexOf(product.category) % 4}${hasMedia ? " media-cover" : ""}`);
+    const number = element("span", hasMedia ? "media-cover-number" : "product-number", `NO. ${String(product.id).padStart(2, "0")}`);
+    number.setAttribute("aria-hidden", "true");
     if (hasMedia) {
       art.type = "button";
       art.dataset.mediaProduct = String(product.id);
-      const label = `View photos and videos for ${product.name}`;
+      const label = `View photos and videos for ${product.name}, product ${product.id}`;
       art.setAttribute("aria-label", label);
       art.setAttribute("aria-haspopup", "dialog");
       art.title = "View photos & videos";
@@ -206,13 +212,13 @@ function renderProducts() {
         art.setAttribute("aria-label", `Preview unavailable. ${label}`);
         const failure = element("span", "media-cover-error", "Preview unavailable");
         failure.setAttribute("aria-hidden", "true");
-        art.replaceChildren(productIllustration(product), failure, expand, ...(play ? [play] : []));
+        art.replaceChildren(productIllustration(product), failure, expand, ...(play ? [play] : []), number);
       }, { once: true });
-      art.append(cover, expand, ...(play ? [play] : []));
+      art.append(cover, expand, ...(play ? [play] : []), number);
       art.addEventListener("click", () => openMedia(product, art));
     } else {
       art.setAttribute("aria-hidden", "true");
-      art.append(element("span", "product-number", `NO. ${String(product.id).padStart(2, "0")}`),
+      art.append(number,
         productIllustration(product),
         element("span", "art-category", product.category));
     }
@@ -694,9 +700,9 @@ async function loadCatalogue() {
     const response = await fetch("/api/catalogue", { cache: "no-store", signal: AbortSignal.timeout(25000) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "The price list is unavailable.");
-    if (!validCatalogue(result)) throw new Error("The price list could not be verified. Retry or contact the shop.");
+    if (!validCatalogue(result, { allowEmpty: true })) throw new Error("The price list could not be verified. Retry or contact the shop.");
     catalogue = result;
-    products = result.products;
+    products = result.products.filter(product => product.hidden !== true);
     categories = ["All products", ...new Set(products.map(product => product.category))];
     category = "All products";
     cart = {};

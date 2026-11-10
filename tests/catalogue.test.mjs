@@ -289,11 +289,72 @@ test("vendor catalogue requires approved login, origin and CSRF before opening t
   assert.equal(calls, 0);
 });
 
+test("visibility defaults to visible, remains private and yearly, and can be restored without changing product numbers", async () => {
+  const rows = catalogueProducts(products);
+  rows[0].hidden = true;
+  assert.equal((await edit({ action: "save", year: 2026, expectedRevision: 1, products: rows })).status, 200);
+  assert.equal((await database.activeCatalogue()).products[0].hidden, true);
+  let visible = await (await publicList()).json();
+  assert.equal(visible.products.length, products.length - 1);
+  assert.equal(visible.products.some(product => product.id === 1), false);
+  assert.equal(visible.products.some(product => "hidden" in product), false);
+  await database.priceLists({ action: "create", year: 2027, sourceYear: 2026, expectedRevision: 2 }, "owner@example.com");
+  rows[0].hidden = false;
+  assert.equal((await edit({ action: "save", year: 2026, expectedRevision: 2, products: rows })).status, 200);
+  assert.deepEqual((await (await publicList()).json()).products, catalogueProducts(products));
+  assert.equal((await database.catalogueVersion(2026, 2)).products[0].hidden, true);
+  assert.equal((await database.catalogueVersion(2027, 1)).products[0].hidden, true);
+  assert.equal((await database.catalogueVersion(2026, 1)).products[0].hidden, undefined);
+  await activate(2027);
+  visible = await (await publicList()).json();
+  assert.equal(visible.year, 2027);
+  assert.equal(visible.products.some(product => product.id === 1), false);
+  assert.deepEqual(buildOrder(payload(), now, { ...base, products: [{ ...products[0], hidden: false }] }),
+    buildOrder(payload(), now, { ...base, products: [products[0]] }));
+});
+
+test("all products can be hidden while the private yearly list and a valid empty public catalogue remain available", async () => {
+  const rows = products.map(product => ({ ...product, hidden: true }));
+  assert.equal((await edit({ action: "save", year: 2026, expectedRevision: 1, products: rows })).status, 200);
+  const response = await publicList();
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { year: 2026, revision: 2, products: [] });
+  const privateResponse = await handleVendorCatalogue(request("/api/vendor-catalogue"), options);
+  assert.equal((await privateResponse.json()).catalogue.products.length, products.length);
+  assert.equal(validCatalogue({ ...base, products: [] }), false);
+  assert.equal(validCatalogue({ ...base, products: [] }, { allowEmpty: true }), true);
+  rows[0].hidden = false;
+  assert.equal((await edit({ action: "save", year: 2026, expectedRevision: 2, products: rows })).status, 200);
+  assert.deepEqual((await (await publicList()).json()).products, catalogueProducts(products.slice(0, 1)));
+});
+
+test("hidden products reject current and stale new checkouts without affecting existing orders or idempotent retries", async () => {
+  assert.equal((await submit(payload())).status, 200);
+  const detail = () => database.dashboard({ action: "vendor-detail", orderId: "SBC-00000000-0000-4000-8000-000000000001" });
+  const previous = await detail();
+  const rows = catalogueProducts(products);
+  rows[0].hidden = true;
+  await save(2026, 1, rows);
+  const mixed = { ...payload(2, 2026, 2), cart: { 1: 1, 2: 1 } };
+  const rejected = await submit(mixed);
+  assert.equal(rejected.status, 400);
+  assert.match((await rejected.json()).error, /no longer available.*Reload the catalogue/);
+  assert.equal((await submit(payload(1, 2026, 2))).status, 409);
+  assert.equal((await submit(payload())).status, 200);
+  assert.deepEqual(await detail(), previous);
+  assert.equal((await engine.query("select count(*)::int as count from order_requests")).rows[0].count, 1);
+  assert.equal((await submit({ ...payload(2, 2026, 3), cart: { 2: 1 } })).status, 200);
+  rows[0].hidden = false;
+  await save(2026, 2, rows);
+  assert.equal((await submit(payload(3, 2026, 4))).status, 200);
+});
+
 test("invalid years, duplicate products, missing fields, fractional paise and oversized prices are rejected", async () => {
   for (const row of [
     { ...products[0], price: 1.001 }, { ...products[0], price: 100001 },
     { ...products[0], price: -1 }, { ...products[0], name: "" },
     { ...products[0], id: 0 }, { ...products[0], category: "bad\ncategory" },
+    ...["true", "false", 0, 1, null, {}].map(hidden => ({ ...products[0], hidden })),
   ]) {
     assert.equal(validCatalogue({ ...base, products: [row] }), false);
     assert.equal((await edit({ action: "save", year: 2026, expectedRevision: 1, products: [row] })).status, 400);

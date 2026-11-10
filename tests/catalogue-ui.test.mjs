@@ -104,6 +104,8 @@ test("customer media covers and gallery preserve cart controls, render credits s
   assert.equal(cover.children.some(child => child.className === "media-cover-caption"), false);
   assert.equal(cover.children.filter(child => child.className?.includes("media-cover-icon")).length, 2);
   assert.equal(cover.children[1].getAttribute("aria-hidden"), "true");
+  assert.equal(cover.children.find(child => child.className === "media-cover-number").textContent, "NO. 01");
+  assert.match(cover.getAttribute("aria-label"), /product 1$/);
   await cover.events.get("click")();
   assert.equal(ui.get("#product-media-dialog").open, true);
   assert.equal(ui.get("#product-media-credit").textContent, `Credit / license: ${photo.credit}`);
@@ -135,6 +137,7 @@ test("customer media covers and gallery preserve cart controls, render credits s
   assert.match(cover.children.find(child => child.className === "media-cover-error").textContent, /Preview unavailable/);
   assert.match(cover.getAttribute("aria-label"), /Preview unavailable.*View photos/);
   assert.equal(cover.children.filter(child => child.className?.includes("media-cover-icon")).length, 2);
+  assert.equal(cover.children.find(child => child.className === "media-cover-number").textContent, "NO. 01");
 });
 
 test("photo-only covers have one expand icon without a video badge or caption", async () => {
@@ -145,8 +148,9 @@ test("photo-only covers have one expand icon without a video badge or caption", 
   ui.respond(async () => Response.json({ year: 2026, revision: 1, products: [{ ...products[0], media: [photo] }] }));
   await ui.emit("#reload-catalogue", "click");
   const cover = ui.get("#products").children[0].children[0];
-  assert.equal(cover.children.length, 2);
+  assert.equal(cover.children.length, 3);
   assert.equal(cover.children[1].className, "media-cover-icon media-cover-expand");
+  assert.equal(cover.children[2].textContent, "NO. 01");
 });
 
 test("YouTube galleries require explicit loading, retain fallback links and unload frames on retry, navigation and close", async () => {
@@ -160,7 +164,8 @@ test("YouTube galleries require explicit loading, retain fallback links and unlo
   await ui.emit("#reload-catalogue", "click");
   const cover = ui.get("#products").children[0].children[0];
   assert.equal(cover.children[0].src, mediaUrl(youtube));
-  assert.equal(cover.children.at(-1).className, "media-cover-icon media-cover-play");
+  assert.equal(cover.children[2].className, "media-cover-icon media-cover-play");
+  assert.equal(cover.children.at(-1).textContent, "NO. 01");
   await cover.events.get("click")();
   let stage = ui.get("#product-media-stage").children[0];
   assert.deepEqual(stage.children.map(node => node.tagName), ["IMG", "BUTTON", "A"]);
@@ -202,6 +207,64 @@ test("YouTube galleries require explicit loading, retain fallback links and unlo
   assert.equal(ui.get("#product-media-stage").children.length, 0);
   ui.run("updateQuantity(1, 1, false)");
   assert.equal(ui.run("cart[1]"), 1);
+});
+
+test("product numbers remain stable on photo, uploaded-video, YouTube and icon covers after filtering and quantity changes", async () => {
+  const ui = await harness();
+  const photo = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
+    resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
+    duration: 0, alt: "Synthetic photo", credit: "" };
+  const video = { ...photo, resourceType: "video", duration: 10, format: "mp4" };
+  const youtube = { provider: "youtube", resourceType: "video", videoId: "M7lc1UVf-VE", alt: "Synthetic video", credit: "" };
+  const rows = [photo, video, youtube, null].map((asset, index) => ({
+    ...products[0], id: index === 3 ? 999999 : index + 10, ...(asset ? { media: [asset] } : {}),
+  }));
+  ui.respond(async () => Response.json({ year: 2026, revision: 1, products: rows }));
+  await ui.emit("#reload-catalogue", "click");
+  for (const [index, card] of ui.get("#products").children.entries()) {
+    const cover = card.children[0];
+    const badge = cover.children.find(node => ["media-cover-number", "product-number"].includes(node.className));
+    assert.equal(badge.textContent, `NO. ${rows[index].id}`);
+    if (index < 3) {
+      cover.children[0].events.get("error")();
+      assert.equal(cover.children.find(node => node.className === "media-cover-number"), badge);
+    }
+  }
+  ui.run("query = '11'; renderProducts(); updateQuantity(11, 1, false)");
+  assert.equal(ui.get("#products").children.length, 1);
+  assert.equal(ui.get("#products").children[0].children[0].children.at(-1).textContent, "NO. 11");
+});
+
+test("an empty public catalogue is a valid out-of-stock state, and products can reappear when restocked", async () => {
+  const ui = await harness();
+  ui.run("updateQuantity(1, 2, false)");
+  ui.respond(async () => Response.json({ year: 2026, revision: 2, products: [] }));
+  await ui.emit("#reload-catalogue", "click");
+  assert.equal(ui.get("#products").children.length, 0);
+  assert.equal(ui.get("#review").disabled, true);
+  assert.equal(ui.get("#no-results").hidden, false);
+  assert.equal(ui.get("#no-results-title").textContent, "No products currently available");
+  assert.equal(ui.get("#no-results-message").textContent, "Please check back later or contact the shop.");
+  assert.equal(ui.get("#reset-filters").hidden, true);
+  assert.match(ui.get("#catalogue-status").textContent, /2026 price list loaded/);
+  assert.equal(ui.run("Object.keys(cart).length"), 0);
+  ui.respond(async () => Response.json({ year: 2026, revision: 3, products: [products[0]] }));
+  await ui.emit("#reload-catalogue", "click");
+  assert.equal(ui.get("#products").children.length, 1);
+  assert.equal(ui.get("#no-results").hidden, true);
+  assert.equal(ui.get("#reset-filters").hidden, false);
+  ui.run("query = 'not-a-product'; renderProducts()");
+  assert.equal(ui.get("#no-results-title").textContent, "No products found");
+  assert.equal(ui.get("#no-results").hidden, false);
+});
+
+test("customer rendering also excludes explicitly hidden products if they reach a catalogue response", async () => {
+  const ui = await harness();
+  ui.respond(async () => Response.json({ year: 2026, revision: 2,
+    products: [{ ...products[0], hidden: true }, products[1]] }));
+  await ui.emit("#reload-catalogue", "click");
+  assert.equal(ui.get("#products").children.length, 1);
+  assert.equal(ui.get("#products").children[0].dataset.id, products[1].id);
 });
 
 test("catalogue failures are explicit, block checkout, and allow retry without a static-price fallback", async () => {
@@ -254,6 +317,10 @@ test("checkout submits catalogue metadata and server returns the authoritative W
   assert.match(ui.get("#full-message").value, /Synthetic saved message from server/);
   assert.equal(ui.get("#message-preview").hidden, false);
   assert.equal(ui.get("#customer-form").hidden, true);
+  const links = ui.get("#message-links").children;
+  assert.equal(links.length, 1);
+  assert.equal(links[0].target, "_self");
+  assert.match(links[0].href, /^https:\/\/wa\.me\//);
 });
 
 test("large yearly catalogues retain the full request and use a single PDF summary in WhatsApp", async () => {
