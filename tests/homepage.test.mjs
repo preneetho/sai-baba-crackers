@@ -24,7 +24,7 @@ test("the homepage has crawlable services, honest fulfilment information and wor
   assert.match(html, /Weddings &amp; family functions/);
   assert.match(html, /Diwali &amp; festivals/);
   assert.match(html, /Bulk requirements/);
-  assert.match(html, /Citywide or same-day delivery is not guaranteed/);
+  assert.match(html, /We deliver across Hyderabad and aim for same-day delivery, subject to availability and shop confirmation/);
   assert.match(html, /Outside the festival season, call first/);
   assert.match(html, /not a professional fireworks-display or event-operation service/);
   assert.match(html, /A submitted request is not a confirmed sale/);

@@ -145,6 +145,8 @@ function setPriceBusy(value) {
   $("open-offers").disabled = value || homepageBusy || offerBusy;
   $("activate-prices").disabled = blocked || priceNeedsReload || priceDirty || !priceList || activePriceYear === priceList.year;
   $("save-prices").disabled = blocked || priceNeedsReload || !priceDirty;
+  $("download-price-pdf").disabled = blocked || priceNeedsReload || priceDirty || !priceList ||
+    !priceList.products.some(product => product.hidden !== true);
   $("add-price-product").disabled = blocked || priceNeedsReload || !priceList || priceList.products.length >= 200;
   const hiddenCount = priceList?.products.filter(product => product.hidden === true).length ?? 0;
   const state = !priceList ? "" : `${priceList.year} - ${priceList.products.length} products${hiddenCount ? `, ${hiddenCount} hidden` : ""}. ${
@@ -692,10 +694,18 @@ function showAccess(message, error = false, canSignIn = true) {
   $("access-retry").hidden = false;
 }
 
-async function api(path, { signal, ...options } = {}) {
+async function api(path, { signal, pdf = false, ...options } = {}) {
   const response = await fetch(path, {
     credentials: "same-origin", cache: "no-store", signal: signal ?? AbortSignal.timeout(25000), ...options,
   });
+  if (response.ok && pdf) {
+    if (response.headers.get("content-type")?.split(";")[0] !== "application/pdf") {
+      throw new Error("The server did not return a PDF. Retry or check the deployment.");
+    }
+    const blob = await response.blob();
+    if (!blob.size) throw new Error("The server returned an empty PDF. Retry the download.");
+    return blob;
+  }
   let body;
   try {
     body = await response.json();
@@ -1210,6 +1220,35 @@ $("close-prices").addEventListener("click", () => {
 $("reload-prices").addEventListener("click", () => {
   if (priceDirty && !window.confirm("Reloading discards visible unsaved edits. Continue?")) return;
   loadPrices(priceList?.year);
+});
+$("download-price-pdf").addEventListener("click", async () => {
+  if (!session || priceBusy || offerBusy || priceNeedsReload || priceDirty || !priceList) return;
+  const version = priceVersion;
+  const { year, revision } = priceList;
+  setPriceBusy(true);
+  notice("price-message", `Preparing the ${year} price-list PDF...`);
+  try {
+    const blob = await api(`/api/vendor-price-list-pdf?year=${year}&revision=${revision}`, { pdf: true });
+    if (version !== priceVersion || !session) return;
+    const url = URL.createObjectURL(blob);
+    try {
+      const link = element("a");
+      link.href = url;
+      link.download = `sai-baba-price-list-${year}-v${revision}.pdf`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+    notice("price-message", `PDF download started for ${year}, version ${revision}. Check your browser's downloads.`);
+  } catch (error) {
+    if (version !== priceVersion || !session) return;
+    if (error.status === 409) priceNeedsReload = true;
+    notice("price-message", error.message, true);
+  } finally {
+    if (version === priceVersion) setPriceBusy(false);
+  }
 });
 $("price-view-message").addEventListener("click", () => {
   $("price-message").scrollIntoView({ block: "center" });

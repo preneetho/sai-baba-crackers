@@ -36,7 +36,7 @@ let galleryTrigger = null;
 let galleryVideo = null;
 let galleryFrame = null;
 const warning = $("#storage-warning");
-const updateOfferCarousel = initializeOfferCarousel($("#shop-offers"), $("#shop-offers-toggle"));
+const updateOfferCarousel = initializeOfferCarousel($("#shop-offers"), $("#shop-offers-toggle"), $("#shop-offers-dots"));
 
 function showStorageWarning(message, reset = false) {
   warning.replaceChildren(document.createTextNode(message));

@@ -6,7 +6,8 @@ const panel = document.getElementById("home-offers");
 const status = document.getElementById("home-offers-status");
 const retry = document.getElementById("home-offers-retry");
 const list = document.getElementById("home-coupons");
-const updateCarousel = initializeOfferCarousel(list, document.getElementById("home-offers-toggle"));
+const updateCarousel = initializeOfferCarousel(list, document.getElementById("home-offers-toggle"),
+  document.getElementById("home-offers-dots"));
 async function load() {
   retry.disabled = true;
   status.textContent = "Loading current offers...";
@@ -24,7 +25,7 @@ async function load() {
       `Free delivery on billed amounts of ${money(freeDeliveryMinimum)} or more after coupon discount. Below this, delivery is ${money(deliveryFee)}.` :
       "Free home delivery on all billed amounts.";
     for (const node of document.querySelectorAll("[data-delivery-terms]")) {
-      node.textContent = `${delivery} Store pickup is free. Delivery area and timing must be confirmed by the shop.`;
+      node.textContent = `${delivery} Store pickup is free. We deliver across Hyderabad and aim for same-day delivery, subject to availability and shop confirmation.`;
     }
     status.textContent = "";
     panel.hidden = false;

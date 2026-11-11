@@ -5,6 +5,14 @@ import { initializeOfferCarousel } from "../vendor-app/offer-widgets.mjs";
 function carousel({ reduced = false, overflow = true } = {}) {
   const document = new EventTarget();
   document.hidden = false;
+  document.createElement = () => {
+    const node = new EventTarget();
+    const attributes = new Map();
+    node.setAttribute = (name, value) => attributes.set(name, value);
+    node.getAttribute = name => attributes.get(name);
+    node.focus = () => { document.activeElement = node; };
+    return node;
+  };
   const motion = new EventTarget();
   motion.matches = reduced;
   const timers = new Map();
@@ -34,16 +42,21 @@ function carousel({ reduced = false, overflow = true } = {}) {
   const list = new EventTarget();
   const scrolls = [];
   Object.assign(list, {
-    ownerDocument: document, parentElement: new EventTarget(),
+    id: "test-offers", ownerDocument: document, parentElement: new EventTarget(),
     scrollWidth: overflow ? 550 : 200, clientWidth: 200, scrollLeft: 0,
     firstElementChild: { getBoundingClientRect: () => ({ width: 100 }) },
     contains: node => node === list.firstElementChild,
-    scrollTo(options) { this.scrollLeft = options.left; scrolls.push(options); },
+    children: Array.from({ length: 5 }, () => ({})),
+    scrollTo(options) { this.scrollLeft = options.left; scrolls.push(options); this.dispatchEvent(new Event("scroll")); },
   });
   const toggle = new EventTarget();
-  initializeOfferCarousel(list, toggle);
+  const pagination = new EventTarget();
+  pagination.children = [];
+  pagination.replaceChildren = (...children) => { pagination.children = children; };
+  pagination.contains = node => pagination.children.includes(node);
+  initializeOfferCarousel(list, toggle, pagination);
   return {
-    list, toggle, document, motion, view, timers, scrolls,
+    list, toggle, pagination, document, motion, view, timers, scrolls,
     visible: value => intersection([{ isIntersecting: value }]),
     resize: () => resize(),
     tick: () => { for (const callback of [...timers.values()]) callback(); },
@@ -137,7 +150,31 @@ test("reduced motion prevents automatic scrolling, including preference changes,
 test("missing observers leave offers manually scrollable rather than stopping the storefront script", () => {
   const list = { ownerDocument: { defaultView: {} }, scrollLeft: 0 };
   const toggle = {};
-  const update = initializeOfferCarousel(list, toggle);
+  const update = initializeOfferCarousel(list, toggle, {});
   assert.equal(toggle.hidden, true);
   assert.doesNotThrow(update);
+});
+
+test("carousel dots follow automatic and manual scrolling, navigate directly and hide when all cards fit", () => {
+  const scene = carousel();
+  scene.visible(true);
+  const dots = scene.pagination.children;
+  assert.equal(dots.length, 5);
+  assert.equal(dots[0].getAttribute("aria-current"), "true");
+  scene.tick();
+  assert.equal(dots[1].getAttribute("aria-current"), "true");
+  assert.equal(dots[0].getAttribute("aria-current"), "false");
+  scene.emit(dots[3], "click");
+  assert.equal(scene.list.scrollLeft, 336);
+  assert.equal(dots[3].getAttribute("aria-current"), "true");
+  scene.list.scrollTo({ left: 350, behavior: "instant" });
+  assert.equal(dots[4].getAttribute("aria-current"), "true");
+  scene.motion.matches = true;
+  scene.emit(scene.motion, "change");
+  scene.emit(dots[0], "click");
+  assert.equal(scene.list.scrollLeft, 0);
+  assert.equal(scene.scrolls.at(-1).behavior, "instant");
+  scene.list.scrollWidth = scene.list.clientWidth;
+  scene.resize();
+  assert.equal(scene.pagination.hidden, true);
 });

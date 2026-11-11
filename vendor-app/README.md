@@ -116,13 +116,24 @@ targets visible. The catalogue offer ribbon and homepage show enabled vendor cou
 only when **Show on website** is checked. Both use horizontal coupon cards with
 copy feedback and a separate free-delivery card showing the configured post-discount
 minimum and fee. Cards can be swiped, scrolled or reached by keyboard. Overflowing
-cards advance every 4.5 seconds while visible; **Pause offers** stops this until
+cards show a preview of the next card and clickable page dots below, with the
+active dot following manual or automatic movement. Soft theme-based gradients
+keep the homepage violet/navy and the shopping page blue/cream.
+Cards advance every 4.5 seconds while visible; **Pause offers** stops this until
 resumed. Hover, keyboard focus, a hidden tab or an offscreen strip temporarily pause
 advancement. Reduced-motion preferences disable automatic scrolling entirely.
+
+In **Manage yearly price lists**, **Download price list PDF** downloads the selected
+year's saved version, including product numbers, categories, brands, selling packs
+and full prices. Hidden products are excluded. Save unsaved edits first; if another
+vendor changes that version, reload before downloading. Coupons and delivery charges
+are not applied. The authenticated endpoint generates the PDF on demand using the
+same bundled Unicode fonts as order PDFs; it does not create a public share link.
 The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon.
 The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
 experience, coupon savings and delivery/pickup options. Delivery area and timing
-remain subject to shop confirmation.
+remain subject to availability and shop confirmation. Delivery covers Hyderabad,
+with same-day delivery on a best-effort basis, not a guarantee.
 The homepage hero uses the original, bundled `modern-fireworks.svg` static fallback
 (under 5 KB) in the requested purple, orange and gold palette. The shopping hero
 uses the original `diwali-fireworks.png` artwork without canvas animation.

@@ -81,7 +81,9 @@
             <label>Price-list year<select id="price-year"></select></label>
             <p id="price-active" class="vendor-muted"></p>
             <button id="activate-prices" type="button">Make this the active year</button>
+            <button id="download-price-pdf" type="button" aria-describedby="price-pdf-help" disabled>Download price list PDF</button>
           </div>
+          <p id="price-pdf-help" class="vendor-muted">PDF includes the selected year's saved prices and excludes hidden products. Save changes before downloading. Coupons and delivery charges are not included.</p>
           <form id="create-price-year" class="vendor-price-toolbar">
             <label>New year<input id="new-price-year" type="number" min="2000" max="9999" step="1" required></label>
             <button type="submit">Copy selected list to new year</button>

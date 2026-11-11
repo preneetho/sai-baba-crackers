@@ -9,6 +9,7 @@ import { handleVendorOrders } from "../netlify/functions/vendor-orders.mjs";
 import { handleVendorImport } from "../netlify/functions/vendor-import.mjs";
 import { handleCatalogue } from "../netlify/functions/catalogue.mjs";
 import { handleVendorCatalogue } from "../netlify/functions/vendor-catalogue.mjs";
+import { handleVendorPriceListPdf } from "../netlify/functions/vendor-price-list-pdf.mjs";
 import { handleVendorMedia } from "../netlify/functions/vendor-media.mjs";
 import { handleVendorOrderShare } from "../netlify/functions/vendor-order-share.mjs";
 import { handleOrderShare } from "../netlify/functions/order-share.mjs";
@@ -82,7 +83,7 @@ const server = createServer(async (request, response) => {
       pathname === "/api/vendor-orders" || pathname === "/api/vendor-import" ||
       pathname === "/api/homepage" || pathname === "/api/vendor-homepage" ||
       pathname === "/api/offers" || pathname === "/api/vendor-offers" ||
-      pathname === "/api/catalogue" || pathname === "/api/vendor-catalogue" ||
+      pathname === "/api/catalogue" || pathname === "/api/vendor-catalogue" || pathname === "/api/vendor-price-list-pdf" ||
       pathname === "/api/vendor-media" || pathname === "/api/vendor-order-share" ||
       pathname.startsWith("/request/") || pathname.startsWith("/api/vendor-auth/")) {
     try {
@@ -102,6 +103,7 @@ const server = createServer(async (request, response) => {
             pathname === "/api/vendor-import" ? handleVendorImport :
               pathname === "/api/catalogue" ? handleCatalogue :
                 pathname === "/api/vendor-catalogue" ? handleVendorCatalogue :
+                  pathname === "/api/vendor-price-list-pdf" ? handleVendorPriceListPdf :
                   pathname === "/api/vendor-media" ? handleVendorMedia :
                     pathname === "/api/vendor-order-share" ? handleVendorOrderShare :
                       pathname.startsWith("/request/") ? handleOrderShare : handleVendorAuth;

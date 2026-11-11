@@ -216,8 +216,9 @@ test("homepage delivery widget reflects paid thresholds and both ways to configu
     const get = await homepageCoupons(undefined, { coupons: [], freeDeliveryMinimum: minimum, deliveryFee: fee });
     const cards = get("home-coupons").children;
     assert.equal(cards.length, 1);
-    const text = cards[0].children.map(node => node.textContent).join(" ");
-    assert.match(text, /Free delivery.*Pickup is free.*confirmed by the shop/);
+    const content = node => (node.textContent ?? "") + node.children.map(content).join(" ");
+    const text = content(cards[0]);
+    assert.match(text, /Free delivery.*Pickup is free.*Hyderabad-wide.*same-day delivery is best-effort.*shop confirmation/);
     if (minimum && fee) assert.match(text, /2,500.*after coupon discount.*100/);
     else {
       assert.match(text, /On all billed amounts/);
