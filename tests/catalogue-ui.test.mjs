@@ -92,6 +92,10 @@ test("cart coupon apply/remove updates post-discount delivery progress and picku
   ui.get("#coupon-code").value = "sale15";
   await ui.emit("#coupon-form", "submit");
   assert.equal(ui.run("total(cart)"), 119);
+  assert.equal(ui.get("#cart-total").textContent, order.money(119));
+  assert.equal(ui.get("#cart-details-label").textContent, "Coupon SALE15 (15%)");
+  assert.equal(ui.get("#cart-savings").textContent, `Save ${order.money(21)}`);
+  assert.ok(ui.get("#cart-pricing").children[0].children.every(row => row.className !== "cart-total"));
   assert.match(ui.get("#delivery-progress-text").textContent, /2,381/);
   ui.get("#fulfilment-delivery").checked = true;
   ui.get("#customer-form").elements.fulfilment.value = "delivery";
@@ -104,6 +108,21 @@ test("cart coupon apply/remove updates post-discount delivery progress and picku
   await ui.emit("#remove-coupon", "click");
   assert.equal(ui.run("total(cart)"), 140);
   assert.equal(ui.run("couponCode"), "");
+  assert.equal(ui.get("#cart-total").textContent, order.money(140));
+  assert.equal(ui.get("#cart-details-label").textContent, "Coupon & price details");
+  assert.equal(ui.get("#cart-savings").textContent, "");
+});
+
+test("cart keeps total and Continue outside the initially collapsed coupon and price details", async () => {
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
+  const details = html.match(/<details id="cart-details"[\s\S]*?<\/details>/)?.[0];
+  assert.ok(details);
+  assert.doesNotMatch(details.split(">")[0], /\bopen\b/);
+  assert.match(details, /id="coupon-form"/);
+  assert.match(details, /id="coupon-status"/);
+  assert.match(details, /id="cart-pricing"/);
+  assert.doesNotMatch(details, /id="cart-total"|id="review"|id="delivery-progress-text"/);
+  assert.match(html, /<\/details>\s*<div class="cart-total">/);
 });
 
 test("category tiles and type counts combine with search, sorting and clear filters without changing the cart", async () => {

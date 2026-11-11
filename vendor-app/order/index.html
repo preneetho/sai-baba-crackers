@@ -232,14 +232,23 @@
 
       <dialog id="cart-drawer" aria-labelledby="requirement-title">
       <aside id="requirement" class="requirement" aria-labelledby="requirement-title">
-        <button class="icon-button close-cart" type="button" data-close-cart aria-label="Close cart" autofocus>&times;</button>
-        <div class="cart-title"><h2 id="requirement-title">Your cart</h2><span id="cart-count" class="count-pill">0</span></div>
-        <button id="clear-cart-top" class="text-button" type="button" hidden>Clear cart</button>
+        <div class="cart-title">
+          <h2 id="requirement-title">Your cart</h2><span id="cart-count" class="count-pill">0</span>
+          <button id="clear-cart-top" class="text-button" type="button" hidden>Clear cart</button>
+          <button class="icon-button close-cart" type="button" data-close-cart aria-label="Close cart" autofocus>&times;</button>
+        </div>
         <div id="storage-warning" class="cart-notice" role="status" hidden></div>
         <div id="cart-items"></div>
         <div class="cart-actions">
         <p id="offer-status" class="checkout-help" role="status" aria-live="polite"></p>
         <button id="reload-offers" class="text-button" type="button" hidden>Reload offers</button>
+        <div id="delivery-offer" class="delivery-offer" hidden>
+          <p id="delivery-progress-text"></p>
+          <progress id="delivery-progress" max="1" value="0"></progress>
+        </div>
+        <details id="cart-details" class="cart-details">
+        <summary><span id="cart-details-label">Coupon &amp; price details</span><strong id="cart-savings"></strong></summary>
+        <div class="cart-details-body">
         <form id="coupon-form" class="coupon-form">
           <label for="coupon-code" class="sr-only">Coupon code</label>
           <input id="coupon-code" autocomplete="off" spellcheck="false" maxlength="24" placeholder="Coupon code" disabled>
@@ -247,13 +256,12 @@
           <button id="remove-coupon" class="text-button" type="button" hidden>Remove</button>
         </form>
         <p id="coupon-status" class="checkout-help" role="status" aria-live="polite"></p>
-        <div id="delivery-offer" class="delivery-offer" hidden>
-          <p id="delivery-progress-text"></p>
-          <progress id="delivery-progress" max="1" value="0"></progress>
-          <p id="delivery-progress-note" class="checkout-help"></p>
-        </div>
+        <p id="delivery-progress-note" class="checkout-help"></p>
         <div id="cart-pricing"></div>
-        <p class="estimate-note">Delivery fee shown at checkout. No payment now; shop confirmation required.</p>
+        </div>
+        </details>
+        <div class="cart-total"><span>Items total</span><strong id="cart-total"></strong></div>
+        <p class="estimate-note">Delivery fee at checkout. No payment now.</p>
         <button id="review" class="button primary wide" type="button" disabled>Continue to checkout <span aria-hidden="true">&#8594;</span></button>
         </div>
       </aside>

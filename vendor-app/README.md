@@ -134,7 +134,12 @@ bookmark. It supports Escape, backdrop dismissal and focus restoration. Checkout
 uses a separate compact dialog above the cart, with a mobile bottom-sheet layout.
 Cart review, customer details and saved WhatsApp handoff are separate steps.
 Long cart items and form content scroll independently of the totals and primary
-actions. Date, notes, price breakdown, privacy details and the complete saved
+actions. The cart gives available height to compact item rows, with Clear cart in
+the header. Coupon entry, subtotal/discount breakdown and delivery terms share an
+initially collapsed disclosure; the applied coupon/savings, free-delivery progress,
+items total and Continue stay visible. Expanded details have their own bounded
+scroll area so the primary action remains reachable on short screens.
+Date, notes, price breakdown, privacy details and the complete saved
 request are expandable instead of filling the initial screen. Back to cart
 preserves the in-memory details; closing checkout still clears them. Required
 fields, validation, request snapshots and recovery controls remain unchanged.

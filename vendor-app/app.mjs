@@ -424,7 +424,7 @@ function pricingSummary(withIds = false) {
       `\u2212${money(amounts.discount)}`, "pricing-row discount-row", "cart-discount"]] : []),
     ...(!withIds && $("#fulfilment-delivery").checked ?
       [["Delivery fee", amounts.deliveryCharge ? money(amounts.deliveryCharge) : "FREE", "pricing-row", "delivery-charge"]] : []),
-    [withIds ? "Items total" : "Estimated total", money(amounts.total), "cart-total", "cart-total"],
+    ...(!withIds ? [["Estimated total", money(amounts.total), "cart-total", "cart-total"]] : []),
   ];
   for (const [label, value, className, id] of rows) {
     const row = element("div", className);
@@ -438,10 +438,15 @@ function pricingSummary(withIds = false) {
 
 function renderCart() {
   const lines = cartLines(cart);
+  const amounts = pricing(cart);
   const units = lines.reduce((sum, line) => sum + line.quantity, 0);
   $("#header-count").textContent = units;
   $("#cart-count").textContent = lines.length;
   $("#cart-pricing").replaceChildren(pricingSummary(true));
+  $("#cart-total").textContent = money(amounts.total);
+  $("#cart-details-label").textContent = amounts.couponCode ?
+    `Coupon ${amounts.couponCode} (${amounts.discountPercent}%)` : "Coupon & price details";
+  $("#cart-savings").textContent = amounts.couponCode ? `Save ${money(amounts.discount)}` : "";
   $("#review").disabled = lines.length === 0 || !offers || offersLoading;
   $("#review").textContent = lines.length ? `Continue \u00b7 ${money(total(cart))}` : "Continue to checkout";
   for (const button of document.querySelectorAll("#clear-cart, #clear-cart-top")) {
@@ -450,7 +455,6 @@ function renderCart() {
   $("#mobile-cart").hidden = lines.length === 0;
   $("#mobile-cart-label").textContent = `${units} pack${units === 1 ? "" : "s"} \u00b7 ${money(total(cart))}`;
   if (offers) {
-    const amounts = pricing(cart);
     const progress = amounts.freeDeliveryRemaining > 0 ?
       `Add ${money(amounts.freeDeliveryRemaining)} more for free delivery` : "Free delivery unlocked";
     $("#delivery-progress-text").textContent = progress;
