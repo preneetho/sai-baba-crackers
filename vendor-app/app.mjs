@@ -1,6 +1,6 @@
 import { track } from "./telemetry-client.mjs";
 import { vendor } from "./catalog.mjs";
-import { validCatalogue } from "./catalogue-model.mjs";
+import { validCatalogue, PRODUCT_TYPES } from "./catalogue-model.mjs";
 import { mediaUrl, isYouTubeMedia } from "./media-model.mjs";
 import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, total as getTotal, money, localDate, validateCustomer, prepareOrderMessage, validateOrderShareLink } from "./order.mjs";
 
@@ -16,6 +16,7 @@ const pricing = value => getPricing(value, products);
 const total = value => getTotal(value, products);
 let cart = {};
 let category = "All products";
+let productType = null;
 let query = "";
 let sort = "catalogue";
 let fullMessage = "";
@@ -160,31 +161,84 @@ function productIllustration(product) {
 }
 
 function renderCategories() {
+  if (!products.length) {
+    $("#categories").replaceChildren();
+    return;
+  }
   $("#categories").replaceChildren(...categories.map(name => {
-    const button = element("button", `category-chip${name === category ? " selected" : ""}`, name);
+    const members = products.filter(product => name === "All products" || product.category === name);
+    const button = element("button", `category-tile${name === category ? " selected" : ""}`);
     button.type = "button";
+    button.dataset.category = name;
     button.setAttribute("aria-pressed", String(name === category));
+    const art = element("span", "category-tile-art");
+    art.setAttribute("aria-hidden", "true");
+    const representative = members.find(product => product.media?.some(asset => asset.resourceType === "image")) ?? members[0];
+    const photo = representative?.media?.find(asset => asset.resourceType === "image");
+    if (photo) {
+      const image = element("img");
+      image.src = mediaUrl(photo);
+      image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
+      image.addEventListener("error", () => {
+        art.replaceChildren(productIllustration(representative), element("small", "category-photo-error", "Photo unavailable"));
+      }, { once: true });
+      art.append(image);
+    } else {
+      art.append(productIllustration(representative));
+    }
+    button.append(art, element("span", "category-tile-name", name),
+      element("small", "category-tile-count", `${members.length} product${members.length === 1 ? "" : "s"}`));
     button.addEventListener("click", () => {
       category = name;
       renderCategories();
+      renderTypes();
       renderProducts();
-      [...$("#categories").children].find(child => child.textContent === name)?.focus({ preventScroll: true });
+      $("#results-count").focus({ preventScroll: true });
+      $("#results-count").scrollIntoView({ block: "start" });
+    });
+    return button;
+  }));
+}
+
+function matchingProducts(type = productType) {
+  return products.filter(product =>
+    (category === "All products" || product.category === category) &&
+    (type === null || product.types?.includes(type)) &&
+    `${product.id} ${product.name} ${product.brand} ${product.category}`.toLowerCase().includes(query.toLowerCase()));
+}
+
+function renderTypes() {
+  const candidates = matchingProducts(null);
+  $("#product-types").replaceChildren(...[{ id: null, label: "All types" }, ...PRODUCT_TYPES].map(({ id, label }) => {
+    const count = id === null ? candidates.length : candidates.filter(product => product.types?.includes(id)).length;
+    const button = element("button", `category-chip${id === productType ? " selected" : ""}`, `${label} (${count})`);
+    button.type = "button";
+    button.dataset.type = id ?? "";
+    button.setAttribute("aria-pressed", String(id === productType));
+    button.disabled = count === 0 && id !== null && id !== productType;
+    button.addEventListener("click", () => {
+      productType = id;
+      renderTypes();
+      renderProducts();
+      [...$("#product-types").children].find(child => child.dataset.type === (id ?? ""))?.focus({ preventScroll: true });
     });
     return button;
   }));
 }
 
 function renderProducts() {
-  const filtered = products.filter(product =>
-    (category === "All products" || product.category === category) &&
-    `${product.id} ${product.name} ${product.brand} ${product.category}`.toLowerCase().includes(query.toLowerCase()));
+  const filtered = matchingProducts();
   if (sort === "low") filtered.sort((a, b) => a.price - b.price);
   if (sort === "high") filtered.sort((a, b) => b.price - a.price);
   if (sort === "name") filtered.sort((a, b) => a.name.localeCompare(b.name));
-  $("#results-count").textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"}${category === "All products" ? "" : ` in ${category.toLowerCase()}`}`;
+  const typeLabel = PRODUCT_TYPES.find(type => type.id === productType)?.label;
+  $("#results-count").textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"}${category === "All products" ? "" : ` in ${category.toLowerCase()}`}${typeLabel ? ` matching ${typeLabel}` : ""}`;
+  $("#clear-filters").hidden = category === "All products" && productType === null && !query;
   $("#no-results").hidden = filtered.length !== 0;
   $("#no-results-title").textContent = products.length ? "No products found" : "No products currently available";
-  $("#no-results-message").textContent = products.length ? "Try a different product name or category." :
+  $("#no-results-message").textContent = products.length ? "Try a different product name, category or type, or clear filters." :
     "Please check back later or contact the shop.";
   $("#reset-filters").hidden = products.length === 0;
   $("#products").replaceChildren(...filtered.map(product => {
@@ -224,6 +278,11 @@ function renderProducts() {
     const body = element("div", "product-body");
     body.append(element("p", "product-brand", product.brand), element("h3", "", product.name),
       element("p", "product-unit", product.unit));
+    if (product.types?.length) {
+      const types = element("p", "product-type-labels",
+        PRODUCT_TYPES.filter(type => product.types.includes(type.id)).map(type => type.label).join(" \u00b7 "));
+      body.append(types);
+    }
     const bottom = element("div", "product-bottom");
     const price = element("div", "product-price");
     price.append(element("strong", "", money(product.price)), element("span", "", "per pack"));
@@ -498,20 +557,25 @@ $("#checkout").addEventListener("click", event => {
 });
 $("#search").addEventListener("input", event => {
   query = event.target.value.trim();
+  renderTypes();
   renderProducts();
 });
 $("#sort").addEventListener("change", event => {
   sort = event.target.value;
   renderProducts();
 });
-$("#reset-filters").addEventListener("click", () => {
+function resetFilters() {
   category = "All products";
+  productType = null;
   query = "";
   $("#search").value = "";
   renderCategories();
+  renderTypes();
   renderProducts();
   $("#search").focus();
-});
+}
+$("#reset-filters").addEventListener("click", resetFilters);
+$("#clear-filters").addEventListener("click", resetFilters);
 function clearSelection() {
   if (!catalogue || catalogueLoading) return;
   if (!window.confirm("Remove all items from your cart?")) return;
@@ -674,6 +738,7 @@ async function loadCatalogue() {
   if ($("#product-media-dialog").open) $("#product-media-dialog").close();
   if (catalogue) retainedCart = JSON.stringify({ year: catalogue.year, revision: catalogue.revision, cart });
   catalogueLoading = true;
+  $("#catalogue-discovery").hidden = true;
   $("#reload-catalogue").disabled = true;
   $("#review").disabled = true;
   $("#catalogue-status").textContent = "Loading the current price list...";
@@ -686,6 +751,7 @@ async function loadCatalogue() {
     products = result.products.filter(product => product.hidden !== true);
     categories = ["All products", ...new Set(products.map(product => product.category))];
     category = "All products";
+    productType = null;
     cart = {};
     submission = null;
     try {
@@ -701,7 +767,9 @@ async function loadCatalogue() {
     for (const node of document.querySelectorAll("[data-catalogue-year]")) node.textContent = result.year;
     $("#catalogue-status").textContent = `${result.year} price list loaded. Prices are confirmed again when you submit.`;
     renderCategories();
+    renderTypes();
     renderProducts();
+    $("#catalogue-discovery").hidden = products.length === 0;
     renderCart();
     retainedCart = null;
   } catch (error) {
@@ -711,6 +779,8 @@ async function loadCatalogue() {
     cart = {};
     $("#products").replaceChildren();
     $("#categories").replaceChildren();
+    $("#product-types").replaceChildren();
+    $("#clear-filters").hidden = true;
     $("#results-count").textContent = "Price list unavailable";
     $("#no-results").hidden = true;
     renderCart();

@@ -217,8 +217,15 @@
           <span class="catalogue-year"><span data-catalogue-year>Current</span> price list</span>
         </div>
         <label class="search-box"><span aria-hidden="true">&#9906;</span><span class="sr-only">Search products, brands or product numbers</span><input id="search" type="search" placeholder="Search sparklers, flower pots, brands..." maxlength="100"><kbd aria-hidden="true">SEARCH</kbd></label>
-        <div id="categories" class="categories" role="group" aria-label="Filter by category"></div>
-        <div class="results-bar"><p id="results-count" role="status"></p><label>Sort by <select id="sort"><option value="catalogue">Default order</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name: A to Z</option></select></label></div>
+        <div id="catalogue-discovery" class="catalogue-discovery" hidden>
+          <h3 id="category-heading">Shop by category</h3>
+          <p class="discovery-hint">Choose a category to jump to matching products. Swipe or scroll for more categories.</p>
+          <div id="categories" class="category-tiles" role="group" aria-labelledby="category-heading"></div>
+          <div class="discovery-heading"><h3 id="type-heading">Shop by type</h3><button id="clear-filters" class="text-button" type="button" hidden>Reset filters</button></div>
+          <p class="discovery-hint">Combine a type with your category or search. Types are labelled by the shop.</p>
+          <div id="product-types" class="categories" role="group" aria-labelledby="type-heading"></div>
+        </div>
+        <div class="results-bar"><p id="results-count" role="status" tabindex="-1"></p><label>Sort by <select id="sort"><option value="catalogue">Default order</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name: A to Z</option></select></label></div>
         <p class="unit-hint">Prices are per listed pack. Select the number of packs, not individual pieces. A 15% discount is automatically applied to your cart total.</p>
         <div id="products" class="product-grid"></div>
         <div id="no-results" class="empty-state" hidden><span aria-hidden="true">&#10023;</span><h3 id="no-results-title">No products found</h3><p id="no-results-message">Try a different product name or category.</p><button id="reset-filters" class="button secondary" type="button">Clear filters</button></div>

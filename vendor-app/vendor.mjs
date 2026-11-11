@@ -1,5 +1,5 @@
 import { ORDER_STATUSES, PAGE_SIZE, validOrder } from "./vendor-model.mjs";
-import { validCatalogue, validYear, catalogueProducts } from "./catalogue-model.mjs";
+import { validCatalogue, validYear, catalogueProducts, PRODUCT_TYPES } from "./catalogue-model.mjs";
 import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "./media-model.mjs";
 import { inspectMediaFile, transferMedia } from "./media-upload.mjs";
 import { validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl } from "./homepage-model.mjs";
@@ -231,6 +231,32 @@ function renderPriceProducts() {
       label.append(input);
       row.append(label);
     }
+    const types = element("fieldset", undefined, "vendor-product-types");
+    types.append(element("legend", "Shop by type"));
+    const typeHelp = element("p", "Select every effect that applies. Leave all unchecked if unsure; the product stays in All types. Save price list to publish.", "vendor-muted");
+    typeHelp.id = `price-types-help-${product.id}`;
+    types.setAttribute("aria-describedby", typeHelp.id);
+    const typeOptions = element("div", undefined, "vendor-type-options");
+    for (const type of PRODUCT_TYPES) {
+      const label = element("label");
+      const input = element("input");
+      input.id = `price-type-${type.id}-${product.id}`;
+      input.type = "checkbox";
+      input.checked = product.types?.includes(type.id) ?? false;
+      input.addEventListener("change", () => {
+        if (priceBusy || priceNeedsReload) return;
+        const selected = new Set(product.types ?? []);
+        if (input.checked) selected.add(type.id);
+        else selected.delete(type.id);
+        product.types = PRODUCT_TYPES.filter(item => selected.has(item.id)).map(item => item.id);
+        priceDirty = true;
+        setPriceBusy(false);
+      });
+      label.append(input, element("span", type.label));
+      typeOptions.append(label);
+    }
+    types.append(typeHelp, typeOptions);
+    row.append(types);
     const visibility = element("label", undefined, "vendor-price-visibility");
     const visible = element("input");
     visible.id = `price-visible-${product.id}`;

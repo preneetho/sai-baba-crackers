@@ -9,7 +9,7 @@ import { handleVendorCatalogue } from "../netlify/functions/vendor-catalogue.mjs
 import { handleOrderRequest, buildOrder } from "../netlify/functions/orders.mjs";
 import { createSession, unseal, vendorSettings } from "../netlify/lib/vendor-auth.mjs";
 import { products } from "../vendor-app/catalog.mjs";
-import { validCatalogue, catalogueProducts } from "../vendor-app/catalogue-model.mjs";
+import { validCatalogue, catalogueProducts, PRODUCT_TYPES, validProductTypes } from "../vendor-app/catalogue-model.mjs";
 import { mediaProof } from "../netlify/lib/product-media.mjs";
 
 const engine = new PGlite();
@@ -78,6 +78,60 @@ beforeEach(async () => {
     [JSON.stringify(migrationSeed.products)]);
 });
 after(async () => { await engine.close(); });
+
+test("product types are optional, strictly enumerated, unique and copied without aliasing", () => {
+  const all = PRODUCT_TYPES.map(type => type.id);
+  for (const types of [undefined, [], ["sound"], all]) {
+    assert.equal(validProductTypes(types), true);
+    assert.equal(validCatalogue({ ...base, products: [{ ...products[0], types }] }), true);
+  }
+  for (const types of [null, "sound", {}, ["Sound"], ["unknown"], ["sound", "sound"], [null], [1], [{}], new Array(1), [...all, "sound"]]) {
+    assert.equal(validProductTypes(types), false);
+    assert.equal(validCatalogue({ ...base, products: [{ ...products[0], types }] }), false);
+  }
+  const rows = [{ ...products[0], types: ["sky", "colour-light"] },
+    { ...products[1], types: ["sound"], hidden: true }];
+  const privateRows = catalogueProducts(rows);
+  const publicRows = catalogueProducts(rows, true);
+  assert.deepEqual(publicRows[0].types, rows[0].types);
+  assert.equal(publicRows.length, 1);
+  assert.deepEqual(privateRows[1].types, ["sound"]);
+  privateRows[0].types.push("ground");
+  assert.deepEqual(rows[0].types, ["sky", "colour-light"]);
+  publicRows[0].types.length = 0;
+  assert.deepEqual(rows[0].types, ["sky", "colour-light"]);
+  assert.equal(catalogueProducts([{ ...products[0], types: [] }])[0].types, undefined);
+});
+
+test("vendor-assigned types persist publicly and across years without changing order snapshots or revision rules", async () => {
+  const rows = catalogueProducts(products);
+  rows[0].types = ["colour-light", "ground"];
+  const response = await edit({ action: "save", year: 2026, expectedRevision: 1, products: rows });
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).catalogue.products[0].types, rows[0].types);
+  assert.deepEqual((await (await publicList()).json()).products[0].types, rows[0].types);
+  await database.priceLists({ action: "create", year: 2027, sourceYear: 2026, expectedRevision: 2 }, "owner@example.com");
+  assert.deepEqual((await database.catalogueVersion(2027, 1)).products[0].types, rows[0].types);
+  assert.equal((await database.catalogueVersion(2026, 1)).products[0].types, undefined);
+  assert.deepEqual(buildOrder(payload(), now, { ...base, products: rows }), buildOrder(payload(), now, base));
+  assert.equal((await submit(payload(1))).status, 409);
+  rows[0].types = [];
+  assert.equal((await edit({ action: "save", year: 2026, expectedRevision: 2, products: rows })).status, 200);
+  assert.equal((await database.activeCatalogue()).products[0].types, undefined);
+  assert.deepEqual((await database.catalogueVersion(2026, 2)).products[0].types, ["colour-light", "ground"]);
+  assert.deepEqual((await database.catalogueVersion(2027, 1)).products[0].types, ["colour-light", "ground"]);
+});
+
+test("invalid type writes are rejected rather than silently dropping tags or changing saved revisions", async () => {
+  for (const types of [null, ["unknown"], ["sound", "sound"], "sky"]) {
+    const rows = catalogueProducts(products);
+    rows[0].types = types;
+    const response = await edit({ action: "save", year: 2026, expectedRevision: 1, products: rows });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /Product types/);
+    assert.equal((await database.activeCatalogue()).revision, 1);
+  }
+});
 
 test("tracked migration seeds every original 2026 product, pack, category and price exactly", async () => {
   assert.deepEqual(migrationSeed, base);

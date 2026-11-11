@@ -1,5 +1,17 @@
 import { validProductMedia, copyMedia } from "./media-model.mjs";
 
+export const PRODUCT_TYPES = Object.freeze([
+  { id: "sound", label: "Sound" },
+  { id: "sky", label: "Sky" },
+  { id: "colour-light", label: "Colour & Light" },
+  { id: "ground", label: "Ground" },
+].map(type => Object.freeze(type)));
+
+export function validProductTypes(types) {
+  return types === undefined || (Array.isArray(types) && types.length <= PRODUCT_TYPES.length &&
+    [...types].every(id => PRODUCT_TYPES.some(type => type.id === id)) && new Set(types).size === types.length);
+}
+
 export function validYear(year) {
   return Number.isInteger(year) && year >= 2000 && year <= 9999;
 }
@@ -17,7 +29,7 @@ export function validCatalogue(value, { allowEmpty = false } = {}) {
           product[key].trim() === product[key] && product[key].length > 0 &&
           product[key].length <= 120 && !/[\u0000-\u001f\u007f]/.test(product[key])) ||
         (product.hidden !== undefined && typeof product.hidden !== "boolean") ||
-        !validProductMedia(product.media)) return false;
+        !validProductMedia(product.media) || !validProductTypes(product.types)) return false;
     ids.add(product.id);
     return true;
   });
@@ -25,8 +37,9 @@ export function validCatalogue(value, { allowEmpty = false } = {}) {
 
 export function catalogueProducts(products, publicView = false) {
   return products.filter(product => !publicView || product.hidden !== true)
-    .map(({ id, name, brand, unit, price, category, media, hidden }) => ({
+    .map(({ id, name, brand, unit, price, category, media, hidden, types }) => ({
       id, name, brand, unit, price, category,
+      ...(types?.length ? { types: [...types] } : {}),
       ...(!publicView && hidden === true ? { hidden: true } : {}),
       ...(media?.length ? { media: media.map(asset => copyMedia(asset, publicView)) } : {}),
     }));

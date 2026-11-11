@@ -138,6 +138,15 @@ specific variants for items such as rockets, sparklers, garlands and flower pots
 These are illustrative, not manufacturer product photos. Public cards use a responsive
 four/three/two/one-column layout with 44 px quantity controls and consistently positioned
 product numbers, including photo/video cards.
+The image area and internal spacing are compact; full names, brands, packs,
+prices and assigned effect labels wrap without truncation. **Shop by category**
+uses visible products' uploaded photos, with bundled illustrations when unavailable.
+**Shop by type** combines vendor-assigned Sound, Sky, Colour & Light or Ground
+with category/search filters. Expand a product in **Manage yearly price lists**,
+choose all applicable types, and **Save price list** to publish. Untagged products
+stay under All types; no types are guessed. Type edits use the existing catalogue
+revision policy, including stale-cart invalidation. Category/type filtering and
+Reset filters do not clear a current cart.
 Selected product cards use a purple-tinted surface and stronger gold
 border, with the selected quantity in bold. The existing quantity and selection
 announcement also identify the state without relying on colour alone. The

@@ -31,7 +31,7 @@ export function sanitizeCart(value, catalogue = products) {
 export function cartLines(cart, catalogue = products) {
   const byId = new Map(catalogue.map(product => [product.id, product]));
   return Object.entries(sanitizeCart(cart, catalogue)).map(([id, quantity]) => {
-    const { media, hidden, ...product } = byId.get(Number(id));
+    const { media, hidden, types, ...product } = byId.get(Number(id));
     return { ...product, quantity, amount: Math.round(product.price * 100) * quantity / 100 };
   });
 }

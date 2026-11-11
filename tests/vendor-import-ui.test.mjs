@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 import { ORDER_STATUSES, PAGE_SIZE, validOrder } from "../vendor-app/vendor-model.mjs";
-import { validCatalogue, validYear, catalogueProducts } from "../vendor-app/catalogue-model.mjs";
+import { validCatalogue, validYear, catalogueProducts, PRODUCT_TYPES } from "../vendor-app/catalogue-model.mjs";
 import { products } from "../vendor-app/catalog.mjs";
 import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "../vendor-app/media-model.mjs";
 import { inspectMediaFile } from "../vendor-app/media-upload.mjs";
@@ -114,7 +114,7 @@ async function harness({ navigator = {} } = {}) {
     { cloudName: mediaAsset.cloudName, resourceType: "image", params: { public_id: mediaAsset.publicId }, ticket: "synthetic.ticket" } :
     { media: { ...mediaAsset } });
   const context = vm.createContext({
-    ORDER_STATUSES, PAGE_SIZE, validOrder, validCatalogue, validYear, catalogueProducts,
+    ORDER_STATUSES, PAGE_SIZE, validOrder, validCatalogue, validYear, catalogueProducts, PRODUCT_TYPES,
     validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId, inspectMediaFile, transferMedia: (...args) => transfer(...args),
     validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl,
     AbortController, AbortSignal, URL, URLSearchParams, Intl, console, navigator,
@@ -163,6 +163,66 @@ async function harness({ navigator = {} } = {}) {
     confirm(value) { confirmed = value; },
   };
 }
+
+test("product effect checkboxes remain drafts, allow multiple types and publish or clear through the existing price-list save", async () => {
+  const ui = await harness();
+  await ui.emit("open-prices");
+  await ui.emit("price-toggle-1");
+  for (const type of PRODUCT_TYPES) assert.equal(ui.get(`price-type-${type.id}-1`).checked, false);
+  for (const id of ["ground", "colour-light"]) {
+    ui.get(`price-type-${id}-1`).checked = true;
+    await ui.emit(`price-type-${id}-1`, "change");
+  }
+  assert.deepEqual(Array.from(vm.runInContext("priceList.products[0].types", ui.context)), ["colour-light", "ground"]);
+  assert.equal(ui.get("save-prices").disabled, false);
+  assert.equal(ui.requests.some(request => request.method === "POST"), false);
+  await ui.emit("price-toggle-1");
+  await ui.emit("price-toggle-1");
+  assert.equal(ui.get("price-type-ground-1").checked, true);
+  let saved;
+  let revision = 1;
+  ui.respondPrice(async (_path, options) => {
+    if (options?.method === "POST") {
+      saved = JSON.parse(options.body);
+      revision++;
+      assert.equal(options.headers["X-Vendor-CSRF"], "a".repeat(43));
+    }
+    return Response.json({ activeYear: 2026, years: [{ year: 2026, revision }],
+      catalogue: { year: 2026, revision, products: saved.products } });
+  });
+  await ui.emit("price-form", "submit");
+  assert.deepEqual(saved.products[0].types, ["colour-light", "ground"]);
+  assert.equal(saved.expectedRevision, 1);
+  assert.equal(saved.products[0].price, products[0].price);
+  assert.equal(ui.get("save-prices").disabled, true);
+  await ui.emit("reload-prices");
+  if (!ui.get("price-editor-1").children.length) await ui.emit("price-toggle-1");
+  assert.equal(ui.get("price-type-colour-light-1").checked, true);
+  for (const id of ["colour-light", "ground"]) {
+    ui.get(`price-type-${id}-1`).checked = false;
+    await ui.emit(`price-type-${id}-1`, "change");
+  }
+  await ui.emit("price-form", "submit");
+  assert.deepEqual(saved.products[0].types, []);
+  assert.equal(vm.runInContext("priceList.products[0].types", ui.context), undefined);
+});
+
+test("failed type saves preserve checkbox drafts and require an explicit reload before further edits", async () => {
+  for (const status of [409, 503]) {
+    const ui = await harness();
+    await ui.emit("open-prices");
+    await ui.emit("price-toggle-1");
+    ui.get("price-type-sky-1").checked = true;
+    await ui.emit("price-type-sky-1", "change");
+    ui.respondPrice(async () => Response.json({ error: "Synthetic save failure" }, { status }));
+    await ui.emit("price-form", "submit");
+    assert.equal(ui.get("price-type-sky-1").checked, true);
+    assert.equal(ui.get("price-type-sky-1").disabled, true);
+    assert.equal(ui.get("save-prices").disabled, true);
+    assert.equal(ui.get("reload-prices").disabled, false);
+    assert.match(ui.get("price-message").textContent, /Synthetic save failure/);
+  }
+});
 
 test("homepage video edits load privately, save explicitly with CSRF/version and can hide the public video", async () => {
   const ui = await harness();

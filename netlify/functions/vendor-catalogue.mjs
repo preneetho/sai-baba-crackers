@@ -40,7 +40,7 @@ export async function handleVendorCatalogue(request, {
           (input.action === "activate" && !validYear(input.expectedActiveYear)) ||
           (input.action === "save" && !validCatalogue({
             year: input.year, revision: input.expectedRevision, products: input.products,
-          }))) return vendorJson({ error: "Use a valid year, version and product list (1-200 products; prices up to Rs.100,000 with at most two decimals)." }, 400);
+          }))) return vendorJson({ error: "Use a valid year, version and product list (1-200 products; prices up to Rs.100,000 with at most two decimals). Product types must be unique choices from Sound, Sky, Colour & Light and Ground." }, 400);
     } catch {
       return vendorJson({ error: "The price-list update could not be read." }, 400);
     }

@@ -222,6 +222,31 @@ Database failures show an explicit error, never a fallback to static prices.
 The explicitly selected Sheets backend continues using the original static
 2026 list and does not support vendor yearly-price editing.
 
+## Category navigation and effect filters
+
+The shopping page has compact **Shop by category** tiles. Each uses an uploaded
+product image from that visible category, or the existing bundled illustration
+when no image is available. Videos and YouTube thumbnails are not category
+photos. Selecting a tile filters the catalogue and moves focus to the results;
+the mobile category rail scrolls horizontally.
+
+**Shop by type** offers Sound, Sky, Colour & Light and Ground. In the vendor
+dashboard, expand a yearly price-list product, select all applicable effects
+under **Shop by type**, then **Save price list**. No types are inferred from
+product names. Untagged products remain visible under All types. These optional,
+validated `types` arrays are stored in the existing product JSON; no migration,
+new API or environment variable is needed. Copying a year copies its saved types.
+Type edits follow the same revision/conflict rules and invalidate stale carts
+like other catalogue edits. Order line items, prices and discounts are unchanged.
+
+Category, type and search filters combine; type counts reflect the current
+category and search before applying the selected type. Zero-count inactive
+types are disabled. Reset filters returns to all products without clearing the
+cart or changing sorting. Compact cards keep the full product name, brand,
+selling pack, price, assigned effects, product number and 44 px quantity buttons.
+Long content wraps rather than being truncated. Shopping keeps its classic
+blue-and-white colours; the vibrant homepage is unchanged.
+
 ## Product photos and videos (Cloudinary)
 
 The database catalogue supports up to **3 photos and 1 video per product**.

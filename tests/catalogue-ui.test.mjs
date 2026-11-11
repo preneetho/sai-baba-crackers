@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 import { vendor, products } from "../vendor-app/catalog.mjs";
-import { validCatalogue } from "../vendor-app/catalogue-model.mjs";
+import { validCatalogue, PRODUCT_TYPES } from "../vendor-app/catalogue-model.mjs";
 import { mediaUrl, isYouTubeMedia } from "../vendor-app/media-model.mjs";
 import * as order from "../vendor-app/order.mjs";
 
@@ -18,6 +18,7 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
     getAttribute(key) { return this.attributes[key]; }
     removeAttribute(key) { delete this.attributes[key]; delete this[key]; }
     focus() { this.focused = true; }
+    scrollIntoView() { this.scrolled = true; }
     click() { this.clicks = (this.clicks ?? 0) + 1; }
     select() { this.selected = true; }
     replaceWith() {}
@@ -41,7 +42,7 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
     ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "DISCOUNT_PERCENT", "money", "localDate", "validateCustomer",
       "prepareOrderMessage", "validateOrderShareLink"].map(key => [key, order[key]])),
     checkCart: order.sanitizeCart, getLines: order.cartLines, getPricing: order.pricing, getTotal: order.total,
-    vendor, validCatalogue, mediaUrl, isYouTubeMedia, track() {}, URL, AbortSignal, console, Intl, navigator,
+    vendor, validCatalogue, PRODUCT_TYPES, mediaUrl, isYouTubeMedia, track() {}, URL, AbortSignal, console, Intl, navigator,
     setTimeout, clearTimeout, crypto: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
     FormData: class {
       *[Symbol.iterator]() {
@@ -70,9 +71,102 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
   return {
     get, storage, requests, events, context, run: source => vm.runInContext(source, context),
     respond(callback) { respond = callback; },
-    async emit(selector, type) { await get(selector).events.get(type)({ preventDefault() {}, currentTarget: get(selector) }); await tick(); },
+    async emit(selector, type) { await get(selector).events.get(type)({ preventDefault() {}, target: get(selector), currentTarget: get(selector) }); await tick(); },
   };
 }
+
+test("category tiles and type counts combine with search, sorting and clear filters without changing the cart", async () => {
+  const ui = await harness();
+  const rows = [
+    { ...products[0], id: 1, category: "Sparklers", types: ["colour-light", "ground"], price: 100 },
+    { ...products[0], id: 2, category: "Sparklers", types: ["ground"], price: 50 },
+    { ...products[0], id: 3, category: "Crackers", types: ["sound"] },
+    { ...products[0], id: 4, name: "Synthetic Rocket", category: "Rockets", types: ["sky", "colour-light"] },
+    { ...products[0], id: 5, category: "Novelties" },
+    { ...products[0], id: 6, category: "Hidden category", hidden: true, types: ["sky"] },
+  ];
+  ui.respond(async () => Response.json({ year: 2026, revision: 1, products: rows }));
+  await ui.emit("#reload-catalogue", "click");
+  assert.equal(ui.get("#catalogue-discovery").hidden, false);
+  assert.equal(ui.get("#categories").children.length, 5);
+  assert.deepEqual(ui.get("#product-types").children.map(node => node.textContent),
+    ["All types (5)", "Sound (1)", "Sky (1)", "Colour & Light (2)", "Ground (2)"]);
+  const category = name => ui.get("#categories").children.find(node => node.dataset.category === name);
+  const type = id => ui.get("#product-types").children.find(node => node.dataset.type === id);
+  await category("Sparklers").events.get("click")();
+  assert.equal(category("Sparklers").getAttribute("aria-pressed"), "true");
+  assert.equal(ui.get("#results-count").focused, true);
+  assert.equal(ui.get("#results-count").scrolled, true);
+  assert.equal(type("ground").textContent, "Ground (2)");
+  assert.equal(type("sky").disabled, true);
+  await type("ground").events.get("click")();
+  ui.get("#sort").value = "low";
+  await ui.emit("#sort", "change");
+  assert.deepEqual(ui.get("#products").children.map(node => node.dataset.id), [2, 1]);
+  await type("colour-light").events.get("click")();
+  assert.deepEqual(ui.get("#products").children.map(node => node.dataset.id), [1]);
+  assert.equal(type("colour-light").getAttribute("aria-pressed"), "true");
+  assert.match(ui.get("#products").children[0].children[1].children.find(node => node.className === "product-type-labels").textContent,
+    /Colour & Light.*Ground/);
+  ui.run("updateQuantity(1, 2, false)");
+  assert.equal(ui.run("total(cart)"), 170);
+  ui.get("#search").value = "Synthetic Rocket";
+  await ui.emit("#search", "input");
+  assert.equal(ui.get("#products").children.length, 0);
+  assert.equal(ui.get("#no-results").hidden, false);
+  assert.equal(type("colour-light").disabled, false);
+  assert.equal(ui.get("#clear-filters").hidden, false);
+  await ui.emit("#reset-filters", "click");
+  assert.equal(ui.get("#search").value, "");
+  assert.equal(ui.get("#products").children.length, 5);
+  assert.equal(ui.get("#clear-filters").hidden, true);
+  assert.equal(type("").getAttribute("aria-pressed"), "true");
+  assert.equal(ui.run("cart[1]"), 2);
+  assert.equal(ui.run("total(cart)"), 170);
+});
+
+test("category tiles use uploaded images rather than video thumbnails and keep usable illustrated error fallbacks", async () => {
+  const ui = await harness();
+  const video = { provider: "youtube", resourceType: "video", videoId: "M7lc1UVf-VE", alt: "Synthetic video", credit: "" };
+  const photo = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
+    resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
+    duration: 0, alt: "Synthetic photo", credit: "" };
+  ui.respond(async () => Response.json({ year: 2026, revision: 1, products: [
+    { ...products[0], media: [video, photo] },
+    { ...products[1], category: "Rockets", media: [video] },
+  ] }));
+  await ui.emit("#reload-catalogue", "click");
+  const tile = ui.get("#categories").children.find(node => node.dataset.category === products[0].category);
+  const art = tile.children[0];
+  assert.equal(art.children[0].tagName, "IMG");
+  assert.equal(art.children[0].src, mediaUrl(photo));
+  assert.equal(art.getAttribute("aria-hidden"), "true");
+  art.children[0].events.get("error")();
+  assert.equal(art.children[0].tagName, "SVG");
+  assert.equal(art.children[1].textContent, "Photo unavailable");
+  assert.equal(ui.get("#categories").children.find(node => node.dataset.category === "Rockets").children[0].children[0].tagName, "SVG");
+  await tile.events.get("click")();
+  assert.equal(ui.get("#products").children.length, 1);
+});
+
+test("untagged catalogues remain browsable and loading failures or empty catalogues hide stale discovery controls", async () => {
+  const ui = await harness();
+  assert.equal(ui.get("#products").children.length, 1);
+  assert.equal(ui.get("#product-types").children[0].disabled, false);
+  assert.equal(ui.get("#product-types").children.slice(1).every(node => node.disabled), true);
+  ui.respond(async () => Response.json({ error: "Synthetic catalogue outage" }, { status: 503 }));
+  await ui.emit("#reload-catalogue", "click");
+  assert.equal(ui.get("#catalogue-discovery").hidden, true);
+  assert.equal(ui.get("#categories").children.length, 0);
+  assert.equal(ui.get("#product-types").children.length, 0);
+  assert.equal(ui.get("#clear-filters").hidden, true);
+  ui.respond(async () => Response.json({ year: 2026, revision: 2, products: [] }));
+  await ui.emit("#reload-catalogue", "click");
+  assert.equal(ui.get("#catalogue-discovery").hidden, true);
+  assert.equal(ui.get("#categories").children.length, 0);
+  assert.equal(ui.get("#no-results-title").textContent, "No products currently available");
+  assert.equal(ui.get("#reset-filters").hidden, true);
+});
 
 test("customer catalogue is loaded dynamically and saved carts are bound to its year and revision", async () => {
   const ui = await harness({ stored: { year: 2026, revision: 1, cart: { 1: 2 } }, price: 99.95 });
