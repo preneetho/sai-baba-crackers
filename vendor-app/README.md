@@ -130,8 +130,15 @@ and never starts playback automatically.
 Older animation assets remain available for cached pages only.
 The native cart dialog opens from the header, mobile shortcut or old `#requirement`
 bookmark. It supports Escape, backdrop dismissal and focus restoration. Checkout
-remains the existing native dialog above the cart, full-height on mobile, with the
-same form, validation, consent, request snapshot and recovery controls.
+uses a separate compact dialog above the cart, with a mobile bottom-sheet layout.
+Cart review, customer details and saved WhatsApp handoff are separate steps.
+Long cart items and form content scroll independently of the totals and primary
+actions. Date, notes, price breakdown, privacy details and the complete saved
+request are expandable instead of filling the initial screen. Back to cart
+preserves the in-memory details; closing checkout still clears them. Required
+fields, validation, request snapshots and recovery controls remain unchanged.
+The submit button has a visible storage/seven-day sharing agreement instead of
+a checkbox; the API still requires the existing consent fields.
 Changing the theme does not change order recording, pricing or WhatsApp messages.
 Product cards use bundled SVG illustrations matched to the cracker type, with
 specific variants for items such as rockets, sparklers, garlands and flower pots.
@@ -154,8 +161,8 @@ border, with the selected quantity in bold. The existing quantity and selection
 announcement also identify the state without relying on colour alone. The
 highlight follows the cart across search, category filters, sorting and reloads,
 and disappears when the product's quantity returns to zero.
-Clear selection is available both above and below the selected-items list.
-Both controls use the same confirmation prompt and are hidden for an empty list.
+Clear cart is available above the selected-items list with the existing
+confirmation prompt and is hidden for an empty list.
 
 ### Redesign preview and approval
 
@@ -238,8 +245,8 @@ the server function, shared secret or spreadsheet credentials in public files.
 
 - Customer-facing copy uses **Cart**, **Checkout** and **Order request** throughout
   the shopping flow, accessibility labels, recovery guidance and WhatsApp message.
-  The mobile shortcut is **View cart**, and both **Clear cart** controls use the
-  same confirmation. Search controls and search behaviour are unchanged.
+  The mobile shortcut is **View cart**, and **Clear cart** retains its confirmation.
+  Search controls and search behaviour are unchanged.
 - Cart quantities are whole **packs**, between 1 and 99 per product. A pack means
   the listed selling unit: a box, packet, or individual piece as shown on the
   product. This wording does not change pack sizes, quantities or prices.
@@ -257,9 +264,11 @@ the server function, shared secret or spreadsheet credentials in public files.
 - Search includes product names, numbers, brands and categories. Categories and
   price/name sorting work together.
 - The cart is saved to local storage, not to a server. Invalid saved data and
-  storage failures are reported. Contact details are not saved to local storage.
+  storage failures are reported inside the cart, not in banners above products.
+  Successful catalogue loading has no persistent notice or reload control;
+  loading failures remain visible with Retry. Contact details are not saved to local storage.
   Required name, mobile number and full address (10-500 characters) are recorded
-  in the vendor's Google Sheet after explicit consent. Multiline addresses are
+  in the vendor's order register after agreement through the submit action. Multiline addresses are
   preserved. Closing checkout clears the local form and message, not sheet rows.
 - The customer agrees to private order recording, WhatsApp sharing and temporary
   read-only snapshot storage for every order. Anyone with the link can see all
@@ -277,8 +286,10 @@ the server function, shared secret or spreadsheet credentials in public files.
 - Revisions create a new reference. The vendor must confirm which reference to
   fulfil and cancel obsolete enquiries. The vendor manages status directly in
   the sheet; status does not automatically track WhatsApp messages.
-- **Proceed to checkout** opens the order summary and customer-details screen.
-  Its **Send order request via WhatsApp** button has a prominent reminder to tap
+- **Continue** opens the compact customer-details step without repeating every item.
+  The estimated total remains visible and the price breakdown is expandable.
+  Its **Save & open WhatsApp** button has a visible agreement to recording and
+  seven-day details-link sharing, replacing the checkbox, plus a reminder to tap
   **Send** inside WhatsApp; opening the chat alone does not send the order request.
   The prepared WhatsApp text is loaded into WhatsApp when it opens.
   The button saves the complete request to the

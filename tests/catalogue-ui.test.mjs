@@ -188,8 +188,11 @@ test("customer catalogue is loaded dynamically and saved carts are bound to its 
   ui.respond(async () => new Response(JSON.stringify({ year: 2027, revision: 2, products: [products[0]] })));
   await ui.emit("#reload-catalogue", "click");
   assert.equal(ui.get("#review").disabled, true);
-  assert.match(ui.get("#storage-warning").children[0].textContent, /year or prices changed/);
+  assert.match(ui.get("#storage-warning").children[0].textContent, /select your items again/);
   assert.equal(ui.get("year-label").textContent, 2027);
+  ui.run("updateQuantity(1, 1, false)");
+  assert.equal(ui.get("#storage-warning").hidden, true);
+  assert.deepEqual(JSON.parse(ui.storage.get(order.CART_KEY)), { year: 2027, revision: 2, cart: { 1: 1 } });
 });
 
 test("customer media covers and gallery preserve cart controls, render credits safely, retry failures and stop video", async () => {
@@ -383,7 +386,8 @@ test("an empty public catalogue is a valid out-of-stock state, and products can 
   assert.equal(ui.get("#no-results-title").textContent, "No products currently available");
   assert.equal(ui.get("#no-results-message").textContent, "Please check back later or contact the shop.");
   assert.equal(ui.get("#reset-filters").hidden, true);
-  assert.match(ui.get("#catalogue-status").textContent, /2026 price list loaded/);
+  assert.equal(ui.get("#catalogue-status").hidden, true);
+  assert.equal(ui.get("#reload-catalogue").hidden, true);
   assert.equal(ui.run("Object.keys(cart).length"), 0);
   ui.respond(async () => Response.json({ year: 2026, revision: 3, products: [products[0]] }));
   await ui.emit("#reload-catalogue", "click");
@@ -412,11 +416,15 @@ test("catalogue failures are explicit, block checkout, and allow retry without a
   assert.equal(ui.get("#review").disabled, true);
   assert.equal(ui.get("#products").children.length, 0);
   assert.match(ui.get("#catalogue-status").textContent, /Synthetic database outage/);
+  assert.equal(ui.get("#catalogue-status").hidden, false);
+  assert.equal(ui.get("#reload-catalogue").hidden, false);
   assert.equal(ui.get("#reload-catalogue").disabled, false);
   ui.respond(async () => new Response(JSON.stringify({ year: 2026, revision: 1, products: [products[0]] })));
   await ui.emit("#reload-catalogue", "click");
   assert.equal(ui.run("cart[1]"), 1);
   assert.equal(ui.get("#review").disabled, false);
+  assert.equal(ui.get("#catalogue-status").hidden, true);
+  assert.equal(ui.get("#reload-catalogue").hidden, true);
 });
 
 test("catalogue reload keeps in-memory selections even when browser storage is blocked", async () => {
@@ -481,7 +489,60 @@ test("checkout submits catalogue metadata and link consent, and even a short ord
   assert.doesNotMatch(text, /Full product details/);
   assert.equal(ui.get("#order-details").hidden, false);
   assert.match(ui.get("#order-expiry").textContent, /IST.*Anyone with the link/);
-  assert.match(ui.get("#handoff-instructions").textContent, /name, estimated total, request ID and a link/);
+  assert.match(ui.get("#handoff-instructions").textContent, /Tap Send in WhatsApp/);
+  assert.equal(ui.get("#checkout-step").textContent, "STEP 3 OF 3");
+  assert.equal(ui.get("#back-to-cart").hidden, true);
+});
+
+test("checkout separates cart review from compact details and preserves the draft when going back", async () => {
+  const ui = await harness();
+  ui.run("updateQuantity(1, 2, false)");
+  await ui.emit("#review", "click");
+  assert.equal(ui.get("#checkout").open, true);
+  assert.equal(ui.get("#checkout-title").textContent, "Your details");
+  assert.equal(ui.get("#checkout-step").textContent, "STEP 2 OF 3");
+  assert.equal(ui.get("#checkout-summary").children.length, 1);
+  assert.equal(ui.get("#checkout-summary").children[0].className, "pricing-summary");
+  assert.equal(ui.get("#checkout-total").textContent, order.money(119));
+  assert.equal(ui.get("#checkout-title").focused, true);
+  let resets = 0;
+  ui.get("#customer-form").reset = () => resets++;
+  await ui.emit("#back-to-cart", "click");
+  await ui.emit("#checkout", "close");
+  assert.equal(resets, 0);
+  ui.run("updateQuantity(1, 1, true)");
+  await ui.emit("#review", "click");
+  assert.equal(ui.get("#checkout-total").textContent, order.money(178.5));
+  await ui.emit("#close-checkout", "click");
+  await ui.emit("#checkout", "close");
+  assert.equal(resets, 1);
+});
+
+test("saving blocks backwards navigation and optional-field validation reveals its collapsed section", async () => {
+  const ui = await harness();
+  ui.run("setSaving(true)");
+  assert.equal(ui.get("#back-to-cart").disabled, true);
+  assert.equal(ui.get("#close-checkout").disabled, true);
+  await ui.emit("#back-to-cart", "click");
+  assert.equal(ui.run("returningToCart"), false);
+  ui.run("setSaving(false)");
+  assert.equal(ui.get("#submit-requirement").textContent, "Save & open WhatsApp");
+  const details = {};
+  ui.get("#customer-form").closest = () => details;
+  await ui.emit("#customer-form", "invalid");
+  assert.equal(details.open, true);
+});
+
+test("checkout uses visible submit agreement without a checkbox and keeps long disclosures optional", async () => {
+  const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /id="consent"|type="checkbox"/);
+  assert.match(html, /By continuing, you agree to save your details with the shop/);
+  assert.match(html, /Anyone with the link can view them/);
+  assert.match(html, /aria-describedby="checkout-agreement whatsapp-send-help"/);
+  assert.match(html, /<details id="extra-details"/);
+  assert.match(html, /<summary>Privacy and sharing details<\/summary>/);
+  assert.match(html, /<details id="complete-request"/);
+  assert.ok(html.indexOf('id="storage-warning"') > html.indexOf('id="cart-drawer"'));
 });
 
 test("large yearly catalogues retain the full request and use the same single web-link summary in WhatsApp", async () => {

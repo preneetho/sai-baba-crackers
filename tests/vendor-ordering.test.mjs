@@ -20,33 +20,33 @@ test("shopping, cart and checkout use familiar ecommerce labels without implying
   assert.match(html, /<a class="header-cart" href="#requirement">Cart /);
   assert.match(html, /id="requirement-title">Your cart<\/h2>/);
   assert.match(html, /id="mobile-cart"[^>]*>[\s\S]*?<span>View cart &#8594;<\/span><\/a>/);
-  assert.match(html, /<button id="review" class="button primary wide" type="button" disabled>Proceed to checkout <span aria-hidden="true">&#8594;<\/span><\/button>/);
-  assert.match(html, /id="checkout-title">Checkout<\/h2>/);
+  assert.match(html, /<button id="review" class="button primary wide" type="button" disabled>Continue to checkout <span aria-hidden="true">&#8594;<\/span><\/button>/);
+  assert.match(html, /id="checkout-title"[^>]*>Your details<\/h2>/);
   assert.match(html, /aria-label="Close checkout"/);
-  assert.match(html, /id="message-title">Order request saved<\/h3>/);
-  assert.match(html, /I understand this is not a confirmed order\./);
+  assert.match(html, /id="message-title"[^>]*>Order request saved<\/h3>/);
+  assert.match(html, /Your request needs shop confirmation\./);
   assert.doesNotMatch(html, />View list|Your festive list|Review your requirement|>Clear selection|>Order confirmed|>Pay now/);
 });
 
-test("the store-pickup option displays the collection address without preselecting fulfilment", async () => {
+test("the store-pickup option provides the collection address on selection without preselecting fulfilment", async () => {
   const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   const pickup = html.match(/<label class="fulfilment-option"><input id="fulfilment-pickup"[\s\S]*?<\/label>/)?.[0];
   assert.ok(pickup);
   assert.match(pickup, /value="pickup" required/);
-  assert.match(pickup, /<small>Industrial Estate, Main Road, Sanath Nagar<\/small>/);
-  assert.ok(pickup.includes(`<small>Phone: ${vendor.phone}</small>`));
-  assert.ok(pickup.indexOf("Industrial Estate, Main Road, Sanath Nagar") < pickup.indexOf("Phone:"));
+  assert.match(app, /method === "pickup" \?\s*"Collect from Industrial Estate, Main Road, Sanath Nagar\. The shop will confirm timing\."/);
+  assert.match(html, /id="fulfilment-help"/);
   assert.doesNotMatch(pickup, /\bchecked\b/);
 });
 
 test("the WhatsApp action explicitly explains the customer's final Send step", async () => {
   const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
-  assert.match(html, /id="submit-requirement"[^>]*aria-describedby="whatsapp-send-help">Send order request via WhatsApp<\/button>/);
-  assert.match(html, /id="whatsapp-send-help"[^>]*><strong>Tap Send in WhatsApp to finish\.<\/strong><br>Opening the chat alone does not send your order request\./);
-  assert.match(app, /"Saving order request\.\.\." : "Send order request via WhatsApp"/);
-  assert.match(app, /"Send order request via WhatsApp \\u2197"/);
-  assert.doesNotMatch(html + app, /Save &(?:amp;)? open WhatsApp|Open WhatsApp chat/);
+  assert.match(html, /id="submit-requirement"[^>]*aria-describedby="checkout-agreement whatsapp-send-help">Save &amp; open WhatsApp<\/button>/);
+  assert.match(html, /id="whatsapp-send-help"[^>]*>Tap Send in WhatsApp\. Your request needs shop confirmation\./);
+  assert.match(app, /"Saving order request\.\.\." : "Save & open WhatsApp"/);
+  assert.match(app, /"Open WhatsApp \\u2197"/);
+  assert.doesNotMatch(html + app, /Order confirmed|Pay now/);
 });
 
 test("the active checkout uses one WhatsApp message and retains the complete request for copy/download", async () => {
@@ -55,7 +55,7 @@ test("the active checkout uses one WhatsApp message and retains the complete req
   assert.match(app, /prepareOrderMessage\(result\.summary\)/);
   assert.match(app, /link\.target = "_self"/);
   assert.match(app, /replaceChildren\(link\)/);
-  assert.match(app, /your name, estimated total, request ID and a link to all order details, valid for 7 days/);
+  assert.match(html, /share them through a link valid for 7 days/);
   assert.doesNotMatch(app, /prepareMessages|Send part|Send every part|split into/);
   assert.match(app, /\$\("#full-message"\)\.value = fullMessage/);
   assert.match(app, /clipboard\.writeText\(fullMessage\)/);
@@ -84,15 +84,14 @@ test("WhatsApp recovery reuses the prepared details-link summary and offers a ph
   assert.match(app, /clipboard\.writeText\(\$\("#whatsapp-message"\)\.value\)/);
   assert.match(app, /\$\("#whatsapp-message"\)\.select\(\)/);
   assert.match(app, /\$\("#whatsapp-message"\)\.value = ""/);
-  assert.match(app, /without submitting again/);
+  assert.match(html, /There is no need to submit again/);
 });
 
-test("clear cart is available above and below the cart items", async () => {
+test("a single clear-cart action stays above the scrollable cart items", async () => {
   const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   assert.match(html, /<button id="clear-cart-top" class="text-button" type="button" hidden>Clear cart<\/button>/);
-  assert.match(html, /<button id="clear-cart" class="text-button" type="button" hidden>Clear cart<\/button>/);
+  assert.doesNotMatch(html, /id="clear-cart"/);
   assert.ok(html.indexOf('id="clear-cart-top"') < html.indexOf('id="cart-items"'));
-  assert.ok(html.indexOf('id="cart-items"') < html.indexOf('id="clear-cart"'));
 });
 
 test("shopping retains its original static artwork and only the homepage adds canvas fireworks", async () => {

@@ -152,14 +152,14 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
 .modern dialog { color-scheme: dark; border-color: var(--control-border); background: var(--surface); padding: 28px; border-radius: 24px; max-height: 90dvh; }
 .modern dialog::backdrop { background: #030611BD; backdrop-filter: blur(5px); }
 .modern #cart-drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(480px, 100%); height: 100dvh; max-height: 100dvh; padding: 0; border-radius: 24px 0 0 24px; border-width: 0 0 0 1px; overflow-y: auto; overscroll-behavior: contain; }
-.modern .requirement { position: relative; top: auto; border: 0; border-radius: 0; padding: 32px 28px max(28px, env(safe-area-inset-bottom)); background: transparent; }
-.modern .close-cart { position: absolute; inset-block-start: 24px; inset-inline-end: 20px; }
+.modern .requirement { position: relative; top: auto; border: 0; border-radius: 0; padding: 20px 20px max(16px, env(safe-area-inset-bottom)); background: transparent; display: flex; flex-direction: column; height: 100%; max-height: 100dvh; }
+.modern .close-cart { position: absolute; inset-block-start: 12px; inset-inline-end: 16px; }
 .modern .cart-title { padding-inline-end: 52px; }
 .modern .cart-title h2 { font-size: 28px; }
 .modern .cart-subtitle { font-size: 13px; }
 .modern .count-pill { background: var(--soft-strong); color: var(--accent); }
-.modern #cart-items { max-height: none; margin-block: 20px; overflow: visible; }
-.modern .cart-item { padding-block: 20px; }
+.modern #cart-items { flex: 1; min-height: 0; margin-block: 12px; overflow-y: auto; overscroll-behavior: contain; padding: 4px; }
+.modern .cart-item { padding-block: 12px; }
 .modern .cart-item h3, .modern .cart-item-heading > strong { font-size: 14px; }
 .modern .cart-item > p, .modern .cart-empty p { font-size: 12px; }
 .modern .cart-empty h3 { font-size: 17px; }
@@ -181,6 +181,41 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
 .modern .fulfilment-option small, .modern .fulfilment-help, .modern .optional, .modern .address-help { font-size: 12px; }
 .modern .privacy-note { font-size: 12px; line-height: 1.8; }
 .modern .consent { font-size: 13px; }
+.catalogue-status { margin-top: 12px; font-size: 13px; line-height: 1.6; }
+.cart-notice { padding: 10px; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font-size: 12px; line-height: 1.5; }
+.modern .cart-actions { flex-shrink: 0; border-top: 1px solid var(--line); padding-top: 12px; }
+.modern .cart-actions .estimate-note { margin: 8px 0 12px; }
+.modern .cart-actions .pricing-summary { gap: 6px; }
+.modern #clear-cart-top { min-height: 44px; margin: 4px 0 -8px auto; }
+.modern #checkout[open] { display: flex; flex-direction: column; width: min(560px, calc(100% - 24px)); max-height: 92dvh; padding: 0; overflow: hidden; }
+.modern #checkout .dialog-heading { flex-shrink: 0; align-items: center; padding: 12px 20px; margin: 0; border-bottom: 1px solid var(--line); }
+.modern #checkout .dialog-heading > div { flex: 1; min-width: 0; }
+.modern #checkout .dialog-heading h2 { margin: 0; font-size: 24px; }
+.modern #checkout .icon-button { min-width: 44px; min-height: 44px; }
+.modern #customer-form { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.modern .checkout-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 20px; scroll-padding-block: 16px; }
+.modern #checkout .form-grid { gap: 12px; }
+.modern .checkout-body > .form-grid:first-child { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.modern #checkout .form-grid input, .modern #checkout textarea { margin-top: 4px; padding: 10px; }
+.modern #checkout .fulfilment-options { margin: 12px 0; }
+.modern #checkout .fulfilment-options legend { margin-bottom: 6px; }
+.modern #checkout .fulfilment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.modern #checkout .fulfilment-option { align-items: center; min-height: 48px; padding: 8px; gap: 8px; }
+.modern #checkout .fulfilment-option strong { font-size: 13px; }
+.modern #checkout .fulfilment-option input { margin: 0; }
+.modern #checkout .fulfilment-option .free-badge { margin: 0; padding: 1px 4px; font-size: 9px; }
+.modern #checkout .fulfilment-help { margin-top: 6px; font-size: 11px; line-height: 1.5; }
+.modern .checkout-extra { margin-top: 4px; }
+.modern .checkout-extra > summary { min-height: 44px; padding-block: 12px; color: var(--brand); cursor: pointer; font-size: 12px; line-height: 1.6; }
+.modern .checkout-extra .pricing-summary { padding-block: 8px; }
+.modern .checkout-actions { flex-shrink: 0; padding: 12px 20px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+.modern .checkout-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+.modern .checkout-total strong { font-size: 22px; white-space: nowrap; }
+.modern .checkout-agreement { margin: 8px 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.modern .checkout-help { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.5; text-align: center; }
+.modern #save-status { font-size: 12px; line-height: 1.5; margin-block: 8px; }
+.modern #message-preview { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 20px; }
+.modern #message-preview #order-expiry { display: block; margin-top: 8px; font-size: 11px; }
 .modern .review-line { font-size: 13px; flex-wrap: wrap; gap: 8px; }
 .modern .contact-section h2 { font-size: 30px; }
 .modern .contact-section p:not(.eyebrow), .modern .contact-details p { font-size: 13px !important; }
@@ -270,9 +305,12 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
   .modern .mobile-cart { z-index: 11; inset-inline: 16px; bottom: max(12px, env(safe-area-inset-bottom)); min-height: 56px; gap: 12px; font-size: 13px; border-radius: 16px; }
   .modern .mobile-cart > span { min-width: 0; overflow-wrap: anywhere; }
   .modern:not(.home) footer { padding-bottom: 110px; }
-  .modern #checkout { width: 100%; height: 100dvh; max-height: 100dvh; margin: 0; padding: 24px 20px max(28px, env(safe-area-inset-bottom)); border: 0; border-radius: 0; overscroll-behavior: contain; }
-  .modern #checkout .dialog-heading { position: sticky; inset-block-start: -24px; z-index: 2; background: var(--surface); padding-block: 16px; border-bottom: 1px solid var(--line); }
-  .modern #checkout .dialog-heading h2 { font-size: 28px; }
+  .modern #checkout[open], .modern #cart-drawer { width: 100%; max-width: 100%; height: auto; max-height: 94dvh; margin: 0; inset: auto 0 0; border: 0; border-radius: 20px 20px 0 0; overscroll-behavior: contain; }
+  .modern #cart-drawer { overflow: hidden; }
+  .modern .requirement { height: auto; max-height: 94dvh; }
+  .modern #checkout .dialog-heading h2 { font-size: 24px; }
+  .modern #checkout .dialog-heading, .modern .checkout-body, .modern #message-preview { padding-inline: 16px; }
+  .modern .checkout-actions { padding-inline: 16px; }
   .modern .dialog-heading .eyebrow { font-size: 9px; }
   .modern .form-grid { grid-template-columns: minmax(0, 1fr); }
   .modern .fulfilment-grid { grid-template-columns: minmax(0, 1fr); }

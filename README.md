@@ -47,10 +47,17 @@ public routes. Keep Netlify's default Pretty URLs enabled to normalize `/order`
 to `/order/`; do not add slash-only redirect rules, which can loop after CDN
 normalization. The local preview mirrors these canonical routes. No catch-all rewrite
 intercepts APIs, authentication callbacks or private request pages.
-The cart opens in a native modal drawer, with the existing checkout above it;
-mobile checkout uses the full viewport. These presentation changes do not alter
-pack units, prices, the 15% discount, validation, consent, request recording or
-customer-initiated WhatsApp sending. See [appearance and preview guidance](vendor-app/README.md#appearance).
+The shopping flow separates cart review, customer details and the saved WhatsApp
+handoff into compact native dialogs, presented as bottom sheets on mobile.
+Long item lists scroll independently of the cart total and Continue button.
+Checkout shows required details first; preferred date, notes, price breakdown
+and full privacy information are expandable. A visible agreement beside
+**Save & open WhatsApp** replaces the checkbox; the existing consent fields
+and server checks are unchanged. Pack units, prices, the 15% discount, validation,
+request recording and customer-initiated WhatsApp sending are preserved.
+Successful catalogue loads show no status banner or reload button; actionable
+loading failures still offer Retry. Saved-cart warnings appear only inside the cart.
+See [appearance and preview guidance](vendor-app/README.md#appearance).
 
 Both public pages have canonical/social metadata. The homepage contains static
 `Store` JSON-LD matching its visible contact details; no ratings, opening hours,
@@ -112,8 +119,9 @@ Netlify Functions receive the private Blobs connection automatically. In the
 default Sheets mode, order details links need no new environment variables or Apps Script
 changes. For database mode, use the development setup below instead.
 
-Current checkout explicitly requests consent to store and share a read-only
-copy of every submitted request. Only after the selected backend acknowledges
+Current checkout explains storage and seven-day link sharing immediately above
+the submit action; pressing **Save & open WhatsApp** agrees to these uses without
+a separate checkbox. Only after the selected backend acknowledges
 saving does `/api/orders` create its private `order-shares` snapshot and return
 the concise WhatsApp summary. Anyone with its link can view customer contact
 details, address, notes and all items without signing in for seven days after

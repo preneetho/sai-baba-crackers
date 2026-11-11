@@ -23,6 +23,7 @@ let fullMessage = "";
 let lastReviewTrigger = null;
 let submission = null;
 let saving = false;
+let returningToCart = false;
 let galleryProduct = null;
 let galleryIndex = 0;
 let galleryTrigger = null;
@@ -63,6 +64,7 @@ function restoredCart(text) {
 function saveCart() {
   try {
     localStorage.setItem(CART_KEY, JSON.stringify({ year: catalogue.year, revision: catalogue.revision, cart }));
+    warning.hidden = true;
   } catch {
     showStorageWarning("Your cart could not be saved on this device. Keep this page open or download your order request before leaving.");
   }
@@ -107,6 +109,7 @@ function updateQuantity(id, change, fromCart) {
     pricing(updated);
   } catch (error) {
     $("#catalogue-status").textContent = error.message;
+    $("#catalogue-status").hidden = false;
     $("#announcement").textContent = error.message;
     return;
   }
@@ -435,6 +438,7 @@ function renderCart() {
   $("#cart-count").textContent = lines.length;
   $("#cart-pricing").replaceChildren(pricingSummary(true));
   $("#review").disabled = lines.length === 0;
+  $("#review").textContent = lines.length ? `Continue \u00b7 ${money(total(cart))}` : "Continue to checkout";
   for (const button of document.querySelectorAll("#clear-cart, #clear-cart-top")) {
     button.hidden = lines.length === 0;
   }
@@ -470,31 +474,28 @@ function updateFulfilment() {
   $("#preferred-date-label").textContent = delivery ? "Preferred delivery date" :
     method === "pickup" ? "Preferred pickup date" : "Preferred date";
   $("#address-label").textContent = delivery ? "Delivery address" : "Your address";
-  $("#address-help").textContent = delivery ?
-    "Free home delivery to this address. The shop will confirm service area and timing." :
-    method === "pickup" ? "Your address will be shared with the shop. Collect your items from the store address shown above." :
-      "Your address and selected delivery or pickup option will be shared with the shop.";
+  $("#fulfilment-help").textContent = method === "pickup" ?
+    "Collect from Industrial Estate, Main Road, Sanath Nagar. The shop will confirm timing." :
+    "Free home delivery. The shop will confirm delivery area and timing.";
   $("#checkout-summary .pricing-summary")?.replaceWith(pricingSummary());
 }
 
 function showReview() {
   if (!catalogue || catalogueLoading || !cartLines(cart).length) return;
   lastReviewTrigger = document.activeElement;
-  const summary = element("div", "review-lines");
-  for (const line of cartLines(cart)) {
-    const row = element("div", "review-line");
-    row.append(element("span", "", `#${line.id} ${line.name} (${line.brand}) \u00d7 ${line.quantity}`),
-      element("strong", "", money(line.amount)));
-    summary.append(row);
-  }
-  summary.append(pricingSummary());
-  $("#checkout-summary").replaceChildren(summary);
+  $("#checkout-summary").replaceChildren(pricingSummary());
+  $("#checkout-total").textContent = money(total(cart));
+  $("#checkout-title").textContent = "Your details";
+  $("#checkout-step").textContent = "STEP 2 OF 3";
+  $("#back-to-cart").hidden = false;
   $("#customer-form").hidden = false;
   $("#message-preview").hidden = true;
   $("#form-error").hidden = true;
   $("#preferred-date").min = localDate();
   updateFulfilment();
   $("#checkout").showModal();
+  $("#checkout .checkout-body").scrollTop = 0;
+  $("#checkout-title").focus({ preventScroll: true });
   if (cartLines(cart).length) track("cart");
   track("checkout");
 }
@@ -508,9 +509,10 @@ function setSaving(value) {
   saving = value;
   for (const control of $("#customer-form").elements) control.disabled = value;
   $("#close-checkout").disabled = value;
+  $("#back-to-cart").disabled = value;
   $("#customer-form").setAttribute("aria-busy", String(value));
   $("#submit-requirement").textContent = value ?
-    "Saving order request..." : "Send order request via WhatsApp";
+    "Saving order request..." : "Save & open WhatsApp";
   $("#save-status").hidden = !value;
 }
 
@@ -518,7 +520,13 @@ $("#checkout").addEventListener("cancel", event => {
   if (saving) event.preventDefault();
 });
 $("#checkout").addEventListener("close", () => {
+  if (returningToCart) {
+    returningToCart = false;
+    lastReviewTrigger?.focus({ preventScroll: true });
+    return;
+  }
   $("#customer-form").reset();
+  for (const details of document.querySelectorAll("#checkout details")) details.open = false;
   updateFulfilment();
   $("#message-links").replaceChildren();
   $("#full-message").value = "";
@@ -536,6 +544,11 @@ $("#checkout").addEventListener("close", () => {
 });
 $("#review").addEventListener("click", showReview);
 $("#close-checkout").addEventListener("click", closeReview);
+$("#back-to-cart").addEventListener("click", () => {
+  if (saving) return;
+  returningToCart = true;
+  $("#checkout").close();
+});
 $("#checkout").addEventListener("click", event => {
   if (event.target !== $("#checkout")) return;
   const box = $("#checkout").getBoundingClientRect();
@@ -577,6 +590,10 @@ for (const button of document.querySelectorAll("#clear-cart, #clear-cart-top")) 
 $("#customer-form").addEventListener("change", event => {
   if (event.target.name === "fulfilment") updateFulfilment();
 });
+$("#customer-form").addEventListener("invalid", event => {
+  const details = event.target.closest("details");
+  if (details) details.open = true;
+}, true);
 $("#customer-form").addEventListener("submit", async event => {
   event.preventDefault();
   if (saving) return;
@@ -642,15 +659,18 @@ $("#customer-form").addEventListener("submit", async event => {
     $("#order-reference").textContent = `Order request ID: ${orderId}`;
     $("#recipient").textContent = `${vendor.name} \u00b7 ${vendor.phone}`;
     $("#message-title").textContent = "Order request saved";
-    $("#handoff-instructions").textContent = "Your complete order request is saved. WhatsApp should open with your name, estimated total, request ID and a link to all order details, valid for 7 days. Tap Send in WhatsApp to share it with the shop. Your complete order request is also available below. The shop will confirm your order.";
-    $("#handoff-instructions").textContent += " If WhatsApp closes or does not open, use the copy-and-open option below without submitting again.";
-    const link = element("a", "button primary wide", "Send order request via WhatsApp \u2197");
+    $("#handoff-instructions").textContent = "Tap Send in WhatsApp to share your request. The shop will confirm availability and final prices. No payment has been made.";
+    const link = element("a", "button primary wide", "Open WhatsApp \u2197");
     link.href = message.url;
     link.target = "_self";
     link.rel = "noopener noreferrer";
     $("#message-links").replaceChildren(link);
     $("#customer-form").hidden = true;
     $("#message-preview").hidden = false;
+    $("#checkout-title").textContent = "Send on WhatsApp";
+    $("#checkout-step").textContent = "STEP 3 OF 3";
+    $("#back-to-cart").hidden = true;
+    $("#message-preview").scrollTop = 0;
     $("#copy-status").textContent = "";
     $("#message-title").tabIndex = -1;
     $("#message-title").focus();
@@ -659,7 +679,7 @@ $("#customer-form").addEventListener("submit", async event => {
     } catch {
       console.warn("Automatic WhatsApp navigation was blocked by the browser.");
       $("#whatsapp-recovery").open = true;
-      $("#handoff-instructions").textContent += " This browser could not open WhatsApp automatically. Tap Send order request via WhatsApp below, then tap Send in WhatsApp. Opening the chat alone does not send your order request.";
+      $("#handoff-instructions").textContent += " WhatsApp could not open automatically. Use Open WhatsApp or the recovery option below.";
     }
   } catch (error) {
     $("#form-error").textContent = error.message;
@@ -672,6 +692,9 @@ $("#customer-form").addEventListener("submit", async event => {
 $("#edit-details").addEventListener("click", () => {
   $("#customer-form").hidden = false;
   $("#message-preview").hidden = true;
+  $("#checkout-title").textContent = "Your details";
+  $("#checkout-step").textContent = "STEP 2 OF 3";
+  $("#back-to-cart").hidden = false;
   $("#customer-form input").focus();
 });
 $("#copy-message").addEventListener("click", async () => {
@@ -680,6 +703,7 @@ $("#copy-message").addEventListener("click", async () => {
     $("#copy-status").textContent = "Message copied. Paste the complete order request into the shop's WhatsApp chat, then tap Send.";
   } catch {
     $("#copy-status").textContent = "Clipboard access is unavailable. Select and copy the message below manually.";
+    $("#complete-request").open = true;
     $("#full-message").focus();
     $("#full-message").select();
   }
@@ -728,6 +752,8 @@ async function loadCatalogue() {
   $("#reload-catalogue").disabled = true;
   $("#review").disabled = true;
   $("#catalogue-status").textContent = "Loading the current price list...";
+  $("#catalogue-status").hidden = false;
+  $("#reload-catalogue").hidden = true;
   try {
     const response = await fetch("/api/catalogue", { cache: "no-store", signal: AbortSignal.timeout(25000) });
     const result = await response.json();
@@ -746,12 +772,13 @@ async function loadCatalogue() {
       else if (localStorage.getItem("sai-baba-cart-v1")) {
         showStorageWarning("Your old cart used the previous catalogue format. Please select items again using the current prices.");
       }
-    } catch (error) {
-      showStorageWarning(`Your saved cart could not be restored. ${error.message}`, true);
+    } catch {
+      showStorageWarning("Your saved cart is no longer available. Please select your items again.", true);
     }
     document.title = `${vendor.name} | Diwali ${result.year}`;
     for (const node of document.querySelectorAll("[data-catalogue-year]")) node.textContent = result.year;
-    $("#catalogue-status").textContent = `${result.year} price list loaded. Prices are confirmed again when you submit.`;
+    $("#catalogue-status").textContent = "";
+    $("#catalogue-status").hidden = true;
     renderCategories();
     renderTypes();
     renderProducts();
@@ -771,6 +798,8 @@ async function loadCatalogue() {
     $("#no-results").hidden = true;
     renderCart();
     $("#catalogue-status").textContent = `${error.message} Retry loading the price list or contact the shop.`;
+    $("#catalogue-status").hidden = false;
+    $("#reload-catalogue").hidden = false;
   } finally {
     catalogueLoading = false;
     $("#reload-catalogue").disabled = false;
