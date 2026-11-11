@@ -9,6 +9,7 @@ import { buildOrder, handleOrderRequest } from "../netlify/functions/orders.mjs"
 import { handleVendorOrders } from "../netlify/functions/vendor-orders.mjs";
 import { createSession, unseal, vendorSettings } from "../netlify/lib/vendor-auth.mjs";
 import { products, vendor } from "../vendor-app/catalog.mjs";
+import { DEFAULT_OFFERS } from "../vendor-app/offers-model.mjs";
 
 const engine = new PGlite();
 const database = createOrderDatabase(drizzle({ client: engine }));
@@ -26,6 +27,7 @@ const cookie = createSession({ sub: "test-vendor", email: "owner@example.com" },
 const csrf = unseal(cookie, "session", settings, now.getTime()).csrf;
 const id = number => `00000000-0000-4000-8000-${number.toString(16).padStart(12, "0")}`;
 const input = (number = 1) => ({
+  offerVersion: null,
   requestId: id(number), consent: true, cart: { 1: 2 }, catalogue: { year: 2026, revision: 1 },
   customer: {
     name: "Synthetic Customer", phone: "9876543210", address: "Synthetic test address only",
@@ -46,6 +48,7 @@ function request(path = "/api/orders", body, authenticated = false) {
   });
 }
 const submit = (body, overrides = {}) => handleOrderRequest(request("/api/orders", body), {
+  readOfferSettings: async () => ({ offers: DEFAULT_OFFERS, version: null }),
   env, now: () => now, fetchImpl: forbiddenFetch, databaseFactory: factory, ...overrides,
 });
 const dashboard = (path = "/api/vendor-orders", body, overrides = {}) => handleVendorOrders(request(path, body, true), {
@@ -121,6 +124,23 @@ test("submission atomically snapshots line items, season, literal text and integ
   assert.equal(detail.order.notes, order.customer.notes);
   assert.ok(detail.order.items.includes(products[0].name));
   assert.equal(await count("order_status_history"), 1);
+});
+
+test("saved coupon codes and paid delivery remain immutable in database details", async () => {
+  const offers = { coupons: [{ code: "SALE15", percent: 15, enabled: true }], freeDeliveryMinimum: 500, deliveryFee: 50 };
+  const payload = { ...input(), couponCode: "sale15", customer: { ...input().customer, fulfilment: "delivery" } };
+  const order = buildOrder(payload, now, undefined, offers);
+  await database.save(order);
+  const row = (await engine.query("select coupon_code, delivery_charge_paise, total_paise from order_requests")).rows[0];
+  assert.deepEqual(row, { coupon_code: "SALE15", delivery_charge_paise: 5000, total_paise: 16900 });
+  offers.coupons[0].enabled = false;
+  offers.deliveryFee = 200;
+  const detail = (await database.dashboard({ action: "vendor-detail", orderId: order.orderId })).order;
+  assert.equal(detail.couponCode, "SALE15");
+  assert.equal(detail.deliveryCharge, 50);
+  assert.equal(detail.discount, 21);
+  assert.equal(detail.total, 169);
+  assert.equal(detail.fulfilment, "Home delivery");
 });
 
 test("retries keep the original timestamp and vendor status without duplicate rows or audit entries", async () => {

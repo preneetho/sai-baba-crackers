@@ -2,7 +2,8 @@ import { track } from "./telemetry-client.mjs";
 import { vendor } from "./catalog.mjs";
 import { validCatalogue, PRODUCT_TYPES } from "./catalogue-model.mjs";
 import { mediaUrl, isYouTubeMedia } from "./media-model.mjs";
-import { CART_KEY, MAX_QUANTITY, DISCOUNT_PERCENT, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, total as getTotal, money, localDate, validateCustomer, prepareOrderMessage, validateOrderShareLink } from "./order.mjs";
+import { CART_KEY, MAX_QUANTITY, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, money, localDate, validateCustomer, prepareOrderMessage, validateOrderShareLink } from "./order.mjs";
+import { DEFAULT_OFFERS, validOffers, validOfferVersion, normalizeCoupon, couponOffer } from "./offers-model.mjs";
 
 const $ = selector => document.querySelector(selector);
 let products = [];
@@ -12,8 +13,12 @@ let catalogueLoading = false;
 let retainedCart = null;
 const sanitizeCart = value => checkCart(value, products);
 const cartLines = value => getLines(value, products);
-const pricing = value => getPricing(value, products);
-const total = value => getTotal(value, products);
+let offers = null;
+let offerVersion = null;
+let offersLoading = false;
+let couponCode = "";
+const pricing = (value, fulfilment = "pickup") => getPricing(value, products, offers ?? DEFAULT_OFFERS, offers ? couponCode : "", fulfilment);
+const total = value => pricing(value).total;
 let cart = {};
 let category = "All products";
 let productType = null;
@@ -118,7 +123,7 @@ function updateQuantity(id, change, fromCart) {
   saveCart();
   renderProducts();
   renderCart();
-  $("#announcement").textContent = `${products.find(product => product.id === id).name}: ${next} pack${next === 1 ? "" : "s"} in your cart. Estimated total after ${DISCOUNT_PERCENT}% discount ${money(total(cart))}.`;
+  $("#announcement").textContent = `${products.find(product => product.id === id).name}: ${next} pack${next === 1 ? "" : "s"} in your cart. Items total ${money(total(cart))}.`;
   const scope = fromCart ? "#cart-items" : "#products";
   const direction = change > 0 ? "increase" : "decrease";
   const active = $(`${scope} [data-id="${id}"] [data-direction="${direction}"]:not(:disabled)`) ??
@@ -411,15 +416,15 @@ $("#product-media-dialog").addEventListener("close", () => {
 });
 
 function pricingSummary(withIds = false) {
-  const amounts = pricing(cart);
+  const amounts = pricing(cart, !withIds && $("#fulfilment-delivery").checked ? "delivery" : "pickup");
   const summary = element("div", "pricing-summary");
   const rows = [
     ["Subtotal", money(amounts.subtotal), "pricing-row", "cart-subtotal"],
-    [`Discount (${DISCOUNT_PERCENT}%)`,
-      `\u2212${money(amounts.discount)}`, "pricing-row discount-row", "cart-discount"],
+    ...(amounts.couponCode ? [[`Coupon ${amounts.couponCode} (${amounts.discountPercent}%)`,
+      `\u2212${money(amounts.discount)}`, "pricing-row discount-row", "cart-discount"]] : []),
     ...(!withIds && $("#fulfilment-delivery").checked ?
-      [["Delivery fee", "FREE", "pricing-row discount-row", "delivery-charge"]] : []),
-    ["Estimated total", money(amounts.total), "cart-total", "cart-total"],
+      [["Delivery fee", amounts.deliveryCharge ? money(amounts.deliveryCharge) : "FREE", "pricing-row", "delivery-charge"]] : []),
+    [withIds ? "Items total" : "Estimated total", money(amounts.total), "cart-total", "cart-total"],
   ];
   for (const [label, value, className, id] of rows) {
     const row = element("div", className);
@@ -437,13 +442,30 @@ function renderCart() {
   $("#header-count").textContent = units;
   $("#cart-count").textContent = lines.length;
   $("#cart-pricing").replaceChildren(pricingSummary(true));
-  $("#review").disabled = lines.length === 0;
+  $("#review").disabled = lines.length === 0 || !offers || offersLoading;
   $("#review").textContent = lines.length ? `Continue \u00b7 ${money(total(cart))}` : "Continue to checkout";
   for (const button of document.querySelectorAll("#clear-cart, #clear-cart-top")) {
     button.hidden = lines.length === 0;
   }
   $("#mobile-cart").hidden = lines.length === 0;
   $("#mobile-cart-label").textContent = `${units} pack${units === 1 ? "" : "s"} \u00b7 ${money(total(cart))}`;
+  if (offers) {
+    const amounts = pricing(cart);
+    const progress = amounts.freeDeliveryRemaining > 0 ?
+      `Add ${money(amounts.freeDeliveryRemaining)} more for free delivery` : "Free delivery unlocked";
+    $("#delivery-progress-text").textContent = progress;
+    $("#mobile-delivery-progress").textContent = progress;
+    $("#delivery-progress").max = Math.max(1, offers.freeDeliveryMinimum);
+    $("#delivery-progress").value = amounts.freeDeliveryRemaining > 0 ? amounts.billed : $("#delivery-progress").max;
+    $("#delivery-progress").setAttribute("aria-label", progress);
+    $("#delivery-progress-note").textContent = amounts.freeDeliveryRemaining > 0 ?
+      `Free delivery from ${money(offers.freeDeliveryMinimum)} after coupon discount. Otherwise ${money(offers.deliveryFee)}. Pickup is free.` :
+      "Based on your items total after coupon discount. Delivery area and timing need shop confirmation.";
+  }
+  $("#delivery-offer").hidden = !offers || !lines.length;
+  $("#coupon-code").disabled = !offers || saving || offersLoading;
+  $("#apply-coupon").disabled = !offers || saving || offersLoading;
+  $("#remove-coupon").hidden = !couponCode;
   if (!lines.length) {
     const empty = element("div", "cart-empty");
     empty.append(element("span", "", "\u2727"), element("h3", "", "Your cart is empty"),
@@ -474,14 +496,16 @@ function updateFulfilment() {
   $("#preferred-date-label").textContent = delivery ? "Preferred delivery date" :
     method === "pickup" ? "Preferred pickup date" : "Preferred date";
   $("#address-label").textContent = delivery ? "Delivery address" : "Your address";
+  const amounts = pricing(cart, method);
+  $("#checkout-total").textContent = money(amounts.total);
   $("#fulfilment-help").textContent = method === "pickup" ?
     "Collect from Industrial Estate, Main Road, Sanath Nagar. The shop will confirm timing." :
-    "Free home delivery. The shop will confirm delivery area and timing.";
+    `${amounts.deliveryCharge ? `Delivery fee ${money(amounts.deliveryCharge)}. Add ${money(amounts.freeDeliveryRemaining)} more after discount for free delivery.` : "Free home delivery."} The shop will confirm delivery area and timing.`;
   $("#checkout-summary .pricing-summary")?.replaceWith(pricingSummary());
 }
 
 function showReview() {
-  if (!catalogue || catalogueLoading || !cartLines(cart).length) return;
+  if (!catalogue || catalogueLoading || !offers || offersLoading || !cartLines(cart).length) return;
   lastReviewTrigger = document.activeElement;
   $("#checkout-summary").replaceChildren(pricingSummary());
   $("#checkout-total").textContent = money(total(cart));
@@ -602,6 +626,8 @@ $("#customer-form").addEventListener("submit", async event => {
     const customer = validateCustomer(Object.fromEntries(new FormData(event.currentTarget)));
     if (!catalogue) throw new Error("Load the current price list before submitting.");
     const selection = sanitizeCart(cart);
+    if (!offers) throw new Error("Return to your cart and reload offers before submitting.");
+    // Requoting after an uncertain save must not create a duplicate request.
     const fingerprint = JSON.stringify({ cart: selection, customer });
     if (!submission || submission.fingerprint !== fingerprint) {
       submission = { requestId: crypto.randomUUID(), fingerprint };
@@ -613,7 +639,7 @@ $("#customer-form").addEventListener("submit", async event => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId: submission.requestId, cart: selection, customer,
-          catalogue: { year: catalogue.year, revision: catalogue.revision }, consent: true, shareConsent: true }),
+          catalogue: { year: catalogue.year, revision: catalogue.revision }, couponCode, offerVersion, consent: true, shareConsent: true }),
         signal: AbortSignal.timeout(25000),
       });
     } catch {
@@ -626,8 +652,15 @@ $("#customer-form").addEventListener("submit", async event => {
     } catch {
       throw new Error("The order tracker returned an unreadable response. Keep checkout open and retry, or contact the shop.");
     }
-    if (!response.ok) throw new Error(typeof result?.error === "string" ? result.error :
-      "We could not confirm saving your order request. Keep checkout open and retry.");
+    if (!response.ok) {
+      if (result?.offersChanged === true) {
+        offers = null;
+        $("#offer-status").textContent = result.error;
+        $("#reload-offers").hidden = false;
+      }
+      throw new Error(typeof result?.error === "string" ? result.error :
+        "We could not confirm saving your order request. Keep checkout open and retry.");
+    }
     const orderId = `SBC-${submission.requestId.toUpperCase()}`;
     if (result?.orderId !== orderId || typeof result.message !== "string" ||
         !result.message.startsWith(`Order ID: ${orderId}\n`) || result.message.length > 131072 ||
@@ -806,4 +839,60 @@ async function loadCatalogue() {
   }
 }
 $("#reload-catalogue").addEventListener("click", loadCatalogue);
+async function loadOffers() {
+  if (saving || offersLoading || $("#checkout").open) return;
+  offersLoading = true;
+  $("#offer-status").textContent = "Loading offers and delivery charges...";
+  $("#reload-offers").disabled = true;
+  renderCart();
+  try {
+    const response = await fetch("/api/offers", { cache: "no-store", signal: AbortSignal.timeout(25000) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Offer settings are unavailable.");
+    if (!validOffers(result.offers) || !validOfferVersion(result.version)) throw new Error("Offers could not be verified. Reload before checking out.");
+    offers = result.offers;
+    offerVersion = result.version;
+    try { couponOffer(offers, couponCode); }
+    catch (error) {
+      couponCode = "";
+      $("#coupon-code").value = "";
+      $("#coupon-status").textContent = `${error.message} No discount is currently applied.`;
+    }
+    $("#offer-status").textContent = "";
+    $("#reload-offers").hidden = true;
+    $("#shop-offers").textContent = offers.coupons.filter(coupon => coupon.enabled)
+      .map(coupon => `${coupon.percent}% off with ${coupon.code}`).join(" \u00b7 ");
+    $("#shop-offers-ribbon").hidden = !offers.coupons.some(coupon => coupon.enabled);
+  } catch (error) {
+    offers = null;
+    $("#offer-status").textContent = error.message;
+    $("#reload-offers").hidden = false;
+  } finally {
+    offersLoading = false;
+    $("#reload-offers").disabled = false;
+    renderCart();
+  }
+}
+$("#coupon-form").addEventListener("submit", event => {
+  event.preventDefault();
+  if (!offers || saving || offersLoading) return;
+  try {
+    const code = normalizeCoupon($("#coupon-code").value);
+    if (!code) throw new Error("Enter a coupon code.");
+    const coupon = couponOffer(offers, code);
+    couponCode = coupon.code;
+    $("#coupon-code").value = couponCode;
+    $("#coupon-status").textContent = `${coupon.percent}% discount applied with ${couponCode}.`;
+    renderCart();
+  } catch (error) { $("#coupon-status").textContent = error.message; }
+});
+$("#remove-coupon").addEventListener("click", () => {
+  if (saving) return;
+  couponCode = "";
+  $("#coupon-code").value = "";
+  $("#coupon-status").textContent = "Coupon removed. No discount applied.";
+  renderCart();
+});
+$("#reload-offers").addEventListener("click", loadOffers);
 loadCatalogue();
+loadOffers();

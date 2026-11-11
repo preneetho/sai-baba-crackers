@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getStore } from "../netlify/node_modules/@netlify/blobs/dist/main.js";
 import { buildOrder, handleOrderRequest } from "../netlify/functions/orders.mjs";
+import { DEFAULT_OFFERS } from "../vendor-app/offers-model.mjs";
 import { handlePdfRequest } from "../netlify/functions/order-pdf.mjs";
 import { config as cleanupConfig } from "../netlify/functions/expire-order-pdfs.mjs";
 import { PDF_TTL_MS, pdfKey, saveOrderPdf, readOrderPdf, removeExpiredOrderPdfs } from "../netlify/lib/order-pdfs.mjs";
@@ -13,6 +14,7 @@ const now = new Date("2026-11-03T04:34:22.858Z");
 const origin = "https://saibabacrackers.netlify.app";
 const secret = "test-only-pdf-signing-value-".repeat(2);
 const input = {
+  offerVersion: null,
   requestId: "12345678-1234-4234-8234-123456789abc", consent: true, pdfConsent: true,
   cart: Object.fromEntries(products.map(product => [product.id, 99])),
   customer: {
@@ -213,6 +215,7 @@ async function submit(payload, { savePdf, acknowledge = true, site = origin } = 
   }), {
     env: { GOOGLE_SHEETS_WEBHOOK_URL: "https://script.google.com/macros/s/test/exec", ORDER_TRACKING_SECRET: secret },
     now: () => now, savePdf,
+    readOfferSettings: async () => ({ offers: DEFAULT_OFFERS, version: null }),
     fetchImpl: async (_, options) => {
       const saved = JSON.parse(options.body).order;
       return Response.json({ ok: acknowledge, orderId: saved.orderId, createdAt: saved.createdAt });

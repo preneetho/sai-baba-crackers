@@ -82,7 +82,7 @@ export async function handleVendorOrders(request, {
         throw new Error("Order response invalid");
       }
       const keys = ["orderId", "createdAt", "status", "name", "phone", "fulfilment", "total",
-        "address", "preferredDate", "items", "subtotal", "discountPercent", "discount", "deliveryCharge", "notes"];
+        "address", "preferredDate", "items", "subtotal", "discountPercent", "discount", "deliveryCharge", "notes", "couponCode"];
       return vendorJson({ order: Object.fromEntries(keys.map(key => [key, result.order[key]])) });
     }
     if (!Array.isArray(result.orders) || result.orders.length > PAGE_SIZE || !result.orders.every(order => validOrder(order)) ||

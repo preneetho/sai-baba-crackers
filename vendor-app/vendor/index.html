@@ -35,9 +35,29 @@
     <section id="dashboard" hidden aria-labelledby="dashboard-title">
       <div class="vendor-heading">
         <div><p class="eyebrow brand-text">Order register</p><h1 id="dashboard-title">Order requests</h1></div>
-        <div class="vendor-actions"><button id="open-homepage" type="button" aria-controls="homepage-panel" aria-expanded="false">Homepage video</button><button id="open-prices" type="button">Manage yearly price lists</button><button id="refresh-orders" type="button">Refresh requests</button></div>
+        <div class="vendor-actions"><button id="open-offers" type="button" aria-controls="offers-panel" aria-expanded="false">Coupons &amp; delivery</button><button id="open-homepage" type="button" aria-controls="homepage-panel" aria-expanded="false">Homepage video</button><button id="open-prices" type="button">Manage yearly price lists</button><button id="refresh-orders" type="button">Refresh requests</button></div>
       </div>
       <p class="vendor-muted">Requests are not confirmed sales. Status updates do not send a WhatsApp message or notify customers.</p>
+      <section id="offers-panel" class="vendor-panel" aria-labelledby="offers-title" hidden>
+        <div class="vendor-heading"><h2 id="offers-title">Coupons &amp; delivery</h2><button id="close-offers" type="button">Close offer settings</button></div>
+        <p>Shared across all years. Enabled codes appear on the homepage. One percentage coupon per request; no code means no discount. Existing saved requests keep their original amounts.</p>
+        <p id="offers-message" class="vendor-notice" role="status" aria-live="polite"></p>
+        <button id="reload-vendor-offers" type="button">Reload saved offers</button>
+        <form id="offers-form">
+          <fieldset id="offers-fields" disabled>
+            <legend>Coupon codes</legend>
+            <div id="vendor-coupons"></div>
+            <button id="add-coupon" type="button">Add coupon</button>
+            <h3>Delivery charges</h3>
+            <div class="vendor-offer-delivery">
+              <label>Free-delivery minimum (Rs.)<input id="free-delivery-minimum" type="number" min="0" max="10000000" step="0.01" required></label>
+              <label>Delivery fee below minimum (Rs.)<input id="delivery-fee" type="number" min="0" max="10000000" step="0.01" required></label>
+            </div>
+            <p class="vendor-muted">Eligibility uses the items total after coupon discount, excluding delivery fees. At the minimum or above, delivery is free. Set the minimum or fee to 0 for free delivery on every request. Store pickup is always free.</p>
+            <button id="save-offers" class="vendor-primary" type="submit">Save coupons &amp; delivery</button>
+          </fieldset>
+        </form>
+      </section>
       <section id="homepage-panel" class="vendor-panel vendor-homepage-panel" aria-labelledby="homepage-title" hidden>
         <div class="vendor-heading"><h2 id="homepage-title">Homepage video</h2><button id="close-homepage" type="button">Close video settings</button></div>
         <p>Change the video on the public homepage. This setting is shared across all price-list years; prices, carts and order requests are unchanged.</p>
@@ -52,7 +72,7 @@
       </section>
       <section id="price-panel" class="vendor-panel" aria-labelledby="price-title" hidden>
         <div class="vendor-heading"><h2 id="price-title">Yearly price lists</h2><button id="close-prices" type="button">Close price lists</button></div>
-        <p>Customers see one active year. Saving changes to the active list updates prices for new requests immediately. Existing orders keep their saved prices. The cart discount remains 15%.</p>
+        <p>Customers see one active year. Saving changes to the active list updates prices for new requests immediately. Existing orders keep their saved prices. Manage discounts separately in Coupons &amp; delivery.</p>
         <p class="vendor-muted">Select a product row to edit its details, effect types, visibility, photos and videos. Choose all applicable effects under Shop by type to help customers filter products. Uncheck Visible to customers when out of stock; recheck it when restocked. Files uploaded to Cloudinary are public; never include private information. Choose Save price list to publish changes. Effect types, visibility, photos and videos are independent for each year.</p>
         <p id="price-message" class="vendor-notice" role="status" aria-live="polite" tabindex="-1"></p>
         <button id="reload-prices" type="button">Reload saved list</button>

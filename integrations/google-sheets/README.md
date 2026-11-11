@@ -131,16 +131,25 @@ Previously sent WhatsApp messages are not retroactively changed.
 
 ## 5. Verify the real integration
 
+Before publishing coupon/delivery checkout, replace the deployed Apps Script with
+the current `Code.gs`, run `setupOrdersSheet`, and deploy a new version of the
+existing web app. **Coupon code** is appended in column R; A-Q stay in place.
+Move any custom data in R first; setup refuses to overwrite a different header.
+Historical rows keep their saved discounts and totals with a blank coupon.
+The old script does not support a nonzero delivery charge.
+
 1. Open the deployed site and add two Ground Chakkar Big units plus one Flower
-   Pot Special: subtotal Rs.370, discount Rs.55.50, total Rs.314.50.
-2. Choose free home delivery or store pickup, enter test contact details and an
+   Pot Special: subtotal Rs.370. No coupon means no discount. With an enabled
+   15% coupon, merchandise is Rs.314.50 before any delivery fee.
+2. Choose home delivery or store pickup, enter test contact details and an
    address, and agree to recording the requirement.
 3. Submit. The site should show a reference starting `SBC-` only after Google
    Sheets acknowledges the write. Verify the same ID in the sheet and WhatsApp
    message; opening a message does not send it. Verify the order date/time in
    column Q matches the IST time included in WhatsApp.
-4. Verify home delivery costs zero, the address and method are recorded, and the
-   15% discounted total is correct.
+4. Verify delivery is free at/above the configured post-discount threshold, or
+   includes the configured fee below it. Verify the applied code in column R,
+   actual fee in M and total in N, plus the same saved details in WhatsApp.
 5. Repeat with store pickup and verify that no delivery date/charge is claimed.
 6. Retry unchanged details in the same open review. There must still be one row
    for that reference, with the original order date/time and status unchanged.
@@ -154,8 +163,8 @@ real submission above is required.
 ## Vendor workflow
 
 Each row includes its ID, timestamp, customer contact/address, delivery or pickup
-choice, preferred date, item quantities/rates/amounts, subtotal, 15% discount,
-zero delivery charge, total, notes, and status.
+choice, preferred date, item quantities/rates/amounts, subtotal, applied coupon
+percentage/discount, actual delivery charge, total, notes, status and coupon code.
 Column B retains the server-generated UTC creation time. Column Q displays the
 same time in IST, and WhatsApp includes it as **Order date & time**. This is the
 time the enquiry was first recorded, not the optional preferred delivery/pickup

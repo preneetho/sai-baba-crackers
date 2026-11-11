@@ -100,8 +100,8 @@
 .vendor-price-product button { align-self: end; }
 .vendor-product-types { grid-column: 1 / -1; min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; }
 .vendor-type-options { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 8px; }
-.vendor-page .vendor-type-options label { display: flex; align-items: center; gap: 10px; min-height: 44px; }
-.vendor-page .vendor-type-options input { width: 22px; min-height: 22px; flex: 0 0 22px; margin: 0; accent-color: var(--brand); }
+.vendor-page .vendor-type-options label, .vendor-page .vendor-coupon-enabled { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.vendor-page .vendor-type-options input, .vendor-page .vendor-coupon-enabled input { width: 22px; min-height: 22px; flex: 0 0 22px; margin: 0; accent-color: var(--brand); }
 .vendor-product-media { grid-column: 1 / -1; min-width: 0; border-top: 1px solid var(--line); padding-top: 12px; }
 .vendor-product-media summary { cursor: pointer; min-height: 44px; padding-block: 10px; font-weight: 600; }
 .vendor-product-media > p, .vendor-product-media > label, .vendor-product-media > button { margin-top: 12px; }
@@ -149,3 +149,9 @@
   .vendor-price-table th:nth-child(5) { width: 31%; }
   .vendor-price-table th:nth-child(6) { width: 18%; }
 }
+.vendor-coupon-row, .vendor-offer-delivery { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-block: 12px; }
+.vendor-coupon-row > label, .vendor-offer-delivery > label { flex: 1; min-width: 140px; }
+.vendor-coupon-row > .vendor-coupon-enabled { flex: 0 1 auto; min-width: auto; }
+.vendor-coupon-row input:not([type="checkbox"]) { width: 100%; }
+#offers-fields { border: 0; padding: 16px 0 0; min-width: 0; }
+#offers-fields legend { font-weight: 600; }

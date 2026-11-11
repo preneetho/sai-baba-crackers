@@ -16,7 +16,7 @@ test("the homepage has crawlable services, honest fulfilment information and wor
   assert.equal([...html.matchAll(/<h1\b/g)].length, 1);
   assert.deepEqual(
     [...html.matchAll(/<a class="button[^"]*" href="\/order\/">([^<]+)<\/a>/g)].map(([, label]) => label),
-    ["Shop crackers", "Shop crackers", "Shop crackers"],
+    ["Shop crackers", "Shop crackers", "Shop crackers", "Shop crackers"],
   );
   for (const id of ["main-content", "celebrations", "delivery", "event-enquiries", "faq", "contact"]) {
     assert.ok(html.includes(`id="${id}"`));
@@ -24,7 +24,7 @@ test("the homepage has crawlable services, honest fulfilment information and wor
   assert.match(html, /Weddings &amp; family functions/);
   assert.match(html, /Diwali &amp; festivals/);
   assert.match(html, /Bulk requirements/);
-  assert.match(html, /citywide or same-day delivery is not guaranteed/);
+  assert.match(html, /Citywide or same-day delivery is not guaranteed/);
   assert.match(html, /Outside the festival season, call first/);
   assert.match(html, /not a professional fireworks-display or event-operation service/);
   assert.match(html, /A submitted request is not a confirmed sale/);

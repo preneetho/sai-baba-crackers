@@ -2,7 +2,7 @@ var ORDER_HEADERS = [
   "Order ID", "Created at (UTC)", "Status", "Customer name", "Mobile", "Address",
   "Fulfilment", "Preferred date", "Items", "Subtotal (INR)", "Discount (%)",
   "Discount (INR)", "Delivery charge (INR)", "Total (INR)", "Notes", "Payload hash",
-  "Order date & time (IST)"
+  "Order date & time (IST)", "Coupon code"
 ];
 var ORDER_STATUSES = [
   "New", "Contacted", "Confirmed", "Preparing", "Out for delivery",
@@ -84,6 +84,12 @@ function orderSheet_() {
   } else if (timeHeader !== ORDER_HEADERS[16]) {
     throw new Error("Column Q is already in use; move its custom data before adding order times");
   }
+  var couponHeader = sheet.getRange(1, 18).getValue();
+  if (couponHeader === "") {
+    sheet.getRange(1, 18).setValues([[ORDER_HEADERS[17]]]).setFontWeight("bold");
+  } else if (couponHeader !== ORDER_HEADERS[17]) {
+    throw new Error("Column R is already in use; move its custom data before adding coupon codes");
+  }
   return sheet;
 }
 
@@ -127,6 +133,7 @@ function dashboardOrder_(row, full) {
     order.discount = row[11];
     order.deliveryCharge = row[12];
     order.notes = dashboardText_(row[14]);
+    order.couponCode = dashboardText_(row[17]);
     [order.subtotal, order.discountPercent, order.discount, order.deliveryCharge].forEach(function (amount) {
       if (typeof amount !== "number" || !isFinite(amount) || amount < 0) throw new Error("Invalid stored amount");
     });
@@ -157,7 +164,7 @@ function dashboardAction_(input) {
         .matchEntireCell(true).useRegularExpression(false).findNext() : null;
       if (!existing) return reply_({ ok: false, error: "NOT_FOUND" });
       var rowNumber = existing.getRow();
-      var row = sheet.getRange(rowNumber, 1, 1, 17).getValues()[0];
+      var row = sheet.getRange(rowNumber, 1, 1, ORDER_HEADERS.length).getValues()[0];
       if (update) {
         if (row[2] !== input.expectedStatus) return reply_({ ok: false, error: "STATUS_CONFLICT" });
         dashboardOrder_(row, true);
@@ -225,7 +232,13 @@ function doPost(event) {
       (order.customer.fulfilment !== "delivery" && order.customer.fulfilment !== "pickup") ||
       !Array.isArray(order.items) || order.items.length < 1 || order.items.length > 68 ||
       !order.amounts || !isFinite(order.amounts.total) || order.amounts.total < 0 ||
-      order.amounts.deliveryCharge !== 0 || typeof order.createdAt !== "string") {
+      typeof order.amounts.deliveryCharge !== "number" || !isFinite(order.amounts.deliveryCharge) ||
+      order.amounts.deliveryCharge < 0 ||
+      typeof order.amounts.discountPercent !== "number" || !Number.isInteger(order.amounts.discountPercent) ||
+      order.amounts.discountPercent < 0 || order.amounts.discountPercent > 100 ||
+      (order.amounts.couponCode !== undefined && (typeof order.amounts.couponCode !== "string" ||
+        (order.amounts.couponCode !== "" && !/^[A-Z0-9][A-Z0-9_-]{1,23}$/.test(order.amounts.couponCode)))) ||
+      typeof order.createdAt !== "string") {
     return reply_({ ok: false, error: "INVALID_ORDER" });
   }
   var createdAt;
@@ -261,10 +274,11 @@ function doPost(event) {
     var row = [
       order.orderId, text_(createdAt), "New", text_(customer.name),
       text_("+91 " + customer.phone), text_(customer.address),
-      customer.fulfilment === "delivery" ? "Free home delivery" : "Store pickup",
+      customer.fulfilment === "delivery" ? (order.amounts.deliveryCharge === 0 ? "Free home delivery" : "Home delivery") : "Store pickup",
       text_(customer.preferredDate), text_(items), order.amounts.subtotal,
-      order.amounts.discountPercent, order.amounts.discount, 0,
-      order.amounts.total, text_(customer.notes), order.fingerprint, text_(orderTime_(createdAt))
+      order.amounts.discountPercent, order.amounts.discount, order.amounts.deliveryCharge,
+      order.amounts.total, text_(customer.notes), order.fingerprint, text_(orderTime_(createdAt)),
+      text_(order.amounts.couponCode || "")
     ];
     var nextRow = lastRow + 1;
     if (nextRow > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), 1);

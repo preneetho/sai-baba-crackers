@@ -5,9 +5,11 @@ import vm from "node:vm";
 import { buildOrder, handleOrderRequest, config } from "../netlify/functions/orders.mjs";
 import { products } from "../vendor-app/catalog.mjs";
 import { prepareOrderMessage, whatsappUrl, MAX_WHATSAPP_URL_LENGTH } from "../vendor-app/order.mjs";
+import { DEFAULT_OFFERS } from "../vendor-app/offers-model.mjs";
 
 const now = new Date("2026-11-02T10:00:00.000Z");
 const input = {
+  offerVersion: null,
   requestId: "12345678-1234-4234-8234-123456789abc",
   cart: { 1: 2, 12: 1 },
   consent: true,
@@ -33,7 +35,8 @@ function handle(req, fetchImpl = async () => {
   const order = buildOrder(input, now);
   return Response.json({ ok: true, orderId: order.orderId, createdAt: order.createdAt });
 }, overrides = {}) {
-  return handleOrderRequest(req, { env, now: () => now, fetchImpl, ...overrides });
+  return handleOrderRequest(req, { env, now: () => now, fetchImpl,
+    readOfferSettings: async () => ({ offers: DEFAULT_OFFERS, version: null }), ...overrides });
 }
 
 test("server recalculates catalogue amounts, ignores client totals and creates a stable reference", () => {
@@ -42,13 +45,13 @@ test("server recalculates catalogue amounts, ignores client totals and creates a
   assert.equal(order.status, "New");
   assert.equal(order.createdAt, now.toISOString());
   assert.deepEqual(order.amounts, {
-    subtotal: 370, discount: 55.5, total: 314.5, discountPercent: 15, deliveryCharge: 0,
+    subtotal: 370, discount: 0, total: 370, discountPercent: 0, deliveryCharge: 0, couponCode: "",
   });
   assert.equal(order.items[0].price, 70);
   assert.ok(order.message.startsWith(`Order ID: ${order.orderId}\n`));
   assert.ok(order.message.includes("Free home delivery"));
   assert.ok(order.message.includes("Delivery fee: Rs.0.00 (FREE)"));
-  assert.ok(order.message.includes("Estimated total: Rs.314.50"));
+  assert.ok(order.message.includes("Estimated total: Rs.370.00"));
   assert.equal(buildOrder(input, new Date("2026-11-03T10:00:00Z")).fingerprint, order.fingerprint);
   assert.notEqual(buildOrder({ ...input, customer: { ...input.customer, notes: "New notes" } }, now).fingerprint,
     order.fingerprint);
@@ -329,10 +332,10 @@ test("Apps Script writes one row, preserves numeric totals and gives the vendor 
   assert.equal(row[2], "New");
   assert.equal(row[6], "Free home delivery");
   assert.equal(row[9], 370);
-  assert.equal(row[10], 15);
-  assert.equal(row[11], 55.5);
+  assert.equal(row[10], 0);
+  assert.equal(row[11], 0);
   assert.equal(row[12], 0);
-  assert.equal(row[13], 314.5);
+  assert.equal(row[13], 370);
   assert.equal(row[1], "'" + order.createdAt);
   assert.equal(row[16], "'2026-11-02 15:30:00 IST");
   assert.equal(harness.rows[0][16], "Order date & time (IST)");
@@ -341,6 +344,26 @@ test("Apps Script writes one row, preserves numeric totals and gives the vendor 
   assert.ok(harness.validations[0].value.values.includes("Completed"));
   assert.equal(harness.validations[0].value.allowInvalid, false);
   assert.equal(harness.releases, 1);
+});
+
+test("Sheets records the coupon and actual delivery fee without changing legacy columns or custom column R", () => {
+  const offers = { coupons: [{ code: "SALE15", percent: 15, enabled: true }], freeDeliveryMinimum: 2500, deliveryFee: 100 };
+  const harness = sheetHarness();
+  const order = buildOrder({ ...input, couponCode: "sale15" }, now, undefined, offers);
+  assert.equal(harness.post(order).ok, true);
+  assert.equal(harness.rows[0][17], "Coupon code");
+  const row = harness.rows[1];
+  assert.equal(row[6], "Home delivery");
+  assert.equal(row[12], 100);
+  assert.equal(row[13], 414.5);
+  assert.equal(row[17], "'SALE15");
+  assert.equal(harness.context.dashboardOrder_(row, true).couponCode, "SALE15");
+  assert.equal(harness.post(order).ok, true);
+  assert.equal(harness.rows.length, 2);
+  harness.rows[0][17] = "Vendor notes";
+  harness.rows[1][17] = "Keep this";
+  assert.throws(() => harness.context.setupOrdersSheet(), /Column R is already in use/);
+  assert.equal(harness.rows[1][17], "Keep this");
 });
 
 test("sheet and WhatsApp use the original IST timestamp across midnight and later retries", async () => {
@@ -369,8 +392,8 @@ test("setup upgrades the original 16-column sheet without moving order data or s
   const harness = sheetHarness();
   const order = buildOrder(input, now);
   harness.post(order);
-  harness.rows[0].pop();
-  harness.rows[1].pop();
+  harness.rows[0].length = 16;
+  harness.rows[1].length = 16;
   harness.rows[1][2] = "Completed";
   harness.maxColumns = 16;
   const existing = structuredClone(harness.rows);
@@ -378,7 +401,7 @@ test("setup upgrades the original 16-column sheet without moving order data or s
   assert.deepEqual(harness.rows.map(row => row.slice(0, 16)), existing);
   assert.equal(harness.rows[0][16], "Order date & time (IST)");
   assert.equal(harness.rows[1][16], "'2026-11-02 15:30:00 IST");
-  assert.equal(harness.maxColumns, 17);
+  assert.equal(harness.maxColumns, 18);
   harness.context.setupOrdersSheet();
   assert.equal(harness.rows.length, 2);
   assert.equal(harness.rows[1][2], "Completed");
@@ -408,8 +431,8 @@ test("IST dates remain correct at midnight, month and year boundaries", async ()
 test("legacy Google date cells convert to IST without changing the original stored instant", () => {
   const harness = sheetHarness();
   harness.post(buildOrder(input, now));
-  harness.rows[0].pop();
-  harness.rows[1].pop();
+  harness.rows[0].length = 16;
+  harness.rows[1].length = 16;
   const stored = new Date("2026-11-02T18:30:00.000Z");
   harness.rows[1][1] = stored;
   harness.context.setupOrdersSheet();
@@ -421,16 +444,16 @@ test("legacy Google date cells convert to IST without changing the original stor
 test("migration never invents missing historical timestamps or overwrites custom columns", () => {
   const missing = sheetHarness();
   missing.post(buildOrder(input, now));
-  missing.rows[0].pop();
-  missing.rows[1].pop();
+  missing.rows[0].length = 16;
+  missing.rows[1].length = 16;
   missing.rows[1][1] = "";
   missing.context.setupOrdersSheet();
   assert.equal(missing.rows[1][16], "");
   assert.equal(missing.warnings.length, 1);
   const invalid = sheetHarness();
   invalid.post(buildOrder(input, now));
-  invalid.rows[0].pop();
-  invalid.rows[1].pop();
+  invalid.rows[0].length = 16;
+  invalid.rows[1].length = 16;
   invalid.rows[1][1] = "Unrecoverable timestamp";
   assert.throws(() => invalid.context.setupOrdersSheet(), /timestamp is invalid/);
   assert.equal(invalid.rows[0][16], undefined);

@@ -1,0 +1,1 @@
+ALTER TABLE "order_requests" ADD COLUMN "coupon_code" text DEFAULT '' NOT NULL;

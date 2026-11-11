@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
-import { DISCOUNT_PERCENT, MAX_WHATSAPP_URL_LENGTH, sanitizeCart, cartLines, pricing, validateCustomer, createRequirement, whatsappUrl } from "../../vendor-app/order.mjs";
+import { MAX_WHATSAPP_URL_LENGTH, sanitizeCart, cartLines, pricing, validateCustomer, createRequirement, whatsappUrl } from "../../vendor-app/order.mjs";
+import { DEFAULT_OFFERS } from "../../vendor-app/offers-model.mjs";
+import { readOffers } from "../lib/offer-settings.mjs";
 import { saveOrderPdf } from "../lib/order-pdfs.mjs";
 import { saveOrderShare } from "../lib/order-shares.mjs";
 import { orderBackend } from "../lib/order-backend.mjs";
@@ -20,7 +22,7 @@ function json(body, status = 200) {
   });
 }
 
-export function buildOrder(input, now = new Date(), catalogue) {
+export function buildOrder(input, now = new Date(), catalogue, offers = DEFAULT_OFFERS) {
   if (!input || typeof input !== "object" || Array.isArray(input) ||
       typeof input.requestId !== "string" || !UUID.test(input.requestId)) {
     throw new Error("The order request ID is invalid. Close checkout and try again.");
@@ -34,9 +36,12 @@ export function buildOrder(input, now = new Date(), catalogue) {
   }).format(now);
   const cart = sanitizeCart(input.cart, catalogue?.products);
   const customer = validateCustomer(input.customer, today);
-  const message = createRequirement(cart, customer, today, catalogue);
+  const couponCode = input.couponCode ?? "";
+  const message = createRequirement(cart, customer, today, catalogue, offers, couponCode);
   const items = cartLines(cart, catalogue?.products);
-  const amounts = { ...pricing(cart, catalogue?.products), discountPercent: DISCOUNT_PERCENT, deliveryCharge: 0 };
+  const calculated = pricing(cart, catalogue?.products, offers, couponCode, customer.fulfilment);
+  const amounts = Object.fromEntries(["subtotal", "discount", "total", "discountPercent", "deliveryCharge", "couponCode"]
+    .map(key => [key, calculated[key]]));
   const orderId = `SBC-${input.requestId.toUpperCase()}`;
   const fingerprint = createHash("sha256").update(JSON.stringify({
     customer, items, amounts, ...(catalogue ? { season: catalogue.year } : {}),
@@ -62,7 +67,7 @@ function submittedDetails(order, savedAt) {
     orderId: order.orderId, createdAt: savedAt.toISOString(), status: "New",
     ...order.customer, ...order.amounts,
     phone: `+91 ${order.customer.phone}`,
-    fulfilment: order.customer.fulfilment === "delivery" ? "Free home delivery" : "Store pickup",
+    fulfilment: order.customer.fulfilment === "delivery" ? (order.amounts.deliveryCharge === 0 ? "Free home delivery" : "Home delivery") : "Store pickup",
     items: order.items.map(item => `#${item.id} ${item.name} | ${item.brand}\nPack: ${item.unit}\n${item.quantity} pack${item.quantity === 1 ? "" : "s"} x Rs.${item.price.toFixed(2)} = Rs.${item.amount.toFixed(2)}`).join("\n\n"),
   };
 }
@@ -88,7 +93,7 @@ function orderSummary(order, savedAt, pdf, backend, share) {
     `Customer: ${order.customer.name}`,
     `Mobile: +91 ${order.customer.phone}`,
     `Items: ${order.items.length} product${order.items.length === 1 ? "" : "s"} (${packs} pack${packs === 1 ? "" : "s"})`,
-    `Delivery option: ${order.customer.fulfilment === "delivery" ? "Free home delivery" : "Store pickup"}`,
+    `Delivery option: ${order.customer.fulfilment === "delivery" ? (order.amounts.deliveryCharge === 0 ? "Free home delivery" : "Home delivery") : "Store pickup"}`,
     `Estimated total: Rs.${order.amounts.total.toFixed(2)}`,
     "",
     ...(pdf ? [
@@ -109,6 +114,7 @@ function orderSummary(order, savedAt, pdf, backend, share) {
 export async function handleOrderRequest(request, {
   env = process.env, fetchImpl = fetch, now = () => new Date(), savePdf = saveOrderPdf,
   saveShare = saveOrderShare,
+  readOfferSettings = readOffers,
   databaseFactory = async () => (await import("../lib/order-database.mjs")).getOrderDatabase(),
 } = {}) {
   if (request.method !== "GET" && request.method !== "POST") {
@@ -167,8 +173,17 @@ export async function handleOrderRequest(request, {
       return json({ error: "The price list could not be confirmed. Keep checkout open and retry." }, 503);
     }
   }
+  let offerSettings;
+  try { offerSettings = await readOfferSettings(); }
+  catch {
+    console.error("Checkout offers and delivery rules could not be loaded.");
+    return json({ error: "Discounts and delivery charges could not be confirmed. Keep checkout open and retry." }, 503);
+  }
+  if (!Object.hasOwn(input ?? {}, "offerVersion") || input.offerVersion !== offerSettings.version) {
+    return json({ error: "Offers or delivery charges changed. Return to your cart and reload offers before submitting.", offersChanged: true }, 409);
+  }
   try {
-    order = buildOrder(input, now(), catalogue);
+    order = buildOrder(input, now(), catalogue, offerSettings.offers);
   } catch (error) {
     return json({ error: error.message }, 400);
   }
@@ -211,7 +226,7 @@ export async function handleOrderRequest(request, {
   }
   if (result?.ok !== true || result.orderId !== order.orderId) {
     if (result?.error === "CONFLICT") {
-      return json({ error: "This request ID already records different details. Close checkout and submit a new order request." }, 409);
+      return json({ error: `This request ID already records different details or prices. Check saved request ${order.orderId} with the shop before starting another request.` }, 409);
     }
     console.error("Order tracking: backend did not acknowledge the requirement.");
     return json({ error: "The tracker has not acknowledged your order request. Keep checkout open and retry, or contact the shop." }, 503);

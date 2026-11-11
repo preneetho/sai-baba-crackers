@@ -59,7 +59,7 @@ ${fields([["Customer", order.name], ["Mobile", order.phone], ["Fulfilment", orde
       ["Address", order.address], ["Preferred date", order.preferredDate],
       [submitted ? "Status at submission" : "Status when shared", order.status], ["Notes", order.notes]])}
 <h2>Requested items</h2><pre class="vendor-items">${escape(order.items)}</pre>
-${fields([["Subtotal", money(order.subtotal)], ["Discount", `${order.discountPercent}% (${money(order.discount)})`],
+${fields([["Subtotal", money(order.subtotal)], ...(order.couponCode ? [["Coupon", order.couponCode]] : []), ["Discount", `${order.discountPercent}% (${money(order.discount)})`],
       ["Delivery charge", money(order.deliveryCharge)], ["Estimated total", money(order.total)]])}
 <p class="vendor-muted">Listed quantities are selling packs/units. Stock, final price and arrangements need shop confirmation. This request is not a payment receipt or a confirmed sale. Contact the shop for current status.</p>`);
   } catch {

@@ -1,8 +1,8 @@
 import { products, vendor } from "./catalog.mjs";
+import { DEFAULT_OFFERS, couponOffer } from "./offers-model.mjs";
 
 export const MAX_QUANTITY = 99;
 export const CART_KEY = "sai-baba-cart-v2";
-export const DISCOUNT_PERCENT = 15;
 export const MAX_WHATSAPP_URL_LENGTH = 1800;
 export const money = value => new Intl.NumberFormat("en-IN", {
   style: "currency", currency: "INR",
@@ -36,21 +36,31 @@ export function cartLines(cart, catalogue = products) {
   });
 }
 
-export function pricing(cart, catalogue = products) {
+export function pricing(cart, catalogue = products, offers = DEFAULT_OFFERS, couponCode = "", fulfilment = "pickup") {
   const subtotalPaise = cartLines(cart, catalogue).reduce((sum, line) => sum + Math.round(line.amount * 100), 0);
   if (!Number.isSafeInteger(subtotalPaise) || subtotalPaise > 2147483647) {
     throw new Error("This cart exceeds the supported request value. Reduce the quantities or contact the shop.");
   }
-  const discountPaise = Math.round(subtotalPaise * DISCOUNT_PERCENT / 100);
+  const coupon = couponOffer(offers, couponCode);
+  const discountPercent = coupon?.percent ?? 0;
+  const discountPaise = Math.round(subtotalPaise * discountPercent / 100);
+  const billedPaise = subtotalPaise - discountPaise;
+  const remainingPaise = offers.deliveryFee > 0 ?
+    Math.max(0, Math.round(offers.freeDeliveryMinimum * 100) - billedPaise) : 0;
+  const deliveryChargePaise = fulfilment === "delivery" && remainingPaise > 0 ? Math.round(offers.deliveryFee * 100) : 0;
+  if (billedPaise + deliveryChargePaise > 2147483647) throw new Error("This cart exceeds the supported request value. Reduce quantities or contact the shop.");
   return {
     subtotal: subtotalPaise / 100,
     discount: discountPaise / 100,
-    total: (subtotalPaise - discountPaise) / 100,
+    discountPercent, couponCode: coupon?.code ?? "",
+    billed: billedPaise / 100, deliveryCharge: deliveryChargePaise / 100,
+    freeDeliveryRemaining: remainingPaise / 100,
+    total: (billedPaise + deliveryChargePaise) / 100,
   };
 }
 
-export function total(cart, catalogue = products) {
-  return pricing(cart, catalogue).total;
+export function total(cart, catalogue = products, offers = DEFAULT_OFFERS, couponCode = "", fulfilment = "pickup") {
+  return pricing(cart, catalogue, offers, couponCode, fulfilment).total;
 }
 
 export function localDate(date = new Date()) {
@@ -65,7 +75,7 @@ export function validateCustomer(input, today = localDate()) {
   const preferredDate = String(input.preferredDate ?? "").trim();
   const notes = String(input.notes ?? "").trim();
   if (fulfilment !== "delivery" && fulfilment !== "pickup") {
-    throw new Error("Choose free home delivery or store pickup.");
+    throw new Error("Choose home delivery or store pickup.");
   }
   if (name.length < 2 || name.length > 80 || /[\r\n]/.test(name)) {
     throw new Error("Enter a customer name between 2 and 80 characters.");
@@ -87,11 +97,11 @@ export function validateCustomer(input, today = localDate()) {
   return { name, phone: normalizedPhone, address, fulfilment, preferredDate, notes };
 }
 
-export function createRequirement(cart, input, today, catalogue = { products, year: vendor.year }) {
+export function createRequirement(cart, input, today, catalogue = { products, year: vendor.year }, offers = DEFAULT_OFFERS, couponCode = "") {
   const lines = cartLines(cart, catalogue.products);
   if (!lines.length) throw new Error("Add at least one product to your cart.");
   const customer = validateCustomer(input, today);
-  const amounts = pricing(cart, catalogue.products);
+  const amounts = pricing(cart, catalogue.products, offers, couponCode, customer.fulfilment);
   const delivery = customer.fulfilment === "delivery";
   const arrangement = delivery ? "delivery" : "pickup";
   return [
@@ -99,14 +109,14 @@ export function createRequirement(cart, input, today, catalogue = { products, ye
     "",
     `Customer: ${customer.name}`,
     `Mobile: +91 ${customer.phone}`,
-    `Delivery option: ${delivery ? "Free home delivery" : "Store pickup"}`,
+    `Delivery option: ${delivery ? (amounts.deliveryCharge === 0 ? "Free home delivery" : "Home delivery") : "Store pickup"}`,
     `Address: ${customer.address}`,
     ...(customer.preferredDate ? [`Preferred ${arrangement} date: ${customer.preferredDate}`] : []),
     "",
     ...lines.map(line => `#${line.id} ${line.name} | ${line.brand}\nPack: ${line.unit}\n${line.quantity} pack${line.quantity === 1 ? "" : "s"} x Rs.${line.price} = Rs.${line.amount}\n`),
     `Subtotal: Rs.${amounts.subtotal.toFixed(2)}`,
-    `Discount applied (${DISCOUNT_PERCENT}%): -Rs.${amounts.discount.toFixed(2)}`,
-    ...(delivery ? ["Delivery fee: Rs.0.00 (FREE)"] : []),
+    ...(amounts.couponCode ? [`Coupon: ${amounts.couponCode}`, `Discount applied (${amounts.discountPercent}%): -Rs.${amounts.discount.toFixed(2)}`] : []),
+    ...(delivery ? [`Delivery fee: Rs.${amounts.deliveryCharge.toFixed(2)}${amounts.deliveryCharge === 0 ? " (FREE)" : ""}`] : []),
     `Estimated total: Rs.${amounts.total.toFixed(2)}`,
     ...(customer.notes ? ["", `Notes: ${customer.notes}`] : []),
     "",

@@ -20,6 +20,8 @@ export function validImportSummary(result) {
 }
 
 export function validOrder(order, full = false) {
+  if (order?.couponCode !== undefined && (typeof order.couponCode !== "string" ||
+      (order.couponCode !== "" && !/^[A-Z0-9][A-Z0-9_-]{1,23}$/.test(order.couponCode)))) return false;
   if (!order || !ORDER_ID.test(order.orderId ?? "") || !ORDER_STATUSES.includes(order.status) ||
       typeof order.createdAt !== "string" || !Number.isFinite(Date.parse(order.createdAt)) ||
       new Date(order.createdAt).toISOString() !== order.createdAt ||

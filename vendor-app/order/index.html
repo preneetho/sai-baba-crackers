@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1e4f91">
-  <meta name="description" content="Sai Baba Crackers Centre: 35 years in the crackers trade. Explore Sanathnagar's wholesale crackers collection, get 15% off your cart, and choose free home delivery or store pickup.">
+  <meta name="description" content="Explore Sai Baba Crackers Centre's wholesale collection, coupon offers, home delivery and store pickup in Sanathnagar, Hyderabad.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Sai Baba Crackers Centre">
   <meta property="og:title" content="Sai Baba Crackers Centre | Diwali price list">
-  <meta property="og:description" content="Explore Sanathnagar's wholesale crackers collection. Get 15% off your cart, with free home delivery or store pickup.">
+  <meta property="og:description" content="Explore Sanathnagar's wholesale crackers collection, coupon offers, home delivery and store pickup.">
   <meta property="og:url" content="https://saibabacrackers.netlify.app/order/">
   <meta property="og:image" content="https://saibabacrackers.netlify.app/diwali-crackers-square.png">
   <meta property="og:image:type" content="image/png">
@@ -17,7 +17,7 @@
   <meta property="og:image:alt" content="Diwali crackers: colourful rockets, sparklers, a flower pot and fireworks on a blue and gold background.">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Sai Baba Crackers Centre | Diwali price list">
-  <meta name="twitter:description" content="Explore Sanathnagar's wholesale crackers collection. Get 15% off your cart, with free home delivery or store pickup.">
+  <meta name="twitter:description" content="Explore Sanathnagar's wholesale crackers collection, coupon offers, home delivery and store pickup.">
   <meta name="twitter:image" content="https://saibabacrackers.netlify.app/diwali-crackers-square.png">
   <meta name="twitter:image:alt" content="Diwali crackers: colourful rockets, sparklers, a flower pot and fireworks on a blue and gold background.">
   <title>Sai Baba Crackers Centre | Diwali price list</title>
@@ -183,7 +183,7 @@
         <h1 id="hero-title">Wholesale crackers.<br>At your <em>doorstep.</em></h1>
         <p>Shop Sanathnagar's wholesale Diwali collection. Add items to your cart and send your order request on WhatsApp.</p>
         <ul class="hero-highlights" aria-label="Shopping benefits">
-          <li>15% off your cart</li><li>Free home delivery</li><li>Store pickup available</li>
+          <li>Coupon savings</li><li>Home delivery</li><li>Store pickup available</li>
         </ul>
         <p class="hero-delivery-note">Delivery area and timing confirmed by the shop.</p>
         <a class="hero-link" href="#catalogue">Shop crackers <span aria-hidden="true">&#8595;</span></a>
@@ -195,9 +195,9 @@
       </div>
     </section>
 
-    <aside class="festival-ribbon" aria-label="Current catalogue offer">
-      <div><span class="offer-tag">YOUR FESTIVE SAVING</span><strong>15% off your cart</strong></div>
-      <p>Automatically applied to the subtotal. No online payment. Every request needs shop confirmation.</p>
+    <aside id="shop-offers-ribbon" class="festival-ribbon" aria-label="Current catalogue offer" hidden>
+      <div><span class="offer-tag">COUPON OFFERS</span><strong id="shop-offers"></strong></div>
+      <p>Enter one coupon in your cart. No online payment. Every request needs shop confirmation.</p>
       <a href="#catalogue">Find your favourites <span aria-hidden="true">&#8595;</span></a>
     </aside>
 
@@ -225,7 +225,7 @@
           <div id="product-types" class="categories" role="group" aria-labelledby="type-heading"></div>
         </div>
         <div class="results-bar"><p id="results-count" role="status" tabindex="-1"></p><label>Sort by <select id="sort"><option value="catalogue">Default order</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name: A to Z</option></select></label></div>
-        <p class="unit-hint">Prices are per listed pack. Select the number of packs, not individual pieces. A 15% discount is automatically applied to your cart total.</p>
+        <p class="unit-hint">Prices are per listed pack. Select the number of packs, not individual pieces. Enter a valid coupon in your cart for a discount.</p>
         <div id="products" class="product-grid"></div>
         <div id="no-results" class="empty-state" hidden><span aria-hidden="true">&#10023;</span><h3 id="no-results-title">No products found</h3><p id="no-results-message">Try a different product name or category.</p><button id="reset-filters" class="button secondary" type="button">Clear filters</button></div>
       </section>
@@ -238,8 +238,22 @@
         <div id="storage-warning" class="cart-notice" role="status" hidden></div>
         <div id="cart-items"></div>
         <div class="cart-actions">
+        <p id="offer-status" class="checkout-help" role="status" aria-live="polite"></p>
+        <button id="reload-offers" class="text-button" type="button" hidden>Reload offers</button>
+        <form id="coupon-form" class="coupon-form">
+          <label for="coupon-code" class="sr-only">Coupon code</label>
+          <input id="coupon-code" autocomplete="off" spellcheck="false" maxlength="24" placeholder="Coupon code" disabled>
+          <button id="apply-coupon" class="button secondary" type="submit" disabled>Apply</button>
+          <button id="remove-coupon" class="text-button" type="button" hidden>Remove</button>
+        </form>
+        <p id="coupon-status" class="checkout-help" role="status" aria-live="polite"></p>
+        <div id="delivery-offer" class="delivery-offer" hidden>
+          <p id="delivery-progress-text"></p>
+          <progress id="delivery-progress" max="1" value="0"></progress>
+          <p id="delivery-progress-note" class="checkout-help"></p>
+        </div>
         <div id="cart-pricing"></div>
-        <p class="estimate-note">No payment now. Final price and availability confirmed by the shop.</p>
+        <p class="estimate-note">Delivery fee shown at checkout. No payment now; shop confirmation required.</p>
         <button id="review" class="button primary wide" type="button" disabled>Continue to checkout <span aria-hidden="true">&#8594;</span></button>
         </div>
       </aside>
@@ -248,12 +262,12 @@
 
     <section id="contact" class="contact-section" aria-labelledby="contact-title">
       <div><p class="eyebrow brand-text">STORE ADDRESS</p><h2 id="contact-title">Visit our store</h2><p>Sai Baba Crackers Centre<br>Industrial Estate, Main Road, Sanath Nagar<br>Hyderabad</p></div>
-      <div class="contact-details"><h3>Contact us</h3><a href="tel:+919849293951">+91 98492 93951</a><a href="tel:+919000592233">+91 90005 92233</a><p>Free home delivery or store pickup.<br>Contact the shop to confirm availability,<br>delivery area and timing.</p></div>
+      <div class="contact-details"><h3>Contact us</h3><a href="tel:+919849293951">+91 98492 93951</a><a href="tel:+919000592233">+91 90005 92233</a><p>Home delivery or store pickup.<br>Delivery charges depend on your billed amount.<br>Contact the shop to confirm area and timing.</p></div>
     </section>
-    <section class="fine-print" aria-label="Important information"><p><strong>Celebrate responsibly.</strong> Follow local rules, age restrictions and product safety instructions. This site collects order requests only; it does not confirm a sale. Free home delivery availability, service area and timing must be confirmed by the shop.</p><p>Shop's printed terms: goods once sold cannot be returned or exchanged; manufacturing defects are subject to the manufacturer's terms. Applicable consumer rights are not excluded.</p></section>
+    <section class="fine-print" aria-label="Important information"><p><strong>Celebrate responsibly.</strong> Follow local rules, age restrictions and product safety instructions. This site collects order requests only; it does not confirm a sale. Delivery availability, fees, service area and timing must be confirmed by the shop.</p><p>Shop's printed terms: goods once sold cannot be returned or exchanged; manufacturing defects are subject to the manufacturer's terms. Applicable consumer rights are not excluded.</p></section>
   </main>
   <footer><span>SAI BABA CRACKERS CENTRE</span><span>A brighter Diwali, together. &middot; <span data-catalogue-year>Current collection</span></span></footer>
-  <a id="mobile-cart" class="mobile-cart" href="#requirement" hidden><span id="mobile-cart-label"></span><span>View cart &#8594;</span></a>
+  <a id="mobile-cart" class="mobile-cart" href="#requirement" hidden><span><span id="mobile-cart-label"></span><small id="mobile-delivery-progress"></small></span><span>View cart &#8594;</span></a>
   <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
 
   <dialog id="product-media-dialog" aria-labelledby="product-media-title">
@@ -276,7 +290,7 @@
       <fieldset class="fulfilment-options">
         <legend>Receive your items <span aria-hidden="true">*</span></legend>
         <div class="fulfilment-grid">
-          <label class="fulfilment-option"><input id="fulfilment-delivery" type="radio" name="fulfilment" value="delivery" required><span><strong>Delivery <small class="free-badge">FREE</small></strong></span></label>
+          <label class="fulfilment-option"><input id="fulfilment-delivery" type="radio" name="fulfilment" value="delivery" required><span><strong>Delivery</strong></span></label>
           <label class="fulfilment-option"><input id="fulfilment-pickup" type="radio" name="fulfilment" value="pickup" required><span><strong>Store pickup</strong></span></label>
         </div>
         <p id="fulfilment-help" class="fulfilment-help">The shop will confirm delivery area and timing.</p>

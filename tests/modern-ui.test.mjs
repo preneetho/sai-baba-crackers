@@ -219,7 +219,8 @@ test("the public theme does not load on vendor pages and presentation modules do
     if (file === "vendor-app/index.html") {
       assert.doesNotMatch(html, /class="festival-ribbon"/);
     } else {
-      assert.match(html, /15% off your cart/);
+      assert.match(html, /id="shop-offers"/);
+      assert.doesNotMatch(html, /15% off your cart/);
     }
   }
   assert.doesNotMatch(await read("vendor-app/vendor/index.html"), /modern\.css|modern-ui\.mjs/);

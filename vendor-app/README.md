@@ -89,7 +89,8 @@ npm.cmd run vendor:test
   Update the phone links and business JSON-LD in `index.html`, and the phone
   links in `order/index.html`, too if either shop number changes.
 - Confirm actual delivery and pickup arrangements and any local restrictions.
-  Customers explicitly choose **free home delivery** or **store pickup**.
+  Customers explicitly choose **home delivery** or **store pickup**.
+  Delivery fees/free-delivery eligibility use the vendor's current billed-amount rules.
   The vendor confirms delivery service area, availability and timing.
   Store pickup collects from **Industrial Estate, Main Road, Sanath Nagar**,
   shown under the pickup option and in the contact section. The pickup option
@@ -111,10 +112,10 @@ layout and cart drawer. The private vendor dashboard and request pages retain
 their existing shared styles. There is no framework migration
 or new runtime dependency. Both public pages retain their canonical URLs and SEO data.
 The sticky header adapts to narrow screens and its measured height keeps anchor
-targets visible. The offer ribbon appears only in the catalogue and describes the existing automatic 15% discount.
+targets visible. The catalogue offer ribbon and homepage show enabled vendor coupon codes.
 The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon.
 The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
-experience, the 15% discount and delivery/pickup options. Delivery area and timing
+experience, coupon savings and delivery/pickup options. Delivery area and timing
 remain subject to shop confirmation.
 The homepage hero uses the original, bundled `modern-fireworks.svg` static fallback
 (under 5 KB) in the requested purple, orange and gold palette. The shopping hero
@@ -250,17 +251,23 @@ the server function, shared secret or spreadsheet credentials in public files.
 - Cart quantities are whole **packs**, between 1 and 99 per product. A pack means
   the listed selling unit: a box, packet, or individual piece as shown on the
   product. This wording does not change pack sizes, quantities or prices.
-- A **15% discount** applies automatically to the complete catalogue subtotal.
-  Cart and checkout show the subtotal, discount and discounted estimated
-  total; the mobile cart and WhatsApp message use the same discounted total.
-  Calculations use integer paise and round the discount once at subtotal level.
-  Catalogue and individual line prices remain the original printed rates.
+- **One vendor-configured percentage coupon** may be applied to the complete
+  merchandise subtotal. No valid code means no discount. Cart and checkout show
+  the applied code, discount and items total; checkout and the saved request also
+  include any delivery fee. Calculations use integer paise and round the discount
+  once at subtotal level. Catalogue and individual line prices are unchanged.
 - Delivery or pickup is a required choice with no preselected option. Home
-  delivery has **zero charge**, shown as the delivery fee in checkout and full order details; the
-  15% discounted total is unchanged. The full request includes the selected method,
+  delivery is free at/above the vendor's minimum **after coupon discount**;
+  otherwise the configured fee applies. Pickup is always free. The full request includes the selected method,
   address and optional preferred delivery/pickup date. Address remains required
   for both options. No delivery radius, minimum order or delivery date guarantee
   is assumed; the vendor confirms arrangements directly.
+- Vendors manage codes, enablement, percentages, minimum and fee under
+  **Coupons & delivery**. Public offers require JavaScript and Netlify Blobs;
+  loading failure blocks checkout instead of silently showing unverified terms.
+  Changed rules require cart reload/review. See
+  [configuration and deployment](../README.md#coupons-and-delivery-rules),
+  including the coupon migration and required Sheets script update.
 - Search includes product names, numbers, brands and categories. Categories and
   price/name sorting work together.
 - The cart is saved to local storage, not to a server. Invalid saved data and

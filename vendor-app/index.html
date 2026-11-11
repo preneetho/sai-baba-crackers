@@ -84,6 +84,17 @@
       </div>
     </section>
 
+    <section class="home-section home-current-offers" aria-label="Current coupon and delivery offers">
+      <p id="home-offers-status" role="status" aria-live="polite"></p>
+      <button id="home-offers-retry" class="button secondary" type="button" hidden>Retry offers</button>
+      <div id="home-offers" hidden>
+        <p class="eyebrow brand-text">CURRENT OFFERS</p>
+        <ul id="home-coupons"></ul>
+        <p id="home-coupon-help"></p>
+        <p data-delivery-terms></p>
+        <a class="button primary" href="/order/">Shop crackers</a>
+      </div>
+    </section>
     <ul class="home-facts" aria-label="About the shop">
       <li><strong>35 years</strong><span>in the crackers trade</span></li>
       <li><strong>Sanathnagar</strong><span>your Hyderabad store</span></li>
@@ -146,7 +157,8 @@
       <div class="home-delivery-options">
         <article>
           <h3>Home delivery</h3>
-          <p>The current catalogue offers free home delivery, subject to the shop confirming serviceability and timing. Call with your Hyderabad locality and preferred date; citywide or same-day delivery is not guaranteed.</p>
+          <p data-delivery-terms>Delivery charges and free-delivery eligibility are shown in your cart. Call the shop to confirm delivery area and timing.</p>
+          <p>Citywide or same-day delivery is not guaranteed.</p>
         </article>
         <article>
           <h3>Collect from the store</h3>
@@ -182,7 +194,7 @@
       </details>
       <details>
         <summary>Can you deliver to my area in Hyderabad?</summary>
-        <p>Delivery area and timing must be confirmed by the shop. Call with your locality and preferred date before planning around a delivery. The current catalogue offers free delivery where the shop confirms serviceability.</p>
+        <p data-delivery-terms>Delivery area and timing must be confirmed by the shop. Delivery charges and free-delivery eligibility are shown in your cart.</p>
       </details>
       <details>
         <summary>Can I enquire outside the Diwali season?</summary>

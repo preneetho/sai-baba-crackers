@@ -20,6 +20,7 @@ export const orderRequests = pgTable("order_requests", {
   notes: text("notes").notNull(),
   subtotalPaise: integer("subtotal_paise").notNull(),
   discountPercent: integer("discount_percent").notNull(),
+  couponCode: text("coupon_code").notNull().default(""),
   discountPaise: integer("discount_paise").notNull(),
   deliveryChargePaise: integer("delivery_charge_paise").notNull(),
   totalPaise: integer("total_paise").notNull(),

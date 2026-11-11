@@ -7,6 +7,7 @@ import { createOrderDatabase } from "../netlify/lib/order-database.mjs";
 import { handleCatalogue } from "../netlify/functions/catalogue.mjs";
 import { handleVendorCatalogue } from "../netlify/functions/vendor-catalogue.mjs";
 import { handleOrderRequest, buildOrder } from "../netlify/functions/orders.mjs";
+import { DEFAULT_OFFERS } from "../vendor-app/offers-model.mjs";
 import { createSession, unseal, vendorSettings } from "../netlify/lib/vendor-auth.mjs";
 import { products } from "../vendor-app/catalog.mjs";
 import { validCatalogue, catalogueProducts, PRODUCT_TYPES, validProductTypes } from "../vendor-app/catalogue-model.mjs";
@@ -46,12 +47,14 @@ function request(path, body, authenticated = true) {
 const edit = body => handleVendorCatalogue(request("/api/vendor-catalogue", body), options);
 const publicList = () => handleCatalogue(request("/api/catalogue", undefined, false), options);
 const payload = (revision = 1, year = 2026, id = 1) => ({
+  offerVersion: null,
   requestId: `00000000-0000-4000-8000-${String(id).padStart(12, "0")}`,
   consent: true, cart: { 1: 2 }, catalogue: { year, revision },
   customer: { name: "Synthetic Customer", phone: "9876543210", address: "Synthetic address only",
     fulfilment: "pickup", preferredDate: "", notes: "" },
 });
 const submit = input => handleOrderRequest(request("/api/orders", input, false), {
+  readOfferSettings: async () => ({ offers: DEFAULT_OFFERS, version: null }),
   ...options, now: () => now, fetchImpl: async () => { throw new Error("No Sheets fallback"); },
 });
 const save = (year, expectedRevision, rows) => database.priceLists({
@@ -299,8 +302,8 @@ test("checkout uses database prices, integer paise and the active year; existing
   assert.match(body.message, /2 packs x Rs.19.99 = Rs.39.98/);
   const rows = (await engine.query("select season, catalogue_revision, total_paise from order_requests order by order_id")).rows;
   assert.deepEqual(rows, [
-    { season: 2026, catalogue_revision: 1, total_paise: 11900 },
-    { season: 2027, catalogue_revision: 2, total_paise: 3398 },
+    { season: 2026, catalogue_revision: 1, total_paise: 14000 },
+    { season: 2027, catalogue_revision: 2, total_paise: 3998 },
   ]);
   const oldItem = (await engine.query("select unit_price_paise from order_items where order_id=$1", [old.orderId])).rows[0];
   assert.equal(oldItem.unit_price_paise, 7000);

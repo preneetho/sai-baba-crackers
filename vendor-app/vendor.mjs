@@ -3,6 +3,7 @@ import { validCatalogue, validYear, catalogueProducts, PRODUCT_TYPES } from "./c
 import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "./media-model.mjs";
 import { inspectMediaFile, transferMedia } from "./media-upload.mjs";
 import { validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl } from "./homepage-model.mjs";
+import { validOffers, validOfferVersion, checkOffers, normalizeCoupon } from "./offers-model.mjs";
 
 const $ = id => document.getElementById(id);
 const money = value => `Rs.${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -35,6 +36,11 @@ let homepageState = null;
 let homepageVersion = 0;
 let homepageBusy = false;
 let homepageNeedsReload = false;
+let offerState = null;
+let offerBusy = false;
+let offerDirty = false;
+let offerNeedsReload = false;
+let offerAccessVersion = 0;
 let expandedProductId = null;
 let mediaController;
 let savedProductIds = new Set();
@@ -65,6 +71,7 @@ function clearPrivateView() {
   session = null;
   clearPrices();
   clearHomepage();
+  clearOffers();
   listVersion++;
   detailVersion++;
   listController?.abort();
@@ -124,19 +131,21 @@ function stopPriceMedia() {
 
 function setPriceBusy(value) {
   priceBusy = value;
+  const blocked = value || offerBusy;
   $("price-panel").setAttribute("aria-busy", String(value));
   for (const control of $("price-panel").querySelectorAll("button, input, select, textarea")) {
-    control.disabled = value || priceNeedsReload;
+    control.disabled = blocked || priceNeedsReload;
   }
   $("close-prices").disabled = value;
   $("reload-prices").disabled = value;
   $("price-view-message").disabled = value;
-  $("open-prices").disabled = value || homepageBusy;
-  $("open-homepage").disabled = value || homepageBusy;
-  $("sign-out").disabled = value || homepageBusy;
-  $("activate-prices").disabled = value || priceNeedsReload || priceDirty || !priceList || activePriceYear === priceList.year;
-  $("save-prices").disabled = value || priceNeedsReload || !priceDirty;
-  $("add-price-product").disabled = value || priceNeedsReload || !priceList || priceList.products.length >= 200;
+  $("open-prices").disabled = value || homepageBusy || offerBusy;
+  $("open-homepage").disabled = value || homepageBusy || offerBusy;
+  $("sign-out").disabled = value || homepageBusy || offerBusy;
+  $("open-offers").disabled = value || homepageBusy || offerBusy;
+  $("activate-prices").disabled = blocked || priceNeedsReload || priceDirty || !priceList || activePriceYear === priceList.year;
+  $("save-prices").disabled = blocked || priceNeedsReload || !priceDirty;
+  $("add-price-product").disabled = blocked || priceNeedsReload || !priceList || priceList.products.length >= 200;
   const hiddenCount = priceList?.products.filter(product => product.hidden === true).length ?? 0;
   const state = !priceList ? "" : `${priceList.year} - ${priceList.products.length} products${hiddenCount ? `, ${hiddenCount} hidden` : ""}. ${
     value ? "Working... Please wait." : priceNeedsReload ? "Reload required. Edits kept." :
@@ -430,7 +439,7 @@ function renderProductMedia(product) {
 }
 
 function addYouTubeVideo(product, input) {
-  if (!session || priceBusy || priceNeedsReload || !priceList) return;
+  if (!session || priceBusy || offerBusy || priceNeedsReload || !priceList) return;
   const videoId = youtubeVideoId(input.value);
   const error = !videoId ? "Enter a valid HTTPS YouTube video URL, such as a watch, youtu.be or Shorts link." :
     (product.media ?? []).some(asset => asset.resourceType === "video") ?
@@ -454,7 +463,7 @@ function addYouTubeVideo(product, input) {
 }
 
 async function uploadProductMedia(product, input) {
-  if (!session || priceBusy || priceNeedsReload || !priceList) return;
+  if (!session || priceBusy || offerBusy || priceNeedsReload || !priceList) return;
   const file = input.files[0];
   if (!file) { notice("price-message", "Choose a photo or video first.", true); return; }
   const version = priceVersion;
@@ -532,7 +541,7 @@ function acceptPrices(result, expectedYear) {
 }
 
 async function loadPrices(year) {
-  if (!session || priceBusy) return;
+  if (!session || priceBusy || offerBusy) return;
   const version = ++priceVersion;
   priceNeedsReload = false;
   setPriceBusy(true);
@@ -552,7 +561,7 @@ async function loadPrices(year) {
 }
 
 async function changePrices(input) {
-  if (!session || priceBusy || priceNeedsReload) return;
+  if (!session || priceBusy || offerBusy || priceNeedsReload) return;
   const version = priceVersion;
   setPriceBusy(true);
   notice("price-message", "Saving price-list changes...");
@@ -588,15 +597,16 @@ function homepageDirty() {
 
 function setHomepageBusy(value) {
   homepageBusy = value;
-  const blocked = value || priceBusy;
+  const blocked = value || priceBusy || offerBusy;
   $("homepage-panel").setAttribute("aria-busy", String(value));
   $("homepage-video-url").disabled = blocked || homepageNeedsReload || !homepageState;
   $("save-homepage").disabled = blocked || homepageNeedsReload || !homepageDirty();
   $("reload-homepage").disabled = blocked;
   $("close-homepage").disabled = blocked;
-  $("open-homepage").disabled = value || priceBusy;
-  $("open-prices").disabled = value || priceBusy;
-  $("sign-out").disabled = value || priceBusy;
+  $("open-homepage").disabled = value || priceBusy || offerBusy;
+  $("open-prices").disabled = blocked;
+  $("sign-out").disabled = blocked;
+  $("open-offers").disabled = blocked;
 }
 
 function clearHomepage() {
@@ -620,7 +630,7 @@ function acceptHomepage(result) {
 }
 
 async function loadHomepage() {
-  if (!session || homepageBusy || priceBusy) return;
+  if (!session || homepageBusy || priceBusy || offerBusy) return;
   const version = ++homepageVersion;
   setHomepageBusy(true);
   notice("homepage-message", "Loading saved homepage video...");
@@ -642,7 +652,7 @@ async function loadHomepage() {
 
 async function saveHomepage(event) {
   event.preventDefault();
-  if (!session || homepageBusy || priceBusy || homepageNeedsReload || !homepageDirty()) return;
+  if (!session || homepageBusy || priceBusy || offerBusy || homepageNeedsReload || !homepageDirty()) return;
   let video;
   try { video = homepageVideoFromUrl($("homepage-video-url").value); }
   catch (error) {
@@ -700,6 +710,165 @@ async function api(path, { signal, ...options } = {}) {
   }
   return body;
 }
+
+function setOfferBusy(value) {
+  offerBusy = value;
+  $("offers-panel").setAttribute("aria-busy", String(value));
+  $("offers-fields").disabled = value || offerNeedsReload || !offerState;
+  $("save-offers").disabled = !offerDirty || value || offerNeedsReload;
+  $("reload-vendor-offers").disabled = value;
+  $("close-offers").disabled = value;
+  $("add-coupon").disabled = value || $("vendor-coupons").children.length >= 20;
+  for (const id of ["open-offers", "open-homepage", "open-prices", "sign-out"]) {
+    $(id).disabled = value || priceBusy || homepageBusy;
+  }
+  setPriceBusy(priceBusy);
+}
+
+function clearOffers() {
+  offerAccessVersion++;
+  offerState = null;
+  offerDirty = false;
+  offerNeedsReload = false;
+  $("offers-panel").hidden = true;
+  $("open-offers").setAttribute("aria-expanded", "false");
+  $("vendor-coupons").replaceChildren();
+  $("free-delivery-minimum").value = "";
+  $("delivery-fee").value = "";
+  notice("offers-message", "");
+  setOfferBusy(false);
+}
+
+function addCouponRow(coupon = { code: "", percent: 15, enabled: true }) {
+  const row = element("div", undefined, "vendor-coupon-row");
+  const codeLabel = element("label", "Code");
+  const code = element("input");
+  code.dataset.field = "code";
+  code.value = coupon.code;
+  code.required = true;
+  code.maxLength = 24;
+  code.minLength = 2;
+  code.pattern = "[A-Za-z0-9][A-Za-z0-9_\\-]{1,23}";
+  code.autocomplete = "off";
+  code.spellcheck = false;
+  codeLabel.append(code);
+  const percentLabel = element("label", "Discount (%)");
+  const percent = element("input");
+  percent.dataset.field = "percent";
+  percent.type = "number";
+  percent.min = "1";
+  percent.max = "100";
+  percent.step = "1";
+  percent.required = true;
+  percent.value = coupon.percent;
+  percentLabel.append(percent);
+  const enabledLabel = element("label", "Enabled");
+  enabledLabel.className = "vendor-coupon-enabled";
+  const enabled = element("input");
+  enabled.dataset.field = "enabled";
+  enabled.type = "checkbox";
+  enabled.checked = coupon.enabled;
+  enabledLabel.prepend(enabled);
+  const remove = element("button", "Remove coupon");
+  remove.type = "button";
+  remove.addEventListener("click", () => {
+    row.remove();
+    offerDirty = true;
+    setOfferBusy(false);
+    $("add-coupon").focus();
+  });
+  row.append(codeLabel, percentLabel, enabledLabel, remove);
+  $("vendor-coupons").append(row);
+  return code;
+}
+
+function acceptOffers(result) {
+  if (!validOffers(result.offers) || !validOfferVersion(result.version)) throw new Error("Saved offers could not be verified.");
+  offerState = result;
+  offerDirty = false;
+  offerNeedsReload = false;
+  $("vendor-coupons").replaceChildren();
+  for (const coupon of result.offers.coupons) addCouponRow(coupon);
+  $("free-delivery-minimum").value = result.offers.freeDeliveryMinimum;
+  $("delivery-fee").value = result.offers.deliveryFee;
+}
+
+async function loadVendorOffers() {
+  if (!session || offerBusy || priceBusy || homepageBusy) return;
+  const version = ++offerAccessVersion;
+  setOfferBusy(true);
+  notice("offers-message", "Loading saved coupons and delivery rules...");
+  try {
+    const result = await api("/api/vendor-offers");
+    if (version !== offerAccessVersion || !session) return;
+    acceptOffers(result);
+    notice("offers-message", "Saved settings loaded. Save changes to publish across the shop.");
+  } catch (error) {
+    if (version !== offerAccessVersion || !session) return;
+    offerNeedsReload = true;
+    notice("offers-message", error.message, true);
+  } finally { if (version === offerAccessVersion) setOfferBusy(false); }
+}
+
+$("open-offers").addEventListener("click", () => {
+  if (!session || offerBusy || priceBusy || homepageBusy || !$("offers-panel").hidden) return;
+  $("offers-panel").hidden = false;
+  $("open-offers").setAttribute("aria-expanded", "true");
+  loadVendorOffers();
+});
+$("close-offers").addEventListener("click", () => {
+  if (offerBusy || (offerDirty && !window.confirm("Discard unsaved coupon and delivery edits?"))) return;
+  clearOffers();
+  $("open-offers").focus();
+});
+$("reload-vendor-offers").addEventListener("click", () => {
+  if (offerDirty && !window.confirm("Reloading discards visible unsaved offer edits. Continue?")) return;
+  loadVendorOffers();
+});
+$("add-coupon").addEventListener("click", () => {
+  if (offerBusy || offerNeedsReload || !offerState || $("vendor-coupons").children.length >= 20) return;
+  const input = addCouponRow();
+  offerDirty = true;
+  setOfferBusy(false);
+  input.focus();
+});
+$("offers-form").addEventListener("input", () => {
+  offerDirty = true;
+  setOfferBusy(offerBusy);
+});
+$("offers-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!session || offerBusy || priceBusy || homepageBusy || offerNeedsReload || !offerState || !offerDirty) return;
+  let offers;
+  try {
+    offers = checkOffers({
+      coupons: [...$("vendor-coupons").children].map(row => ({
+        code: normalizeCoupon(row.querySelector('[data-field="code"]').value),
+        percent: Number(row.querySelector('[data-field="percent"]').value),
+        enabled: row.querySelector('[data-field="enabled"]').checked,
+      })),
+      freeDeliveryMinimum: $("free-delivery-minimum").valueAsNumber,
+      deliveryFee: $("delivery-fee").valueAsNumber,
+    });
+  } catch (error) { notice("offers-message", error.message, true); return; }
+  const version = offerAccessVersion;
+  setOfferBusy(true);
+  notice("offers-message", "Saving coupons and delivery rules...");
+  try {
+    const result = await api("/api/vendor-offers", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Vendor-CSRF": session.csrf },
+      body: JSON.stringify({ offers, expectedVersion: offerState.version }),
+    });
+    if (version !== offerAccessVersion || !session) return;
+    if (JSON.stringify(result.offers) !== JSON.stringify(offers)) throw new Error("The saved offer update could not be verified.");
+    acceptOffers(result);
+    notice("offers-message", "Saved. New visits use these coupons and delivery rules. Open carts must reload offers if settings change.");
+  } catch (error) {
+    if (version !== offerAccessVersion || !session) return;
+    offerNeedsReload = true;
+    notice("offers-message", `${error.message} Your edits are kept. Reload saved offers to check whether the update was committed before trying again.`, true);
+  } finally { if (version === offerAccessVersion) setOfferBusy(false); }
+});
 
 async function initialise() {
   clearPrivateView();
@@ -839,7 +1008,7 @@ function renderDetail(order) {
   ]);
   $("detail-items").textContent = order.items;
   detailFields("detail-amounts", [
-    ["Subtotal", money(order.subtotal)], ["Discount", `${order.discountPercent}% (${money(order.discount)})`],
+    ["Subtotal", money(order.subtotal)], ...(order.couponCode ? [["Coupon", order.couponCode]] : []), ["Discount", `${order.discountPercent}% (${money(order.discount)})`],
     ["Delivery charge", money(order.deliveryCharge)], ["Estimated total", money(order.total)],
   ]);
   $("detail-status").value = order.status;
@@ -1099,7 +1268,7 @@ $("price-form").addEventListener("submit", event => {
   changePrices({ action: "save", year: priceList.year, expectedRevision: priceList.revision, products });
 });
 window.addEventListener("beforeunload", event => {
-  if (priceDirty || priceBusy || homepageDirty() || homepageBusy) { event.preventDefault(); event.returnValue = ""; }
+  if (priceDirty || priceBusy || homepageDirty() || homepageBusy || offerDirty || offerBusy) { event.preventDefault(); event.returnValue = ""; }
 });
 $("close-details").addEventListener("click", () => $("order-dialog").close());
 $("order-dialog").addEventListener("cancel", event => { if (saving) event.preventDefault(); });
@@ -1157,8 +1326,8 @@ $("status-form").addEventListener("submit", async event => {
   }
 });
 $("sign-out").addEventListener("click", async () => {
-  if (!session || priceBusy || homepageBusy ||
-      ((priceDirty || homepageDirty()) && !window.confirm("Sign out and discard unsaved dashboard edits?"))) return;
+  if (!session || priceBusy || homepageBusy || offerBusy ||
+      ((priceDirty || homepageDirty() || offerDirty) && !window.confirm("Sign out and discard unsaved dashboard edits?"))) return;
   $("sign-out").disabled = true;
   try {
     await api("/api/vendor-auth/logout", {

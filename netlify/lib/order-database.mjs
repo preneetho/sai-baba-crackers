@@ -18,7 +18,7 @@ function summary(row) {
   return {
     orderId: row.orderId, createdAt: new Date(row.createdAt).toISOString(),
     status: row.status, name: row.name, phone: `+91 ${row.phone}`,
-    fulfilment: row.fulfilment === "delivery" ? "Free home delivery" : "Store pickup",
+    fulfilment: row.fulfilment === "delivery" ? (row.deliveryChargePaise === 0 ? "Free home delivery" : "Home delivery") : "Store pickup",
     total: row.totalPaise / 100,
   };
 }
@@ -31,6 +31,7 @@ async function detail(tx, orderId) {
   return { ok: true, order: {
     ...summary(row), address: row.address, preferredDate: row.preferredDate, notes: row.notes,
     subtotal: row.subtotalPaise / 100, discountPercent: row.discountPercent,
+    couponCode: row.couponCode,
     discount: row.discountPaise / 100, deliveryCharge: row.deliveryChargePaise / 100,
     items: items.map(item => `#${item.productId} ${item.name} | ${item.brand}\nPack: ${item.unit}\n${item.quantity} pack${item.quantity === 1 ? "" : "s"} x Rs.${(item.unitPricePaise / 100).toFixed(2)} = Rs.${(item.amountPaise / 100).toFixed(2)}`).join("\n\n"),
   } };
@@ -121,6 +122,7 @@ export function createOrderDatabase(db) {
           catalogueRevision: order.catalogueRevision,
           createdAt: order.createdAt, status: "New", ...order.customer,
           subtotalPaise: paise(order.amounts.subtotal), discountPercent: order.amounts.discountPercent,
+          couponCode: order.amounts.couponCode ?? "",
           discountPaise: paise(order.amounts.discount), deliveryChargePaise: paise(order.amounts.deliveryCharge),
           totalPaise: paise(order.amounts.total),
         }).onConflictDoNothing({ target: orderRequests.orderId }).returning({ orderId: orderRequests.orderId });

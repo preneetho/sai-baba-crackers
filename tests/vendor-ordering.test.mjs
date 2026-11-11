@@ -360,17 +360,20 @@ test("catalogue contains all 68 numbered products and the PDF's exact rates", ()
 });
 
 test("quantities count selling units rather than pieces", () => {
-  assert.equal(total({ 1: 2, 12: 1 }), 314.5);
+  assert.equal(total({ 1: 2, 12: 1 }), 370);
   assert.equal(cartLines({ 1: 2 })[0].unit, "10 pcs / box");
   assert.equal(total({}), 0);
-  assert.equal(total({ 32: 99 }), 504900);
+  assert.equal(total({ 32: 99 }), 594000);
 });
 
-test("15% discount is applied once to the subtotal, with paise preserved", () => {
-  assert.deepEqual(pricing({ 1: 2, 12: 1 }), { subtotal: 370, discount: 55.5, total: 314.5 });
-  assert.deepEqual(pricing({ 18: 1 }), { subtotal: 25, discount: 3.75, total: 21.25 });
-  assert.deepEqual(pricing({ 21: 1 }), { subtotal: 20, discount: 3, total: 17 });
-  assert.deepEqual(pricing({}), { subtotal: 0, discount: 0, total: 0 });
+test("no coupon means no automatic discount, with paise preserved", () => {
+  for (const [cart, subtotal] of [[{ 1: 2, 12: 1 }, 370], [{ 18: 1 }, 25], [{ 21: 1 }, 20], [{}, 0]]) {
+    const amounts = pricing(cart);
+    assert.equal(amounts.subtotal, subtotal);
+    assert.equal(amounts.discount, 0);
+    assert.equal(amounts.total, subtotal);
+    assert.equal(amounts.couponCode, "");
+  }
   assert.ok(money(314.5).endsWith("314.50"));
   assert.ok(money(21.25).endsWith("21.25"));
   assert.ok(money(70).endsWith("70"));
@@ -378,7 +381,7 @@ test("15% discount is applied once to the subtotal, with paise preserved", () =>
     const cart = Object.fromEntries(products.map(product => [product.id, quantity]));
     const amounts = pricing(cart);
     const subtotalPaise = products.reduce((sum, product) => sum + product.price * quantity * 100, 0);
-    assert.equal(Math.round(amounts.discount * 100), Math.round(subtotalPaise * 15 / 100));
+    assert.equal(Math.round(amounts.discount * 100), 0);
     assert.equal(Math.round(amounts.total * 100) + Math.round(amounts.discount * 100), subtotalPaise);
   }
 });
@@ -414,7 +417,7 @@ test("invalid names, phones, addresses, dates and oversized notes fail explicitl
 test("delivery or pickup is an explicit required choice", () => {
   for (const fulfilment of [undefined, "", "courier", "Delivery", " pickup "]) {
     assert.throws(() => validateCustomer({ ...customer, fulfilment }, today),
-      /Choose free home delivery or store pickup/);
+      /Choose home delivery or store pickup/);
   }
   for (const fulfilment of ["delivery", "pickup"]) {
     assert.equal(validateCustomer({ ...customer, fulfilment }, today).fulfilment, fulfilment);
@@ -424,11 +427,11 @@ test("delivery or pickup is an explicit required choice", () => {
   }
 });
 
-test("free home delivery and pickup retain the same 15% discounted total", () => {
+test("default delivery and pickup do not apply an automatic discount", () => {
   for (const fulfilment of ["delivery", "pickup"]) {
     const text = createRequirement({ 1: 2, 12: 1 }, { ...customer, fulfilment }, today);
-    assert.ok(text.includes("Discount applied (15%): -Rs.55.50"));
-    assert.ok(text.includes("Estimated total: Rs.314.50"));
+    assert.ok(!text.includes("Discount applied"));
+    assert.ok(text.includes("Estimated total: Rs.370.00"));
     assert.ok(text.includes(`Address: ${customer.address}`));
     if (fulfilment === "delivery") {
       assert.ok(text.includes("Delivery option: Free home delivery"));
@@ -445,7 +448,7 @@ test("free home delivery and pickup retain the same 15% discounted total", () =>
     const withoutDate = createRequirement({ 18: 1 },
       { ...customer, fulfilment, preferredDate: "" }, today);
     assert.ok(!withoutDate.includes("Preferred "));
-    assert.ok(withoutDate.includes("Estimated total: Rs.21.25"));
+    assert.ok(withoutDate.includes("Estimated total: Rs.25.00"));
   }
 });
 
@@ -464,15 +467,15 @@ test("message contains every detail, line amount, pack, brand and estimated tota
   for (const content of [`New order request - ${vendor.name} (${vendor.year})`, "Ravi Kumar", "+91 9876543210", "2026-11-05",
     "#1 Ground Chakkar Big | STANDARD", "Pack: 10 pcs / box",
     "2 packs x Rs.70 = Rs.140", "1 pack x Rs.230 = Rs.230", "#12 Flower Pot Special",
-    `Address: ${customer.address}`, "Subtotal: Rs.370.00", "Discount applied (15%): -Rs.55.50",
-    "Estimated total: Rs.314.50", "Please confirm stock.",
+    `Address: ${customer.address}`, "Subtotal: Rs.370.00",
+    "Estimated total: Rs.370.00", "Please confirm stock.",
     "This is an order request, not a confirmed order. No payment has been made."]) {
     assert.ok(message.includes(content), content);
   }
   assert.throws(() => createRequirement({}, customer, today), /at least one/);
   const fractional = createRequirement({ 18: 1 }, customer, today);
-  assert.ok(fractional.includes("Discount applied (15%): -Rs.3.75"));
-  assert.ok(fractional.includes("Estimated total: Rs.21.25"));
+  assert.ok(!fractional.includes("Discount applied"));
+  assert.ok(fractional.includes("Estimated total: Rs.25.00"));
 });
 
 test("WhatsApp links encode customer content without permitting URL injection", () => {

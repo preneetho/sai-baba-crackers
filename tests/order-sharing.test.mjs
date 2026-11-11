@@ -7,6 +7,7 @@ import { handleOrderShare, config as pageConfig } from "../netlify/functions/ord
 import { config as cleanupConfig } from "../netlify/functions/expire-order-shares.mjs";
 import { SHARE_TTL_MS, shareKey, saveOrderShare, readOrderShare, removeExpiredOrderShares } from "../netlify/lib/order-shares.mjs";
 import { handleOrderRequest } from "../netlify/functions/orders.mjs";
+import { DEFAULT_OFFERS } from "../vendor-app/offers-model.mjs";
 import { products } from "../vendor-app/catalog.mjs";
 import { validateOrderShareLink, whatsappUrl, MAX_WHATSAPP_URL_LENGTH } from "../vendor-app/order.mjs";
 
@@ -289,6 +290,7 @@ test("invalid, missing, expired and failed page lookups have explicit private-da
 });
 
 const checkout = {
+  offerVersion: null,
   requestId: "00000000-0000-4000-8000-000000000001",
   catalogue: { year: 2026, revision: 1 }, cart: { 1: 1 }, consent: true, shareConsent: true,
   customer: {
@@ -305,6 +307,7 @@ function checkoutRequest(input = checkout) {
 function checkoutBackend(save, overrides = {}) {
   return {
     env, now: () => now,
+    readOfferSettings: async () => ({ offers: DEFAULT_OFFERS, version: null }),
     databaseFactory: async () => ({
       catalogueVersion: async () => ({ year: 2026, revision: 1, products }),
       save,

@@ -6,6 +6,7 @@ import { vendor, products } from "../vendor-app/catalog.mjs";
 import { validCatalogue, PRODUCT_TYPES } from "../vendor-app/catalogue-model.mjs";
 import { mediaUrl, isYouTubeMedia } from "../vendor-app/media-model.mjs";
 import * as order from "../vendor-app/order.mjs";
+import * as offers from "../vendor-app/offers-model.mjs";
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 async function harness({ stored, unavailableStorage = false, price = 70, navigator = {} } = {}) {
@@ -39,7 +40,8 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
     year: 2026, revision: 1, products: [{ ...products[0], price }],
   }));
   const context = vm.createContext({
-    ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "DISCOUNT_PERCENT", "money", "localDate", "validateCustomer",
+    ...offers,
+    ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "money", "localDate", "validateCustomer",
       "prepareOrderMessage", "validateOrderShareLink"].map(key => [key, order[key]])),
     checkCart: order.sanitizeCart, getLines: order.cartLines, getPricing: order.pricing, getTotal: order.total,
     vendor, validCatalogue, PRODUCT_TYPES, mediaUrl, isYouTubeMedia, track() {}, URL, AbortSignal, console, Intl, navigator,
@@ -63,7 +65,11 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
     },
     window: { location: { origin: "https://vendor.example" }, confirm: () => true,
       addEventListener: (type, callback) => events.set(type, callback) },
-    fetch: async (path, options) => { requests.push({ path, ...options }); return respond(path, options); },
+    fetch: async (path, options) => {
+      requests.push({ path, ...options });
+      if (path === "/api/offers") return Response.json({ offers: offers.DEFAULT_OFFERS, version: null });
+      return respond(path, options);
+    },
   });
   const source = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   vm.runInContext(source.replace(/^import .*;\r?\n/gm, ""), context);
@@ -74,6 +80,31 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
     async emit(selector, type) { await get(selector).events.get(type)({ preventDefault() {}, target: get(selector), currentTarget: get(selector) }); await tick(); },
   };
 }
+
+test("cart coupon apply/remove updates post-discount delivery progress and pickup/delivery totals", async () => {
+  const ui = await harness();
+  ui.run(`offers = { coupons: [{ code: "SALE15", percent: 15, enabled: true }], freeDeliveryMinimum: 2500, deliveryFee: 100 }`);
+  ui.run("updateQuantity(1, 2, false)");
+  ui.get("#coupon-code").value = "invalid";
+  await ui.emit("#coupon-form", "submit");
+  assert.match(ui.get("#coupon-status").textContent, /invalid/);
+  assert.equal(ui.run("total(cart)"), 140);
+  ui.get("#coupon-code").value = "sale15";
+  await ui.emit("#coupon-form", "submit");
+  assert.equal(ui.run("total(cart)"), 119);
+  assert.match(ui.get("#delivery-progress-text").textContent, /2,381/);
+  ui.get("#fulfilment-delivery").checked = true;
+  ui.get("#customer-form").elements.fulfilment.value = "delivery";
+  ui.run("updateFulfilment()");
+  assert.equal(ui.get("#checkout-total").textContent, order.money(219));
+  ui.get("#fulfilment-delivery").checked = false;
+  ui.get("#customer-form").elements.fulfilment.value = "pickup";
+  ui.run("updateFulfilment()");
+  assert.equal(ui.get("#checkout-total").textContent, order.money(119));
+  await ui.emit("#remove-coupon", "click");
+  assert.equal(ui.run("total(cart)"), 140);
+  assert.equal(ui.run("couponCode"), "");
+});
 
 test("category tiles and type counts combine with search, sorting and clear filters without changing the cart", async () => {
   const ui = await harness();
@@ -109,7 +140,7 @@ test("category tiles and type counts combine with search, sorting and clear filt
   assert.match(ui.get("#products").children[0].children[1].children.find(node => node.className === "product-type-labels").textContent,
     /Colour & Light.*Ground/);
   ui.run("updateQuantity(1, 2, false)");
-  assert.equal(ui.run("total(cart)"), 170);
+  assert.equal(ui.run("total(cart)"), 200);
   ui.get("#search").value = "Synthetic Rocket";
   await ui.emit("#search", "input");
   assert.equal(ui.get("#products").children.length, 0);
@@ -122,7 +153,7 @@ test("category tiles and type counts combine with search, sorting and clear filt
   assert.equal(ui.get("#clear-filters").hidden, true);
   assert.equal(type("").getAttribute("aria-pressed"), "true");
   assert.equal(ui.run("cart[1]"), 2);
-  assert.equal(ui.run("total(cart)"), 170);
+  assert.equal(ui.run("total(cart)"), 200);
 });
 
 test("category tiles always use default category icons while photos and video thumbnails stay on product cards", async () => {
@@ -182,7 +213,7 @@ test("customer catalogue is loaded dynamically and saved carts are bound to its 
   assert.equal(ui.get("#products").children.length, 1);
   assert.equal(ui.get("#review").disabled, false);
   assert.equal(ui.get("year-label").textContent, 2026);
-  assert.equal(ui.run("total(cart)"), 169.91);
+  assert.equal(ui.run("total(cart)"), 199.9);
   ui.run("updateQuantity(1, 1, false)");
   assert.deepEqual(JSON.parse(ui.storage.get(order.CART_KEY)), { year: 2026, revision: 1, cart: { 1: 3 } });
   ui.respond(async () => new Response(JSON.stringify({ year: 2027, revision: 2, products: [products[0]] })));
@@ -503,7 +534,7 @@ test("checkout separates cart review from compact details and preserves the draf
   assert.equal(ui.get("#checkout-step").textContent, "STEP 2 OF 3");
   assert.equal(ui.get("#checkout-summary").children.length, 1);
   assert.equal(ui.get("#checkout-summary").children[0].className, "pricing-summary");
-  assert.equal(ui.get("#checkout-total").textContent, order.money(119));
+  assert.equal(ui.get("#checkout-total").textContent, order.money(140));
   assert.equal(ui.get("#checkout-title").focused, true);
   let resets = 0;
   ui.get("#customer-form").reset = () => resets++;
@@ -512,7 +543,7 @@ test("checkout separates cart review from compact details and preserves the draf
   assert.equal(resets, 0);
   ui.run("updateQuantity(1, 1, true)");
   await ui.emit("#review", "click");
-  assert.equal(ui.get("#checkout-total").textContent, order.money(178.5));
+  assert.equal(ui.get("#checkout-total").textContent, order.money(210));
   await ui.emit("#close-checkout", "click");
   await ui.emit("#checkout", "close");
   assert.equal(resets, 1);
@@ -598,6 +629,29 @@ test("failed link preparation keeps the same request ID for retry before creatin
   assert.equal(attempts.length, 2);
   assert.equal(attempts[0].requestId, attempts[1].requestId);
   assert.equal(ui.get("#message-links").children.length, 1);
+});
+
+test("requotes after an uncertain save retain the request ID even if the coupon is disabled", async () => {
+  const ui = await harness();
+  let uuid = 0;
+  ui.context.crypto.randomUUID = () => `00000000-0000-4000-8000-${String(++uuid).padStart(12, "0")}`;
+  ui.run(`offers = { coupons: [{ code: "SALE15", percent: 15, enabled: true }], freeDeliveryMinimum: 2500, deliveryFee: 100 };
+    offerVersion = "version-1"; couponCode = "SALE15"; updateQuantity(1, 1, false)`);
+  const attempts = [];
+  ui.respond(async (_, options) => {
+    attempts.push(JSON.parse(options.body));
+    return Response.json({ error: "Your request is saved, but its details link could not be prepared. Retry." }, { status: 503 });
+  });
+  await ui.emit("#customer-form", "submit");
+  ui.run('offers.coupons[0].enabled = false; offers.deliveryFee = 120; offerVersion = "version-2"; couponCode = ""');
+  await ui.emit("#customer-form", "submit");
+  assert.equal(attempts[0].requestId, attempts[1].requestId);
+  assert.equal(attempts[1].offerVersion, "version-2");
+  assert.equal(attempts[1].couponCode, "");
+  assert.equal(ui.get("#message-links").children.length, 0);
+  ui.run("updateQuantity(1, 1, false)");
+  await ui.emit("#customer-form", "submit");
+  assert.notEqual(attempts[2].requestId, attempts[1].requestId);
 });
 
 test("WhatsApp recovery copies the concise link summary without resubmitting and closing clears the detail URL", async () => {

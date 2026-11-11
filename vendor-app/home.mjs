@@ -1,5 +1,6 @@
 import "./auth-callback.mjs";
 import "./homepage-video.mjs";
+import "./homepage-offers.mjs";
 
 const catalogueAnchors = new Set(["#catalogue", "#requirement", "#products", "#search", "#checkout"]);
 function restoreCatalogueBookmark() {

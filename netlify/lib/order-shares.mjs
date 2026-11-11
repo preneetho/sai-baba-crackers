@@ -6,7 +6,7 @@ export const SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TOKEN = /^(\d{8})\.[A-Za-z0-9_-]{43}$/;
 const KEY = /^shares\/(\d{8})\/[a-f0-9]{64}$/;
 const FIELDS = ["orderId", "createdAt", "status", "name", "phone", "fulfilment", "total",
-  "address", "preferredDate", "items", "subtotal", "discountPercent", "discount", "deliveryCharge", "notes"];
+  "address", "preferredDate", "items", "subtotal", "discountPercent", "discount", "deliveryCharge", "notes", "couponCode"];
 const day = date => date.toISOString().slice(0, 10).replaceAll("-", "");
 const shareStore = () => getStore({ name: "order-shares", consistency: "strong" });
 const iso = value => typeof value === "string" && Number.isFinite(Date.parse(value)) &&
@@ -28,7 +28,7 @@ export async function saveOrderShare({ order, origin, source = "vendor" }, { sto
   const sharedAt = now().toISOString();
   const expiresAt = new Date(Date.parse(sharedAt) + SHARE_TTL_MS).toISOString();
   const token = `${day(new Date(expiresAt))}.${randomBytes(32).toString("base64url")}`;
-  const snapshot = { order: Object.fromEntries(FIELDS.map(key => [key, order[key]])), sharedAt, expiresAt, source };
+  const snapshot = { order: Object.fromEntries(FIELDS.filter(key => order[key] !== undefined).map(key => [key, order[key]])), sharedAt, expiresAt, source };
   const { modified } = await store.setJSON(shareKey(token), snapshot, { metadata: { expiresAt }, onlyIfNew: true });
   if (!modified) throw new Error("The shared request write was not acknowledged.");
   return { orderId: order.orderId, url: new URL(`/request/${token}`, origin).href, expiresAt };

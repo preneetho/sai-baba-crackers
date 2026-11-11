@@ -186,6 +186,15 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
 .modern .cart-actions { flex-shrink: 0; border-top: 1px solid var(--line); padding-top: 12px; }
 .modern .cart-actions .estimate-note { margin: 8px 0 12px; }
 .modern .cart-actions .pricing-summary { gap: 6px; }
+.coupon-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 4px; }
+.coupon-form input { flex: 1; min-width: 100px; width: 0; min-height: 44px; padding: 10px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; }
+.coupon-form .button { min-height: 44px; padding: 8px 14px; }
+.delivery-offer { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-block: 8px; background: var(--soft); }
+.delivery-offer > p:first-child { font-size: 13px; font-weight: 600; }
+.delivery-offer progress { width: 100%; height: 8px; display: block; margin-top: 6px; accent-color: var(--brand); }
+.delivery-offer .checkout-help { text-align: start; margin-top: 4px; }
+#mobile-delivery-progress { display: block; font-size: 10px; font-weight: 400; line-height: 1.4; }
+.checkout-help:empty { display: none; }
 .modern #clear-cart-top { min-height: 44px; margin: 4px 0 -8px auto; }
 .modern #checkout[open] { display: flex; flex-direction: column; width: min(560px, calc(100% - 24px)); max-height: 92dvh; padding: 0; overflow: hidden; }
 .modern #checkout .dialog-heading { flex-shrink: 0; align-items: center; padding: 12px 20px; margin: 0; border-bottom: 1px solid var(--line); }

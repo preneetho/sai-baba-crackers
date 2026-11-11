@@ -1,8 +1,8 @@
 # Sai Baba Crackers Centre
 
 An evergreen Hyderabad marketing homepage and mobile-friendly yearly catalogue,
-initially seeded with the 68 original 2026 products, a saved cart, an automatic
-15% discount, free home delivery or store pickup, and a customer-reviewed
+initially seeded with the 68 original 2026 products, a saved cart, vendor-managed
+coupon discounts, conditional free delivery or free store pickup, and a customer-reviewed
 order request including the customer's name, mobile number and address.
 Order requests are saved to the vendor's private order register before WhatsApp is prepared.
 Every order sends one short WhatsApp summary with the customer's name, mobile,
@@ -53,11 +53,52 @@ Long item lists scroll independently of the cart total and Continue button.
 Checkout shows required details first; preferred date, notes, price breakdown
 and full privacy information are expandable. A visible agreement beside
 **Save & open WhatsApp** replaces the checkbox; the existing consent fields
-and server checks are unchanged. Pack units, prices, the 15% discount, validation,
+and server checks are unchanged. Pack units, catalogue prices, validation,
 request recording and customer-initiated WhatsApp sending are preserved.
 Successful catalogue loads show no status banner or reload button; actionable
 loading failures still offer Retry. Saved-cart warnings appear only inside the cart.
 See [appearance and preview guidance](vendor-app/README.md#appearance).
+
+## Coupons and delivery rules
+
+Approved vendors open **Coupons & delivery** in `/vendor/` to publish up to 20
+unique codes, a whole percentage discount (1-100%) for each, and an enabled flag.
+Enabled codes appear on the homepage and catalogue; customers must apply one in
+their cart. There is no automatic discount and no stacking. Disabling or removing
+a code affects new requests, not saved amounts or historical discounts.
+
+The same editor sets the **free-delivery minimum** and **delivery fee below
+minimum**, in rupees with at most two decimal places. Eligibility uses merchandise
+after the coupon discount, excluding delivery fees. Exactly at the minimum is
+free; pickup is always free. Set the minimum or fee to 0 for free delivery on every request.
+The cart/mobile shortcut shows the amount remaining or **Free delivery unlocked**.
+The final checkout total includes any delivery fee after the customer chooses delivery.
+Delivery area, availability and timing still require shop confirmation.
+
+Settings persist separately from price lists in Netlify Blobs `site-settings`,
+key `checkout-offers`. The absent-record default is no coupons, minimum 0 and
+fee 0; this intentionally replaces the previous automatic 15%. Storage failures
+never silently use these defaults: checkout is blocked with an offer-reload action.
+`GET /api/offers` is public. `GET/POST /api/vendor-offers` uses existing approved
+sessions, same-origin CSRF checks and conditional writes. Stale/uncertain vendor
+saves preserve edits but require reloading before another update.
+
+Checkout sends only the selected code and settings version, never trusted prices.
+The server loads current rules, recalculates in integer paise and rejects changed
+rules before saving. Return to the cart, reload offers and review the new amount.
+An unchanged cart/customer keeps its request reference after reloading offers,
+even if the applied code is disabled. Do not generate a fresh request to bypass
+a changed-rules or duplicate-reference conflict. If an earlier
+save already succeeded under old rules, check that existing request in the vendor
+register rather than submitting again. Previously saved requests retain their amounts.
+
+Deploy frontend, Functions and the tracked `coupon_snapshot` SQL/snapshot migration
+together using the normal Git-connected Netlify deployment. It adds `coupon_code`
+with an empty historical default; existing discounts/totals are not recalculated.
+No new dependency or environment variable is needed; Netlify Blobs must be available.
+If using Sheets, **update and redeploy Apps Script before publishing this checkout**:
+run `setupOrdersSheet` to add **Coupon code** in column R. Existing A-Q values stay
+in place; move any custom R data first. The older script rejects paid delivery.
 
 Both public pages have canonical/social metadata. The homepage contains static
 `Store` JSON-LD matching its visible contact details; no ratings, opening hours,
@@ -215,7 +256,7 @@ Visibility changes create a revision and invalidate older carts like price edits
 Previously saved orders and their retries are unchanged. No new migration or
 environment variable is required.
 
-The 15% discount and free-delivery/pickup rules are unchanged. Each save retains
+Coupon and delivery settings are managed separately from the price list. Each save retains
 an immutable revision with the authenticated editor and timestamp. Concurrent
 edits are rejected rather than overwritten. If a response is uncertain, visible
 drafts remain on screen but further changes require **Reload saved list**;

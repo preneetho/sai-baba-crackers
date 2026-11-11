@@ -14,6 +14,8 @@ import { handleVendorOrderShare } from "../netlify/functions/vendor-order-share.
 import { handleOrderShare } from "../netlify/functions/order-share.mjs";
 import { handleHomepage } from "../netlify/functions/homepage.mjs";
 import { handleVendorHomepage } from "../netlify/functions/vendor-homepage.mjs";
+import { handleOffers } from "../netlify/functions/offers.mjs";
+import { handleVendorOffers } from "../netlify/functions/vendor-offers.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -27,6 +29,8 @@ const files = new Map([
   ["/home.mjs", ["home.mjs", "text/javascript; charset=utf-8"]],
   ["/homepage-model.mjs", ["homepage-model.mjs", "text/javascript; charset=utf-8"]],
   ["/homepage-video.mjs", ["homepage-video.mjs", "text/javascript; charset=utf-8"]],
+  ["/homepage-offers.mjs", ["homepage-offers.mjs", "text/javascript; charset=utf-8"]],
+  ["/offers-model.mjs", ["offers-model.mjs", "text/javascript; charset=utf-8"]],
   ["/modern.css", ["modern.css", "text/css; charset=utf-8"]],
   ["/modern-ui.mjs", ["modern-ui.mjs", "text/javascript; charset=utf-8"]],
   ["/canvas-fireworks.mjs", ["canvas-fireworks.mjs", "text/javascript; charset=utf-8"]],
@@ -76,6 +80,7 @@ const server = createServer(async (request, response) => {
   if (pathname === "/api/orders" || pathname === "/api/order-pdf" ||
       pathname === "/api/vendor-orders" || pathname === "/api/vendor-import" ||
       pathname === "/api/homepage" || pathname === "/api/vendor-homepage" ||
+      pathname === "/api/offers" || pathname === "/api/vendor-offers" ||
       pathname === "/api/catalogue" || pathname === "/api/vendor-catalogue" ||
       pathname === "/api/vendor-media" || pathname === "/api/vendor-order-share" ||
       pathname.startsWith("/request/") || pathname.startsWith("/api/vendor-auth/")) {
@@ -86,7 +91,9 @@ const server = createServer(async (request, response) => {
         init.duplex = "half";
       }
       const url = new URL(request.url, `http://127.0.0.1:${port}`);
-      const handler = pathname === "/api/homepage" ? handleHomepage :
+      const handler = pathname === "/api/offers" ? handleOffers :
+        pathname === "/api/vendor-offers" ? handleVendorOffers :
+        pathname === "/api/homepage" ? handleHomepage :
         pathname === "/api/vendor-homepage" ? handleVendorHomepage :
         pathname === "/api/orders" ? handleOrderRequest :
         pathname === "/api/order-pdf" ? handlePdfRequest :
