@@ -7,11 +7,14 @@ import { validCatalogue, PRODUCT_TYPES } from "../vendor-app/catalogue-model.mjs
 import { mediaUrl, isYouTubeMedia } from "../vendor-app/media-model.mjs";
 import * as order from "../vendor-app/order.mjs";
 import * as offers from "../vendor-app/offers-model.mjs";
+import { renderOfferWidgets } from "../vendor-app/offer-widgets.mjs";
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
+const text = node => (node.textContent ?? "") + node.children.map(text).join(" ");
 async function harness({ stored, unavailableStorage = false, price = 70, navigator = {} } = {}) {
+  let document;
   class Node {
-    constructor(tag = "div") { this.tagName = tag.toUpperCase(); this.children = []; this.events = new Map(); this.dataset = {}; this.value = ""; this.attributes = {}; }
+    constructor(tag = "div") { this.ownerDocument = document; this.tagName = tag.toUpperCase(); this.children = []; this.events = new Map(); this.dataset = {}; this.value = ""; this.attributes = {}; }
     append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; }
     addEventListener(type, callback) { this.events.set(type, callback); }
@@ -44,6 +47,7 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
   }));
   const context = vm.createContext({
     ...offers,
+    renderOfferWidgets, initializeOfferCarousel: () => () => {},
     ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "money", "localDate", "validateCustomer",
       "prepareOrderMessage", "validateOrderShareLink"].map(key => [key, order[key]])),
     checkCart: order.sanitizeCart, getLines: order.cartLines, getPricing: order.pricing, getTotal: order.total,
@@ -74,6 +78,8 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
       return respond(path, options);
     },
   });
+  document = context.document;
+  document.defaultView = { navigator };
   const source = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   vm.runInContext(source.replace(/^import .*;\r?\n/gm, ""), context);
   await tick();
@@ -149,16 +155,43 @@ test("unlisted coupons are verified on entry, survive offer reloads and stop app
   await applying;
   assert.equal(ui.run("total(cart)"), 112);
   assert.equal(ui.run("couponCode"), "FRIENDS20");
-  assert.equal(ui.get("#shop-offers-ribbon").hidden, true);
-  assert.doesNotMatch(ui.get("#shop-offers").textContent, /FRIENDS20/);
+  assert.equal(ui.get("#shop-offers-ribbon").hidden, false);
+  assert.equal(ui.get("#shop-offers").children.length, 1, "The delivery card stays visible without advertised coupons");
+  assert.doesNotMatch(text(ui.get("#shop-offers")), /FRIENDS20/);
   await ui.emit("#reload-offers", "click");
   assert.equal(ui.run("total(cart)"), 112);
-  assert.equal(ui.get("#shop-offers-ribbon").hidden, true);
+  assert.equal(ui.get("#shop-offers-ribbon").hidden, false);
   enabled = false;
   await ui.emit("#reload-offers", "click");
   assert.equal(ui.run("couponCode"), "");
   assert.equal(ui.run("total(cart)"), 140);
   assert.match(ui.get("#coupon-status").textContent, /no longer active/);
+});
+
+test("shopping offer cards advertise only public coupons, copy their codes and disappear after a settings failure", async () => {
+  let copied;
+  const ui = await harness({ navigator: { clipboard: { async writeText(code) { copied = code; } } } });
+  ui.respondOffers(async () => Response.json({
+    offers: { coupons: [
+      { code: "SALE15", percent: 15, enabled: true },
+      { code: "FRIENDS20", percent: 20, enabled: true, showOnWebsite: false },
+      { code: "OLD50", percent: 50, enabled: false },
+    ], freeDeliveryMinimum: 2500, deliveryFee: 100 }, version: "version-1",
+  }));
+  await ui.emit("#reload-offers", "click");
+  const cards = ui.get("#shop-offers").children;
+  assert.equal(cards.length, 2);
+  assert.match(text(cards[0]), /15% off.*SALE15/);
+  assert.match(text(cards[1]), /Free delivery.*2,500.*after coupon discount.*100/);
+  assert.doesNotMatch(text(ui.get("#shop-offers")), /FRIENDS20|OLD50/);
+  await cards[0].children[1].events.get("click")();
+  assert.equal(copied, "SALE15");
+  assert.match(ui.get("#shop-coupon-copy-status").textContent, /SALE15 copied/);
+  ui.respondOffers(async () => Response.json({ error: "Settings unavailable." }, { status: 503 }));
+  await ui.emit("#reload-offers", "click");
+  assert.equal(ui.get("#shop-offers-ribbon").hidden, true);
+  assert.match(ui.get("#offer-status").textContent, /unavailable/);
+  assert.equal(ui.get("#reload-offers").hidden, false);
 });
 
 test("changed offers during private coupon lookup block checkout until current rules are reloaded", async () => {

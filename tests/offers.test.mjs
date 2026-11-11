@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { DEFAULT_OFFERS, validOffers, validOfferVersion, normalizeCoupon, isPublicCoupon } from "../vendor-app/offers-model.mjs";
 import { pricing, createRequirement, money } from "../vendor-app/order.mjs";
 import { products } from "../vendor-app/catalog.mjs";
+import { renderOfferWidgets } from "../vendor-app/offer-widgets.mjs";
 import { readOffers, saveOffers } from "../netlify/lib/offer-settings.mjs";
 import { handleOffers } from "../netlify/functions/offers.mjs";
 import { handleVendorOffers } from "../netlify/functions/vendor-offers.mjs";
@@ -162,7 +163,7 @@ test("coupon lookup rejects malformed, oversized and unsupported requests withou
   assert.equal((await handleOffers(new Request(origin + "/api/offers", { method: "DELETE" }), { store })).status, 405);
 });
 
-async function homepageCoupons(clipboard) {
+async function homepageCoupons(clipboard, settings = offers) {
   class Node {
     constructor() { this.children = []; this.events = new Map(); }
     replaceChildren(...children) { this.children = children; }
@@ -172,16 +173,22 @@ async function homepageCoupons(clipboard) {
   }
   const nodes = new Map();
   const get = id => {
-    if (!nodes.has(id)) nodes.set(id, new Node());
+    if (!nodes.has(id)) {
+      const node = new Node();
+      node.ownerDocument = document;
+      nodes.set(id, node);
+    }
     return nodes.get(id);
   };
+  const document = { getElementById: get, createElement: () => new Node(), querySelectorAll: () => [],
+    defaultView: { navigator: { clipboard } } };
   const source = await readFile(new URL("../vendor-app/homepage-offers.mjs", import.meta.url), "utf8");
   vm.runInNewContext(source.replace(/^import .*;\r?\n/gm, ""), {
-    validOffers, validOfferVersion, isPublicCoupon, money, AbortSignal,
-    document: { getElementById: get, createElement: () => new Node(), querySelectorAll: () => [] },
+    validOffers, validOfferVersion, isPublicCoupon, money, AbortSignal, renderOfferWidgets,
+    initializeOfferCarousel: () => () => {}, document,
     navigator: { clipboard },
-    fetch: async () => Response.json({ offers: { ...offers, coupons: [
-      ...offers.coupons, { code: "FRIENDS20", percent: 20, enabled: true, showOnWebsite: false },
+    fetch: async () => Response.json({ offers: { ...settings, coupons: [
+      ...settings.coupons, { code: "FRIENDS20", percent: 20, enabled: true, showOnWebsite: false },
     ] }, version: "version-1" }),
   });
   await new Promise(resolve => setImmediate(resolve));
@@ -190,15 +197,33 @@ async function homepageCoupons(clipboard) {
 
 test("homepage copies only advertised codes and reports success after clipboard acknowledgement", async () => {
   let copied;
-  const get = await homepageCoupons({ async writeText(code) { copied = code; } });
+  const get = await homepageCoupons({ async writeText(code) { copied = code; } },
+    { ...offers, coupons: [...offers.coupons, { code: "SAVE10", percent: 10, enabled: true }] });
   const coupons = get("home-coupons").children;
-  assert.equal(coupons.length, 1);
+  assert.equal(coupons.length, 3, "Only advertised coupons and the delivery card are rendered");
+  assert.equal(coupons[1].className, "offer-card offer-delivery", "Delivery stays beside the first coupon, not after every promotion");
+  assert.equal(coupons[2].children[0].children[1].textContent, "Use code SAVE10");
   const button = coupons[0].children[1];
   await button.events.get("click")();
   assert.equal(copied, "DIWALI15");
   assert.equal(button.textContent, "Copied");
   assert.match(get("home-coupon-copy-status").textContent, /DIWALI15 copied/);
   assert.equal(button.disabled, false);
+});
+
+test("homepage delivery widget reflects paid thresholds and both ways to configure all-free delivery", async () => {
+  for (const [minimum, fee] of [[2500, 100], [0, 100], [2500, 0]]) {
+    const get = await homepageCoupons(undefined, { coupons: [], freeDeliveryMinimum: minimum, deliveryFee: fee });
+    const cards = get("home-coupons").children;
+    assert.equal(cards.length, 1);
+    const text = cards[0].children.map(node => node.textContent).join(" ");
+    assert.match(text, /Free delivery.*Pickup is free.*confirmed by the shop/);
+    if (minimum && fee) assert.match(text, /2,500.*after coupon discount.*100/);
+    else {
+      assert.match(text, /On all billed amounts/);
+      assert.doesNotMatch(text, /Below this|after coupon discount/);
+    }
+  }
 });
 
 test("homepage copy failure never claims success and explains manual copying", async () => {

@@ -84,15 +84,17 @@
       </div>
     </section>
 
-    <section class="home-section home-current-offers" aria-label="Current coupon and delivery offers">
+    <section class="home-section home-current-offers offer-carousel" aria-label="Current coupon and delivery offers">
       <p id="home-offers-status" role="status" aria-live="polite"></p>
       <button id="home-offers-retry" class="button secondary" type="button" hidden>Retry offers</button>
       <div id="home-offers" hidden>
-        <p class="eyebrow brand-text">CURRENT OFFERS</p>
-        <ul id="home-coupons"></ul>
+        <div class="offer-carousel-heading">
+          <p class="eyebrow brand-text">CURRENT OFFERS</p>
+          <button id="home-offers-toggle" class="text-button" type="button" aria-controls="home-coupons" hidden>Pause offers</button>
+        </div>
+        <ul id="home-coupons" class="offer-track" tabindex="0" aria-label="Coupon and free-delivery offer cards"></ul>
         <p id="home-coupon-copy-status" role="status" aria-live="polite"></p>
         <p id="home-coupon-help"></p>
-        <p data-delivery-terms></p>
         <a class="button primary" href="/order/">Shop crackers</a>
       </div>
     </section>

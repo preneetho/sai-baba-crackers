@@ -66,12 +66,21 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
 .modern .secondary:hover { background: var(--soft-strong); }
 .modern .icon-button { min-width: 44px; min-height: 44px; }
 .modern .home-outline { border-color: var(--control-border); }
-.festival-ribbon { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px 28px; margin-top: 20px; border: 1px solid #65502E; border-radius: 18px; background: linear-gradient(100deg, #FFC85712, #8B5CF612); }
-.festival-ribbon > div { flex-shrink: 0; }
+.festival-ribbon { margin-top: 20px; border: 1px solid #65502E; border-radius: 18px; background: linear-gradient(100deg, #FFC85712, #8B5CF612); }
 .offer-tag { display: block; font-size: 9px; font-weight: 700; letter-spacing: 1.6px; color: var(--muted); }
-.festival-ribbon strong { font-size: 24px; letter-spacing: -.5px; color: var(--accent); }
-.festival-ribbon p { max-width: 470px; font-size: 13px; color: var(--muted); }
-.festival-ribbon > a { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; min-height: 44px; }
+.modern .offer-carousel { display: block; min-width: 0; padding: 16px; }
+.offer-carousel-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.offer-carousel-heading .eyebrow { margin: 0; }
+.offer-carousel-heading button { min-height: 44px; padding: 8px 12px; }
+.offer-track { display: flex; gap: 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 2px; min-width: 0; list-style: none; padding: 4px 2px 12px; margin: 12px 0 0; }
+.offer-track .offer-card { display: flex; flex: 1 0 min(84%, 340px); flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--soft); scroll-snap-align: start; line-height: 1.45; }
+.offer-card-copy { display: grid; gap: 8px; }
+.modern .offer-card strong { color: var(--brand); font-size: 20px; letter-spacing: 0; }
+.offer-card span { font-size: 13px; }
+.modern .offer-card .button { margin-top: auto; min-height: 44px; padding: 8px 14px; font-size: 13px; }
+.modern .offer-carousel .offer-card p { margin: 0; font-size: 12px; color: var(--muted); }
+.offer-carousel p[role="status"]:empty { display: none; }
+.offer-track:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .modern .home-facts { margin-top: 12px; padding-block: 30px; }
 .modern .home-facts strong { color: var(--ink); font-size: 22px; }
 .modern .home-section { margin-top: 76px; }
@@ -279,8 +288,6 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
   .modern .site-header { gap: 16px; }
   .modern .hero, .modern .home-hero { padding: 36px; min-height: 430px; }
   .modern nav { gap: 16px; }
-  .modern .festival-ribbon { flex-wrap: wrap; }
-  .modern .festival-ribbon p { flex: 1; min-width: 200px; }
 }
 @media (min-width: 1024px) {
   .modern .shop-layout { grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 380px); gap: 24px; }
@@ -308,9 +315,6 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
   .modern .art-caption { display: block; }
   .modern .hero-meta { gap: 12px; font-size: 10px; }
   .modern .hero-meta span:first-child { padding-right: 12px; }
-  .modern .festival-ribbon { display: grid; gap: 10px; padding: 22px; }
-  .modern .festival-ribbon p { min-width: 0; }
-  .modern .festival-ribbon strong { font-size: 26px; }
   .modern .home-facts strong { font-size: 17px; }
   .modern .home-section { margin-top: 52px; }
   .modern .home-service { padding: 26px; }

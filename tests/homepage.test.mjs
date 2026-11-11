@@ -185,6 +185,7 @@ test("local preview serves the public routes, assets, redirects and vendor page"
     ["/home.mjs", "text/javascript", "restoreCatalogueBookmark"],
     ["/homepage-model.mjs", "text/javascript", "validHomepageVideo"],
     ["/homepage-video.mjs", "text/javascript", "/api/homepage"],
+    ["/offer-widgets.mjs", "text/javascript", "initializeOfferCarousel"],
     ["/modern.css", "text/css", ".modern"],
     ["/modern-ui.mjs", "text/javascript", "restoreCartBookmark"],
     ["/canvas-fireworks.mjs", "text/javascript", "prefers-reduced-motion"],

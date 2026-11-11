@@ -3,7 +3,8 @@ import { vendor } from "./catalog.mjs";
 import { validCatalogue, PRODUCT_TYPES } from "./catalogue-model.mjs";
 import { mediaUrl, isYouTubeMedia } from "./media-model.mjs";
 import { CART_KEY, MAX_QUANTITY, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, money, localDate, validateCustomer, prepareOrderMessage, validateOrderShareLink } from "./order.mjs";
-import { DEFAULT_OFFERS, validOffers, validOfferVersion, normalizeCoupon, isPublicCoupon } from "./offers-model.mjs";
+import { DEFAULT_OFFERS, validOffers, validOfferVersion, normalizeCoupon } from "./offers-model.mjs";
+import { renderOfferWidgets, initializeOfferCarousel } from "./offer-widgets.mjs";
 
 const $ = selector => document.querySelector(selector);
 let products = [];
@@ -35,6 +36,7 @@ let galleryTrigger = null;
 let galleryVideo = null;
 let galleryFrame = null;
 const warning = $("#storage-warning");
+const updateOfferCarousel = initializeOfferCarousel($("#shop-offers"), $("#shop-offers-toggle"));
 
 function showStorageWarning(message, reset = false) {
   warning.replaceChildren(document.createTextNode(message));
@@ -660,6 +662,8 @@ $("#customer-form").addEventListener("submit", async event => {
     if (!response.ok) {
       if (result?.offersChanged === true) {
         offers = null;
+        $("#shop-offers-ribbon").hidden = true;
+        updateOfferCarousel();
         $("#offer-status").textContent = result.error;
         $("#reload-offers").hidden = false;
       }
@@ -885,11 +889,13 @@ async function loadOffers() {
     }
     $("#offer-status").textContent = "";
     $("#reload-offers").hidden = true;
-    $("#shop-offers").textContent = offers.coupons.filter(isPublicCoupon)
-      .map(coupon => `${coupon.percent}% off with ${coupon.code}`).join(" \u00b7 ");
-    $("#shop-offers-ribbon").hidden = !offers.coupons.some(isPublicCoupon);
+    renderOfferWidgets($("#shop-offers"), offers, $("#shop-coupon-copy-status"));
+    $("#shop-offers-ribbon").hidden = false;
+    updateOfferCarousel();
   } catch (error) {
     offers = null;
+    $("#shop-offers-ribbon").hidden = true;
+    updateOfferCarousel();
     $("#offer-status").textContent = error.message;
     $("#reload-offers").hidden = false;
   } finally {
@@ -915,6 +921,8 @@ $("#coupon-form").addEventListener("submit", async event => {
     $("#coupon-status").textContent = error.message;
     if (error.status === 409) {
       offers = null;
+      $("#shop-offers-ribbon").hidden = true;
+      updateOfferCarousel();
       $("#offer-status").textContent = error.message;
       $("#reload-offers").hidden = false;
     }

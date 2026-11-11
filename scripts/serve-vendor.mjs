@@ -30,6 +30,7 @@ const files = new Map([
   ["/homepage-model.mjs", ["homepage-model.mjs", "text/javascript; charset=utf-8"]],
   ["/homepage-video.mjs", ["homepage-video.mjs", "text/javascript; charset=utf-8"]],
   ["/homepage-offers.mjs", ["homepage-offers.mjs", "text/javascript; charset=utf-8"]],
+  ["/offer-widgets.mjs", ["offer-widgets.mjs", "text/javascript; charset=utf-8"]],
   ["/offers-model.mjs", ["offers-model.mjs", "text/javascript; charset=utf-8"]],
   ["/modern.css", ["modern.css", "text/css; charset=utf-8"]],
   ["/modern-ui.mjs", ["modern-ui.mjs", "text/javascript; charset=utf-8"]],

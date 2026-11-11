@@ -113,7 +113,12 @@ their existing shared styles. There is no framework migration
 or new runtime dependency. Both public pages retain their canonical URLs and SEO data.
 The sticky header adapts to narrow screens and its measured height keeps anchor
 targets visible. The catalogue offer ribbon and homepage show enabled vendor coupon codes
-only when **Show on website** is checked; homepage codes can be copied with feedback.
+only when **Show on website** is checked. Both use horizontal coupon cards with
+copy feedback and a separate free-delivery card showing the configured post-discount
+minimum and fee. Cards can be swiped, scrolled or reached by keyboard. Overflowing
+cards advance every 4.5 seconds while visible; **Pause offers** stops this until
+resumed. Hover, keyboard focus, a hidden tab or an offscreen strip temporarily pause
+advancement. Reduced-motion preferences disable automatic scrolling entirely.
 The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon.
 The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
 experience, coupon savings and delivery/pickup options. Delivery area and timing

@@ -195,10 +195,13 @@
       </div>
     </section>
 
-    <aside id="shop-offers-ribbon" class="festival-ribbon" aria-label="Current catalogue offer" hidden>
-      <div><span class="offer-tag">COUPON OFFERS</span><strong id="shop-offers"></strong></div>
-      <p>Enter one coupon in your cart. No online payment. Every request needs shop confirmation.</p>
-      <a href="#catalogue">Find your favourites <span aria-hidden="true">&#8595;</span></a>
+    <aside id="shop-offers-ribbon" class="festival-ribbon offer-carousel" aria-label="Coupon and delivery offers" hidden>
+      <div class="offer-carousel-heading">
+        <span class="offer-tag">CURRENT OFFERS</span>
+        <button id="shop-offers-toggle" class="text-button" type="button" aria-controls="shop-offers" hidden>Pause offers</button>
+      </div>
+      <ul id="shop-offers" class="offer-track" tabindex="0" aria-label="Coupon and free-delivery offer cards"></ul>
+      <p id="shop-coupon-copy-status" role="status" aria-live="polite"></p>
     </aside>
 
     <div class="how-it-works" aria-label="How it works">
