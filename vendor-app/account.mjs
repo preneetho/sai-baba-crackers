@@ -35,7 +35,7 @@ function otpError(error) {
     "auth/invalid-app-credential": "Test verification is not configured correctly. Check the Firebase fictional number and website setup.",
     "auth/captcha-check-failed": "Verification could not start. Check the Firebase website and fictional-number configuration.",
     "auth/network-request-failed": "Firebase could not be reached. Check your connection and retry.",
-    "auth/operation-not-allowed": "Phone authentication is not enabled for this Firebase project.",
+    "auth/operation-not-allowed": "Firebase blocked phone verification. Check that the Phone provider is enabled and India (+91) is allowed in the SMS region policy.",
   };
   return new Error(messages[error.code] ?? "Firebase verification failed. Check the test configuration and retry.");
 }

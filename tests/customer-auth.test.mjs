@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { customerSettings, verifyCustomer } from "../netlify/lib/customer-auth.mjs";
 import { handleCustomerConfig } from "../netlify/functions/customer-config.mjs";
 import { handleCustomerOrders } from "../netlify/functions/customer-orders.mjs";
@@ -67,6 +68,24 @@ test("missing, forged and expired tokens cannot authenticate and verification ou
   await assert.rejects(verifyCustomer(request(), settings, {
     verifyIdToken: async () => { throw new Error("synthetic network outage"); },
   }), error => error.status === 503);
+  await assert.rejects(verifyCustomer(request(), settings, {
+    verifyIdToken: async () => { throw Object.assign(new Error("private diagnostic detail"), { code: "ERR_MODULE_NOT_FOUND" }); },
+  }), error => error.status === 503 && /ERR_MODULE_NOT_FOUND/.test(error.message) &&
+    !error.message.includes("private diagnostic detail"));
+});
+
+test("Firebase verification loads with Lambda's require-ESM interop disabled", () => {
+  const moduleUrl = new URL("../netlify/lib/customer-auth.mjs", import.meta.url).href;
+  const result = spawnSync(process.execPath, ["--no-experimental-require-module", "--input-type=module", "-e", `
+    import assert from "node:assert/strict";
+    import { verifyCustomer } from ${JSON.stringify(moduleUrl)};
+    await assert.rejects(verifyCustomer(
+      new Request("https://shop.example/api/customer-orders", { headers: { Authorization: "Bearer forged" } }),
+      { mode: "test", projectId: "synthetic-project", testPhones: [] }
+    ), error => error.status === 401);
+  `], { encoding: "utf8", timeout: 30000 });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test("history requires verified identity before opening the database and never accepts a customer ID or phone query", async () => {

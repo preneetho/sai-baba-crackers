@@ -42,8 +42,12 @@ export async function verifyCustomer(request, settings, { verifyIdToken = fireba
       "auth/id-token-revoked", "auth/user-disabled"].includes(error.code)) {
       throw failure("Your login expired or could not be verified. Sign in again.", 401);
     }
-    console.error("Customer identity verification is unavailable.");
-    throw failure("Customer verification is unavailable. Keep your cart and retry.", 503);
+    const dependencyErrors = ["ERR_MODULE_NOT_FOUND", "MODULE_NOT_FOUND", "ERR_PACKAGE_PATH_NOT_EXPORTED", "ERR_REQUIRE_ESM"];
+    const reason = dependencyErrors.includes(error.code) ? error.code : "verification-unavailable";
+    console.error("Customer identity verification is unavailable.", { reason });
+    throw failure(reason === "verification-unavailable" ?
+      "Customer verification is unavailable. Keep your cart and retry." :
+      `Customer verification could not load its server dependency (${reason}). The deployment needs repair.`, 503);
   }
   if (token.aud !== settings.projectId || token.iss !== `https://securetoken.google.com/${settings.projectId}` ||
       typeof token.uid !== "string" || !token.uid || token.uid.length > 128 ||

@@ -7,7 +7,7 @@
     "@netlify/database": "2.0.1",
     "@netlify/identity": "^2.0.0",
     "drizzle-orm": "1.0.0-beta.22",
-    "firebase-admin": "14.5.0",
+    "firebase-admin": "13.10.0",
     "fontkit": "2.0.4",
     "pdfkit": "0.20.2",
     "sai-baba-crackers": "file:.."

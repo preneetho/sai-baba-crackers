@@ -447,6 +447,8 @@ on Netlify.
 
 Enable the Phone provider, authorize the exact test-deployment hostname, and add
 the fictional numbers **and their six-digit codes** in Firebase before testing.
+Allow India (+91) under Authentication > Settings > SMS region policy; a blocked
+region can produce `auth/operation-not-allowed` even when Phone is enabled.
 Those codes stay in Firebase; do not put them in the app, environment variables,
 screenshots or source control. The allowlist returned to the browser consists of
 fictional numbers only, not customers' real phone numbers.
@@ -480,6 +482,12 @@ The native browser SDK is pinned to Firebase `13.2.0`; its narrow CSP sources an
 the project's auth iframe are declared in `netlify.toml`. Update the iframe
 domain alongside any project change. Analytics is not initialized. The additive
 customer-account migration is generated alongside the existing database schema.
+The server pins Firebase Admin to `13.10.0`, whose JWKS dependency supports
+Netlify's Node 22 Lambda runtime without experimental flags. Admin `14.5.0`
+requires ESM interop that Lambda disables by default and fails to load with
+`ERR_REQUIRE_ESM`. Before upgrading the server SDK, run the regression that
+disables require-ESM interop and verify the deployed function. No `NODE_OPTIONS`
+override or service-account key is needed for this compatible version.
 
 The schema lives in `db/schema.ts`, with generated migrations in
 `netlify/database/migrations`. Database dependencies and the matching Drizzle migration CLI are installed at the
