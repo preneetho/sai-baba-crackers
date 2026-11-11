@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
-import { orderRequests, orderItems, orderStatusHistory } from "./order-schema.mjs";
+import { customerAccounts, orderRequests, orderItems, orderStatusHistory } from "./order-schema.mjs";
 import { ORDER_STATUSES, PAGE_SIZE } from "../../vendor-app/vendor-model.mjs";
 import { vendor } from "../../vendor-app/catalog.mjs";
 import { approvedImportMetadata, ImportPreviewRollback } from "./approved-import.mjs";
@@ -18,6 +18,7 @@ function summary(row) {
   return {
     orderId: row.orderId, createdAt: new Date(row.createdAt).toISOString(),
     status: row.status, name: row.name, phone: `+91 ${row.phone}`,
+    ...(row.isTest ? { isTest: true } : {}),
     fulfilment: row.fulfilment === "delivery" ? (row.deliveryChargePaise === 0 ? "Free home delivery" : "Home delivery") : "Store pickup",
     total: row.totalPaise / 100,
   };
@@ -53,6 +54,7 @@ export function createOrderDatabase(db) {
         await tx.select().from(orderRequests).limit(0);
         await tx.select().from(orderItems).limit(0);
         await tx.select().from(orderStatusHistory).limit(0);
+        await tx.select().from(customerAccounts).limit(0);
       }, true);
     },
     async importApprovedSql(statement, approvedHash, actor, preview = false) {
@@ -104,12 +106,29 @@ export function createOrderDatabase(db) {
     },
     async save(order) {
       return transaction(async tx => {
+        let customerId = null;
+        const isTest = order.customerIdentity?.isTest === true;
+        if (order.customerIdentity) {
+          const identity = order.customerIdentity;
+          if (!isTest || identity.phone !== `+91${order.customer.phone}`) throw new Error("Unverified customer identity.");
+          const [account] = await tx.insert(customerAccounts).values({
+            firebaseProject: identity.projectId, firebaseUid: identity.uid,
+            phone: identity.phone, name: order.customer.name, isTest,
+          }).onConflictDoUpdate({
+            target: [customerAccounts.firebaseProject, customerAccounts.firebaseUid, customerAccounts.isTest],
+            set: { phone: identity.phone, name: order.customer.name },
+          }).returning({ id: customerAccounts.id });
+          customerId = account.id;
+        }
+        const sameRequest = existing => existing.fingerprint === order.fingerprint &&
+          existing.customerId === customerId && existing.isTest === isTest;
         if (order.catalogueRevision !== undefined) {
           await tx.execute(catalogueLock);
           const [existing] = await tx.select({
             fingerprint: orderRequests.fingerprint, createdAt: orderRequests.createdAt,
+            customerId: orderRequests.customerId, isTest: orderRequests.isTest,
           }).from(orderRequests).where(eq(orderRequests.orderId, order.orderId));
-          if (existing) return existing.fingerprint === order.fingerprint ?
+          if (existing) return sameRequest(existing) ?
             { ok: true, orderId: order.orderId, createdAt: new Date(existing.createdAt).toISOString() } :
             { ok: false, error: "CONFLICT" };
           const active = await activeCatalogue(tx);
@@ -120,6 +139,7 @@ export function createOrderDatabase(db) {
         const inserted = await tx.insert(orderRequests).values({
           orderId: order.orderId, fingerprint: order.fingerprint, season: order.season ?? Number(vendor.year),
           catalogueRevision: order.catalogueRevision,
+          customerId, isTest,
           createdAt: order.createdAt, status: "New", ...order.customer,
           subtotalPaise: paise(order.amounts.subtotal), discountPercent: order.amounts.discountPercent,
           couponCode: order.amounts.couponCode ?? "",
@@ -129,9 +149,10 @@ export function createOrderDatabase(db) {
         if (!inserted.length) {
           const [existing] = await tx.select({
             fingerprint: orderRequests.fingerprint, createdAt: orderRequests.createdAt,
+            customerId: orderRequests.customerId, isTest: orderRequests.isTest,
           }).from(orderRequests).where(eq(orderRequests.orderId, order.orderId));
           if (!existing) throw new Error("Existing request could not be confirmed.");
-          return existing.fingerprint === order.fingerprint ?
+          return sameRequest(existing) ?
             { ok: true, orderId: order.orderId, createdAt: new Date(existing.createdAt).toISOString() } :
             { ok: false, error: "CONFLICT" };
         }
@@ -141,18 +162,44 @@ export function createOrderDatabase(db) {
           unit: item.unit, quantity: item.quantity, unitPricePaise: paise(item.price), amountPaise: paise(item.amount),
         })));
         await tx.insert(orderStatusHistory).values({
-          orderId: order.orderId, fromStatus: null, toStatus: "New", actor: "customer submission",
+          orderId: order.orderId, fromStatus: null, toStatus: "New",
+          actor: isTest ? "customer test submission" : "customer submission",
           changedAt: order.createdAt,
         });
         return { ok: true, orderId: order.orderId, createdAt: order.createdAt };
       });
     },
+    async customerOrders(identity, { page = 1, orderId = null } = {}) {
+      return transaction(async tx => {
+        const [account] = await tx.select().from(customerAccounts).where(and(
+          eq(customerAccounts.firebaseProject, identity.projectId),
+          eq(customerAccounts.firebaseUid, identity.uid), eq(customerAccounts.isTest, identity.isTest),
+        ));
+        if (!account) return orderId ? { ok: false } :
+          { ok: true, orders: [], total: 0, page, pageSize: 20, isTest: identity.isTest };
+        const owned = and(eq(orderRequests.customerId, account.id), eq(orderRequests.isTest, identity.isTest));
+        if (orderId) {
+          const [row] = await tx.select({ orderId: orderRequests.orderId }).from(orderRequests)
+            .where(and(owned, eq(orderRequests.orderId, orderId)));
+          return row ? detail(tx, row.orderId) : { ok: false };
+        }
+        const [count] = await tx.select({ total: sql`count(*)`.mapWith(Number) }).from(orderRequests).where(owned);
+        const rows = await tx.select().from(orderRequests).where(owned)
+          .orderBy(desc(orderRequests.createdAt), asc(orderRequests.orderId)).limit(20).offset((page - 1) * 20);
+        return { ok: true, orders: rows.map(summary), total: count.total, page, pageSize: 20, isTest: identity.isTest };
+      }, true);
+    },
     async dashboard(input, actor) {
       return transaction(async tx => {
-        if (input.action === "vendor-detail") return detail(tx, input.orderId);
+        if (input.action === "vendor-detail") {
+          const [row] = await tx.select({ isTest: orderRequests.isTest }).from(orderRequests)
+            .where(eq(orderRequests.orderId, input.orderId));
+          return row?.isTest === false ? detail(tx, input.orderId) : { ok: false, error: "NOT_FOUND" };
+        }
         if (input.action === "vendor-status") {
           const updated = await tx.update(orderRequests).set({ status: input.status }).where(and(
             eq(orderRequests.orderId, input.orderId), eq(orderRequests.status, input.expectedStatus),
+            eq(orderRequests.isTest, false),
           )).returning({ orderId: orderRequests.orderId });
           if (!updated.length) {
             const [existing] = await tx.select({ orderId: orderRequests.orderId }).from(orderRequests)
@@ -167,7 +214,7 @@ export function createOrderDatabase(db) {
           return detail(tx, input.orderId);
         }
         if (input.action !== "vendor-list") throw new Error("Unknown database action.");
-        const filters = [];
+        const filters = [eq(orderRequests.isTest, false)];
         if (input.status) filters.push(eq(orderRequests.status, input.status));
         if (input.query) {
           const escaped = `%${input.query.replace(/[\\%_]/g, "\\$&")}%`;

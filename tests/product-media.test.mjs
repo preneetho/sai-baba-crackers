@@ -260,15 +260,16 @@ test("rejected uploads report the provider status and reason without exposing up
   });
 });
 
-test("production CSP permits only the required media providers, local metadata blobs and first-party scripts", async () => {
+test("production CSP permits only required media providers, local metadata blobs and pinned Firebase authentication sources", async () => {
   const config = await readFile(new URL("../netlify.toml", import.meta.url), "utf8");
   const policy = /Content-Security-Policy = "([^"]+)"/.exec(config)?.[1];
   assert.ok(policy);
   const directives = Object.fromEntries(policy.split(";").map(value => value.trim().split(/\s+/)).map(([key, ...sources]) => [key, sources]));
-  assert.deepEqual(directives["script-src"], ["'self'"]);
+  assert.deepEqual(directives["script-src"], ["'self'", "https://www.gstatic.com/firebasejs/13.2.0/"]);
   assert.deepEqual(directives["img-src"], ["'self'", "data:", "https://res.cloudinary.com", "https://i.ytimg.com"]);
   assert.deepEqual(directives["media-src"], ["'self'", "blob:", "https://res.cloudinary.com"]);
-  assert.deepEqual(directives["connect-src"], ["'self'", "https://api.cloudinary.com"]);
-  assert.deepEqual(directives["frame-src"], ["https://www.youtube-nocookie.com"]);
+  assert.deepEqual(directives["connect-src"], ["'self'", "https://api.cloudinary.com",
+    "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"]);
+  assert.deepEqual(directives["frame-src"], ["https://www.youtube-nocookie.com", "https://saibabacracker-b91e3.firebaseapp.com"]);
   assert.deepEqual(directives["frame-ancestors"], ["'none'"]);
 });

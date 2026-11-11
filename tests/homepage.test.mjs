@@ -33,7 +33,8 @@ test("the homepage has crawlable services, honest fulfilment information and wor
     if (href.startsWith("#")) {
       assert.ok(html.includes(`id="${href.slice(1)}"`), `Missing anchor target: ${href}`);
     } else if (href.startsWith("/") && href !== "/") {
-      assert.equal(href, "/order/");
+      assert.ok(["/order/", "/account/"].includes(href), `Unexpected local link: ${href}`);
+      await read(`vendor-app${href}index.html`);
     }
   }
   assert.ok(html.includes(`href="tel:+${vendor.whatsapp}"`));
@@ -61,7 +62,7 @@ test("the homepage waits for video settings, preserves player privacy and keeps 
   assert.match(html, /<noscript>.*Enable JavaScript.*current video/);
   assert.match(await read("vendor-app/home.mjs"), /import "\.\/homepage-video\.mjs"/);
   assert.match(await read("vendor-app/home.css"), /\.home-video-player\s*\{[^}]*aspect-ratio: 9 \/ 16;/);
-  assert.match(await read("netlify.toml"), /frame-src https:\/\/www\.youtube-nocookie\.com;/);
+  assert.match(await read("netlify.toml"), /frame-src https:\/\/www\.youtube-nocookie\.com https:\/\/saibabacracker-b91e3\.firebaseapp\.com;/);
 });
 
 test("both public pages have distinct canonical/social URLs and the homepage has accurate business data", async () => {
@@ -138,7 +139,7 @@ test("old catalogue/cart fragments preserve query strings while home and auth fr
 
 test("Netlify redirects are explicit, preserve private function routes and do not use a catch-all rewrite", async () => {
   const config = await read("netlify.toml");
-  for (const [from, to] of [["/index.html", "/"], ["/order/index.html", "/order/"]]) {
+  for (const [from, to] of [["/index.html", "/"], ["/order/index.html", "/order/"], ["/account/index.html", "/account/"]]) {
     assert.ok(config.includes(`from = "${from}"\n  to = "${to}"\n  status = 301`));
   }
   assert.doesNotMatch(config, /from = "\/order\/?"/, "Netlify Pretty URLs handle trailing slashes; slash-only redirect rules can loop");
@@ -153,7 +154,7 @@ test("local preview serves the public routes, assets, redirects and vendor page"
   const port = listener.address().port;
   await new Promise((resolve, reject) => listener.close(error => error ? reject(error) : resolve()));
   const child = spawn(process.execPath, [fileURLToPath(new URL("../scripts/serve-vendor.mjs", import.meta.url))], {
-    env: { ...process.env, VENDOR_PORT: String(port), ORDER_BACKEND: "sheets",
+    env: { ...process.env, VENDOR_PORT: String(port), ORDER_BACKEND: "sheets", CUSTOMER_AUTH_MODE: "off",
       GOOGLE_SHEETS_WEBHOOK_URL: "", ORDER_TRACKING_SECRET: "" },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -178,6 +179,11 @@ test("local preview serves the public routes, assets, redirects and vendor page"
   for (const [path, contentType, marker] of [
     ["/", "text/html", 'id="home-title"'],
     ["/order/", "text/html", 'id="customer-form"'],
+    ["/account/", "text/html", 'id="history-panel"'],
+    ["/account.mjs", "text/javascript", "loadHistory"],
+    ["/account.css", "text/css", ".account-panel"],
+    ["/customer-client.mjs", "text/javascript", "customerAuthorization"],
+    ["/customer-checkout.mjs", "text/javascript", "Save test request"],
     ["/vendor/", "text/html", 'name="robots"'],
     ["/robots.txt", "text/plain", "Sitemap:"],
     ["/sitemap.xml", "application/xml", "<urlset"],
@@ -198,7 +204,8 @@ test("local preview serves the public routes, assets, redirects and vendor page"
     assert.ok(response.headers.get("content-type").includes(contentType), path);
     assert.ok((await response.text()).includes(marker), path);
   }
-  for (const [path, destination] of [["/index.html", "/"], ["/order", "/order/"], ["/order/index.html", "/order/"]]) {
+  for (const [path, destination] of [["/index.html", "/"], ["/order", "/order/"], ["/order/index.html", "/order/"],
+    ["/account", "/account/"], ["/account/index.html", "/account/"]]) {
     const response = await fetch(`${base}${path}?source=legacy`, { redirect: "manual" });
     assert.equal(response.status, 301);
     assert.equal(response.headers.get("location"), `${destination}?source=legacy`);
@@ -209,6 +216,14 @@ test("local preview serves the public routes, assets, redirects and vendor page"
   assert.ok(Number(head.headers.get("content-length")) > 0);
   const vendorPage = await fetch(`${base}/vendor/`);
   assert.match(vendorPage.headers.get("x-robots-tag"), /noindex/);
+  const accountPage = await fetch(`${base}/account/`);
+  assert.match(accountPage.headers.get("x-robots-tag"), /noindex/);
+  const customerConfig = await fetch(`${base}/api/customer-config`);
+  assert.equal(customerConfig.status, 200);
+  assert.deepEqual(await customerConfig.json(), { mode: "off" });
+  const customerHistory = await fetch(`${base}/api/customer-orders`);
+  assert.equal(customerHistory.status, 503);
+  assert.equal((await customerHistory.json()).error, "Customer login is not enabled.");
   const missing = await fetch(`${base}/unrelated-page`);
   assert.equal(missing.status, 404);
   const unavailable = await fetch(`${base}/api/catalogue`);

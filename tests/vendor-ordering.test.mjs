@@ -44,7 +44,8 @@ test("the WhatsApp action explicitly explains the customer's final Send step", a
   const app = await readFile(new URL("../vendor-app/app.mjs", import.meta.url), "utf8");
   assert.match(html, /id="submit-requirement"[^>]*aria-describedby="checkout-agreement whatsapp-send-help">Save &amp; open WhatsApp<\/button>/);
   assert.match(html, /id="whatsapp-send-help"[^>]*>Tap Send in WhatsApp\. Your request needs shop confirmation\./);
-  assert.match(app, /"Saving order request\.\.\." : "Save & open WhatsApp"/);
+  assert.match(app, /"Saving order request\.\.\."/);
+  assert.match(app, /"Save & open WhatsApp"/);
   assert.match(app, /"Open WhatsApp \\u2197"/);
   assert.doesNotMatch(html + app, /Order confirmed|Pay now/);
 });

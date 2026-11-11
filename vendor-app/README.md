@@ -419,6 +419,68 @@ can load the login page but cannot access the data. Public collection is
 same-origin, validated and rate-limited; counts are observational and can include
 bots or fabricated events, so they must not be used as financial records.
 
+## Customer login and My Orders (fictional-number test rollout)
+
+The public `/account/` page uses Firebase Phone Authentication, separate from the
+vendor's Google login. Browsing and the device cart need no login. Leave
+`CUSTOMER_AUTH_MODE` unset (or `off`) to preserve the existing guest checkout.
+Enabling `test` makes verified customer authentication mandatory for **every**
+order POST, not just for submissions made through the UI.
+
+Configure these environment variables in Netlify for the test deployment:
+
+| Variable | Value |
+| --- | --- |
+| `CUSTOMER_AUTH_MODE` | `test` |
+| `CUSTOMER_FIREBASE_WEB_CONFIG` | A JSON object containing the exact public `apiKey`, `authDomain`, `projectId` and `appId` from Firebase's Web app settings |
+| `CUSTOMER_AUTH_TEST_PHONES` | Comma-separated Indian E.164 numbers explicitly added under Firebase Authentication > Sign-in method > Phone > Phone numbers for testing |
+| `ORDER_BACKEND` | `netlify-db` (retain the existing order/PDF configuration) |
+
+For the configured project, use `saibabacracker-b91e3` and
+`saibabacracker-b91e3.firebaseapp.com`; copy the API key and app ID accurately from
+the console. The public web configuration is not a service-account credential.
+No private service-account key is needed: the Admin SDK verifies ID-token
+signatures with Google's public signing certificates and the explicit project ID.
+It does not request token-revocation checks; an already issued ID token may remain
+valid until its normal expiry (usually one hour). Do not set an Auth emulator host
+on Netlify.
+
+Enable the Phone provider, authorize the exact test-deployment hostname, and add
+the fictional numbers **and their six-digit codes** in Firebase before testing.
+Those codes stay in Firebase; do not put them in the app, environment variables,
+screenshots or source control. The allowlist returned to the browser consists of
+fictional numbers only, not customers' real phone numbers.
+
+The browser disables app verification only in explicit test mode, rejects numbers
+outside the allowlist before requesting verification, and never falls back to
+real SMS. The server independently verifies the Firebase token's project, issuer,
+phone provider and allowed phone; the submitted mobile must match that identity.
+Keep real-SMS billing disabled during testing: the app allowlist is not a
+provider-wide SMS restriction on Firebase's public API. Firebase's public phone
+configuration, region policy and billing/quota controls remain relevant.
+`live` mode is intentionally unsupported in this initial rollout. Do not remove
+the test safeguards to enable production SMS without a separate rollout.
+
+First sign-in creates the Firebase account; the first saved request creates the
+stable internal customer account. History is scoped by Firebase project and UID,
+never by a phone query or a customer ID supplied by the browser. Existing orders
+remain unowned: matching an old unverified phone does not grant access.
+History is paginated, private and uncached; authentication persists for the
+current browser-tab session. Sign out on shared devices.
+
+Test requests have an explicit `is_test` flag and are excluded from vendor
+lists, totals, details and status changes. They cannot create PDF/share links
+or a WhatsApp handoff, and are labelled test requests rather than purchases.
+They retain normal request-ID idempotency, including cross-account conflict
+checks. No live Firebase test-number login has been verified merely by passing
+the synthetic automated checks; verify the configured console number/code on
+the deployed authorized hostname before relying on the integration.
+
+The native browser SDK is pinned to Firebase `13.2.0`; its narrow CSP sources and
+the project's auth iframe are declared in `netlify.toml`. Update the iframe
+domain alongside any project change. Analytics is not initialized. The additive
+customer-account migration is generated alongside the existing database schema.
+
 The schema lives in `db/schema.ts`, with generated migrations in
 `netlify/database/migrations`. Database dependencies and the matching Drizzle migration CLI are installed at the
 repository root so automatic migration generation resolves compatible versions.

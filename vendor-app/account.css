@@ -1,0 +1,24 @@
+.account-main { max-width: 760px; padding: 24px; }
+.account-main h1 { margin-top: 12px; }
+.account-main p { line-height: 1.6; }
+.account-intro, .account-panel > p { margin-bottom: 16px; }
+.account-panel { margin-top: 24px; padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.account-panel h2 { font-size: 22px; margin-bottom: 16px; }
+.account-panel form { display: grid; gap: 16px; }
+.account-panel input:not([type="checkbox"]) { min-height: 44px; min-width: 0; width: 100%; padding: 10px 12px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.account-phone { display: flex; align-items: center; gap: 12px; }
+.account-consent { display: flex; align-items: flex-start; gap: 12px; font-size: 13px; line-height: 1.6; }
+.account-consent input { flex-shrink: 0; margin-top: 4px; width: 20px; height: 20px; }
+.account-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0; }
+.account-main .button { min-height: 44px; justify-content: center; }
+.account-main .button:disabled { opacity: .6; }
+.account-notice { margin: 16px 0; padding: 16px; background: var(--selected-surface); border: 1px solid var(--selected-border); border-radius: var(--radius); line-height: 1.6; }
+.customer-order { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 16px; overflow-wrap: anywhere; }
+.customer-order h3 { font-size: 15px; margin-bottom: 8px; }
+.customer-order summary { cursor: pointer; min-height: 44px; padding: 12px 0; }
+.customer-order pre { white-space: pre-wrap; font: inherit; line-height: 1.6; }
+#history-status { margin-top: 24px; }
+@media (max-width: 480px) {
+  .account-main, .account-panel { padding: 16px; }
+  .account-main .account-actions > .button { flex: 1 1 auto; }
+}

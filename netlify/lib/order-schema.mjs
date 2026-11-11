@@ -1,15 +1,29 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, integer, timestamp, uuid, index, primaryKey, check } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, uuid, boolean, index, uniqueIndex, primaryKey, check } from "drizzle-orm/pg-core";
 import { ORDER_STATUSES } from "../../vendor-app/vendor-model.mjs";
 
 const statuses = sql.raw(ORDER_STATUSES.map(status => `'${status}'`).join(", "));
 const instant = name => timestamp(name, { withTimezone: true, precision: 3, mode: "string" });
+
+export const customerAccounts = pgTable("customer_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firebaseProject: text("firebase_project").notNull(),
+  firebaseUid: text("firebase_uid").notNull(),
+  phone: text("phone").notNull(),
+  name: text("name").notNull(),
+  isTest: boolean("is_test").notNull(),
+  createdAt: instant("created_at").notNull().defaultNow(),
+}, table => [
+  uniqueIndex("customer_accounts_identity_idx").on(table.firebaseProject, table.firebaseUid, table.isTest),
+]);
 
 export const orderRequests = pgTable("order_requests", {
   orderId: text("order_id").primaryKey(),
   fingerprint: text("fingerprint").notNull(),
   season: integer("season").notNull(),
   catalogueRevision: integer("catalogue_revision"),
+  customerId: uuid("customer_id").references(() => customerAccounts.id),
+  isTest: boolean("is_test").notNull().default(false),
   createdAt: instant("created_at").notNull(),
   status: text("status").notNull().default("New"),
   name: text("name").notNull(),
@@ -28,6 +42,7 @@ export const orderRequests = pgTable("order_requests", {
   index("order_requests_time_idx").on(table.createdAt.desc(), table.orderId.asc()),
   index("order_requests_status_time_idx").on(table.status, table.createdAt.desc()),
   index("order_requests_season_idx").on(table.season),
+  index("order_requests_customer_time_idx").on(table.customerId, table.createdAt.desc(), table.orderId),
   check("order_requests_status_check", sql`${table.status} in (${statuses})`),
   check("order_requests_fulfilment_check", sql`${table.fulfilment} in ('delivery', 'pickup')`),
   check("order_requests_season_check", sql`${table.season} between 2000 and 9999`),

@@ -17,6 +17,8 @@ import { handleHomepage } from "../netlify/functions/homepage.mjs";
 import { handleVendorHomepage } from "../netlify/functions/vendor-homepage.mjs";
 import { handleOffers } from "../netlify/functions/offers.mjs";
 import { handleVendorOffers } from "../netlify/functions/vendor-offers.mjs";
+import { handleCustomerConfig } from "../netlify/functions/customer-config.mjs";
+import { handleCustomerOrders } from "../netlify/functions/customer-orders.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -26,6 +28,11 @@ const files = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
   ["/index.html", ["index.html", "text/html; charset=utf-8"]],
   ["/order/", ["order/index.html", "text/html; charset=utf-8"]],
+  ["/account/", ["account/index.html", "text/html; charset=utf-8"]],
+  ["/account.mjs", ["account.mjs", "text/javascript; charset=utf-8"]],
+  ["/customer-client.mjs", ["customer-client.mjs", "text/javascript; charset=utf-8"]],
+  ["/customer-checkout.mjs", ["customer-checkout.mjs", "text/javascript; charset=utf-8"]],
+  ["/account.css", ["account.css", "text/css; charset=utf-8"]],
   ["/home.css", ["home.css", "text/css; charset=utf-8"]],
   ["/home.mjs", ["home.mjs", "text/javascript; charset=utf-8"]],
   ["/homepage-model.mjs", ["homepage-model.mjs", "text/javascript; charset=utf-8"]],
@@ -80,6 +87,7 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (pathname === "/api/orders" || pathname === "/api/order-pdf" ||
+      pathname === "/api/customer-config" || pathname === "/api/customer-orders" ||
       pathname === "/api/vendor-orders" || pathname === "/api/vendor-import" ||
       pathname === "/api/homepage" || pathname === "/api/vendor-homepage" ||
       pathname === "/api/offers" || pathname === "/api/vendor-offers" ||
@@ -93,7 +101,9 @@ const server = createServer(async (request, response) => {
         init.duplex = "half";
       }
       const url = new URL(request.url, `http://127.0.0.1:${port}`);
-      const handler = pathname === "/api/offers" ? handleOffers :
+      const handler = pathname === "/api/customer-config" ? handleCustomerConfig :
+        pathname === "/api/customer-orders" ? handleCustomerOrders :
+        pathname === "/api/offers" ? handleOffers :
         pathname === "/api/vendor-offers" ? handleVendorOffers :
         pathname === "/api/homepage" ? handleHomepage :
         pathname === "/api/vendor-homepage" ? handleVendorHomepage :
@@ -121,13 +131,14 @@ const server = createServer(async (request, response) => {
     return;
   }
   const redirect = pathname === "/index.html" ? "/" :
+    pathname === "/account" || pathname === "/account/index.html" ? "/account/" :
     pathname === "/order" || pathname === "/order/index.html" ? "/order/" : null;
   if (redirect) {
     response.writeHead(301, { Location: `${redirect}${search}` });
     response.end();
     return;
   }
-  if (pathname.startsWith("/vendor/")) response.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
+  if (pathname.startsWith("/vendor/") || pathname.startsWith("/account/")) response.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.writeHead(405, { Allow: "GET, HEAD" });
     response.end("Method not allowed");

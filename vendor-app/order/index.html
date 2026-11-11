@@ -28,6 +28,7 @@
   <script type="module" src="/modern-ui.mjs"></script>
   <script type="module" src="/auth-callback.mjs"></script>
   <script type="module" src="/app.mjs"></script>
+  <script type="module" src="/customer-checkout.mjs"></script>
 </head>
 <body class="modern">
   <svg class="product-artwork-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -172,6 +173,7 @@
       <a href="/">Home</a>
       <a class="nav-active" href="#catalogue" aria-current="page">Catalogue</a>
       <a href="#contact">Contact us</a>
+      <a href="/account/">My Orders</a>
     </nav>
     <a class="header-cart" href="#requirement">Cart <span id="header-count">0</span></a>
   </header>
@@ -298,6 +300,8 @@
     <div class="dialog-heading"><button id="back-to-cart" class="icon-button" type="button" aria-label="Back to cart">&larr;</button><div><p id="checkout-step" class="eyebrow brand-text">STEP 2 OF 3</p><h2 id="checkout-title" tabindex="-1">Your details</h2></div><button id="close-checkout" class="icon-button" type="button" aria-label="Close checkout">&times;</button></div>
     <form id="customer-form">
       <div class="checkout-body">
+      <p id="customer-login-note" hidden><a href="/account/">Sign in to verify your mobile</a>. Your cart stays on this device.</p>
+      <p id="customer-test-note" role="status" hidden></p>
       <div class="form-grid">
         <label>Your name <span aria-hidden="true">*</span><input name="name" autocomplete="name" required minlength="2" maxlength="80" placeholder="Full name"></label>
         <label>Mobile number <span aria-hidden="true">*</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required maxlength="20" placeholder="10-digit number"></label>
