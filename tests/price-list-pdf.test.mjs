@@ -96,3 +96,10 @@ test("real price-list PDFs retain Unicode and paginate the maximum catalogue wit
   assert.ok(pages > 1 && pages < 12, `A complete 200-product price list should paginate compactly: ${pages}`);
   assert.ok(bytes.length < 1024 * 1024);
 });
+
+test("the original 68-product catalogue prints on two Legal-size order-form pages", async () => {
+  const bytes = await generatePriceListPdf({ year: 2026, revision: 1, products }, new Date(now).toISOString());
+  const source = bytes.toString("latin1");
+  assert.equal(source.match(/\/Type \/Page\b/g)?.length, 2);
+  assert.equal(source.match(/\/MediaBox \[0 0 612 1008\]/g)?.length, 2);
+});

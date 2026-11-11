@@ -20,8 +20,9 @@ export function renderOfferWidgets(list, offers, feedback) {
   feedback.textContent = "";
   for (const coupon of offers.coupons.filter(isPublicCoupon)) {
     const card = make("li", "", "offer-card offer-coupon");
-    const label = make("span", "", "offer-card-copy");
-    label.append(heading(`${coupon.percent}% off`, "\u{1F39F}\uFE0F"), make("span", `Use code ${coupon.code}`));
+    const label = make("div", "", "offer-card-copy");
+    label.append(heading(`${coupon.percent}% off`, "\u{1F39F}\uFE0F"), make("span", `Use code ${coupon.code}`),
+      make("p", "More sparkle for less. Apply this code in your cart to unlock your discount."));
     const copy = make("button", "Copy code", "button secondary");
     copy.type = "button";
     copy.setAttribute("aria-label", `Copy coupon ${coupon.code}`);
@@ -109,7 +110,10 @@ export function initializeOfferCarousel(list, toggle, pagination) {
     updatePages();
     const overflowing = list.scrollWidth > list.clientWidth + 1;
     toggle.hidden = motion.matches || !overflowing;
-    toggle.textContent = paused ? "Resume offers" : "Pause offers";
+    const action = paused ? "Resume offers" : "Pause offers";
+    toggle.setAttribute("aria-label", action);
+    toggle.setAttribute("title", action);
+    toggle.setAttribute("data-paused", String(paused));
     if (paused || hovered || focused || !visible || document.hidden || motion.matches || !overflowing) {
       stop();
     } else if (timer === null) {

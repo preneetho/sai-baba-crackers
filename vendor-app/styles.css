@@ -117,8 +117,8 @@ h2 { font-family: Georgia, "Times New Roman", serif; font-size: 27px; font-weigh
 .art-3 { background: #f0f3ff; color: #5b6fb3; }
 .product-artwork-definitions { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 .product-illustration { width: 64px; height: 64px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.product-number { position: absolute; top: 12px; left: 12px; font-size: 8px; letter-spacing: 1.4px; color: var(--muted); }
-.art-category { position: absolute; bottom: 10px; right: 12px; font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.product-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-bottom: 2px; }
+.product-number { flex-shrink: 0; white-space: nowrap; font-size: 10px; font-weight: 650; color: var(--muted); }
 .product-body { padding: 16px 14px 14px; display: flex; flex-direction: column; flex: 1; }
 .product-brand { color: var(--muted); font-size: 8px; font-weight: 700; letter-spacing: 1.3px; margin-bottom: 7px; }
 .product-body h3 { font-size: 13px; line-height: 1.5; font-weight: 600; min-height: 39px; overflow-wrap: anywhere; }
@@ -285,8 +285,6 @@ textarea { resize: vertical; }
   .product-art.media-cover { height: 80px; min-height: 80px; }
   .product-cover { height: 80px; }
   .product-illustration { width: 40px; height: 40px; }
-  .product-number { top: 8px; left: 8px; }
-  .art-category { display: none; }
   .product-body { padding: 12px 10px; }
   .product-body h3 { font-size: 12px; min-height: 36px; }
   .product-bottom { gap: 8px; flex-wrap: wrap; }

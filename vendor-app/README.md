@@ -117,15 +117,21 @@ only when **Show on website** is checked. Both use horizontal coupon cards with
 copy feedback and a separate free-delivery card showing the configured post-discount
 minimum and fee. Cards can be swiped, scrolled or reached by keyboard. Overflowing
 cards show a preview of the next card and clickable page dots below, with the
-active dot following manual or automatic movement. Soft theme-based gradients
-keep the homepage violet/navy and the shopping page blue/cream.
-Cards advance every 4.5 seconds while visible; **Pause offers** stops this until
-resumed. Hover, keyboard focus, a hidden tab or an offscreen strip temporarily pause
+active dot following manual or automatic movement. The homepage retains soft
+violet/navy gradients; the catalogue distinguishes warm gold coupon cards from
+deep blue delivery cards. Coupon cards explain that the code must be applied in
+the cart. Cards advance every 4.5 seconds while visible; a compact pause/play icon
+stops this until resumed, with an accessible label and tooltip naming the action.
+Hover, keyboard focus, a hidden tab or an offscreen strip temporarily pause
 advancement. Reduced-motion preferences disable automatic scrolling entirely.
 
 In **Manage yearly price lists**, **Download price list PDF** downloads the selected
-year's saved version, including product numbers, categories, brands, selling packs
-and full prices. Hidden products are excluded. Save unsaved edits first; if another
+year's saved version in the supplied shop's printable order-form layout: Legal-size
+pages, shop header and logo, blank customer details, and a ruled table with product
+number, description, make, unit, rate, quantity required and amount columns.
+Quantity, amount, total, grand total and signature fields are left blank for
+handwritten orders; headers repeat on continuation pages. Products retain their
+saved order and full prices. Hidden products are excluded. Save unsaved edits first; if another
 vendor changes that version, reload before downloading. Coupons and delivery charges
 are not applied. The authenticated endpoint generates the PDF on demand using the
 same bundled Unicode fonts as order PDFs; it does not create a public share link.
@@ -171,8 +177,9 @@ Product cards use bundled SVG illustrations matched to the cracker type, with
 specific variants for items such as rockets, sparklers, garlands and flower pots.
 These are illustrative, not manufacturer product photos. Public cards use a responsive
 four/three/two/one-column layout with 44 px quantity controls and consistently positioned
-product numbers, including photo/video cards.
-The image area and internal spacing are compact; full names, brands, packs,
+product numbers in the metadata row beside the brand, never over the image.
+Product cards omit category labels; category navigation and filtering remain
+available above the catalogue. The image area and internal spacing are compact; full names, brands, packs,
 prices and assigned effect labels wrap without truncation. **Shop by category**
 uses only bundled default category icons, alongside labels and counts in short
 horizontal tiles. Uploaded photos and video thumbnails stay on product cards

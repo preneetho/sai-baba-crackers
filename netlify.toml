@@ -16,7 +16,7 @@
   included_files = ["netlify/assets/fonts/**"]
 
 [functions.vendor-price-list-pdf]
-  included_files = ["netlify/assets/fonts/**"]
+  included_files = ["netlify/assets/fonts/**", "vendor-app/sai-baba-logo.png"]
 
 [[redirects]]
   from = "/index.html"

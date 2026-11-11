@@ -49,7 +49,7 @@ function carousel({ reduced = false, overflow = true } = {}) {
     children: Array.from({ length: 5 }, () => ({})),
     scrollTo(options) { this.scrollLeft = options.left; scrolls.push(options); this.dispatchEvent(new Event("scroll")); },
   });
-  const toggle = new EventTarget();
+  const toggle = document.createElement("button");
   const pagination = new EventTarget();
   pagination.children = [];
   pagination.replaceChildren = (...children) => { pagination.children = children; };
@@ -115,14 +115,18 @@ test("offer widgets pause for hover, focus, hidden tabs and offscreen content; e
   assert.equal(scene.timers.size, 0);
   scene.visible(true);
   scene.emit(scene.toggle, "click");
-  assert.equal(scene.toggle.textContent, "Resume offers");
+  assert.equal(scene.toggle.getAttribute("aria-label"), "Resume offers");
+  assert.equal(scene.toggle.getAttribute("title"), "Resume offers");
+  assert.equal(scene.toggle.getAttribute("data-paused"), "true");
   scene.emit(scene.list.parentElement, "pointerenter");
   scene.emit(scene.list.parentElement, "pointerleave");
   scene.visible(false);
   scene.visible(true);
   assert.equal(scene.timers.size, 0);
   scene.emit(scene.toggle, "click");
-  assert.equal(scene.toggle.textContent, "Pause offers");
+  assert.equal(scene.toggle.getAttribute("aria-label"), "Pause offers");
+  assert.equal(scene.toggle.getAttribute("title"), "Pause offers");
+  assert.equal(scene.toggle.getAttribute("data-paused"), "false");
   assert.equal(scene.timers.size, 1);
 });
 

@@ -203,6 +203,7 @@ test("homepage copies only advertised codes and reports success after clipboard 
   assert.equal(coupons.length, 3, "Only advertised coupons and the delivery card are rendered");
   assert.equal(coupons[1].className, "offer-card offer-delivery", "Delivery stays beside the first coupon, not after every promotion");
   assert.equal(coupons[2].children[0].children[1].textContent, "Use code SAVE10");
+  assert.match(coupons[0].children[0].children[2].textContent, /Apply this code in your cart to unlock your discount/);
   const button = coupons[0].children[1];
   await button.events.get("click")();
   assert.equal(copied, "DIWALI15");

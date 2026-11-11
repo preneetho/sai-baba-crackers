@@ -198,7 +198,9 @@
     <aside id="shop-offers-ribbon" class="festival-ribbon offer-carousel" aria-label="Coupon and delivery offers" hidden>
       <div class="offer-carousel-heading">
         <span class="offer-tag">CURRENT OFFERS</span>
-        <button id="shop-offers-toggle" class="text-button" type="button" aria-controls="shop-offers" hidden>Pause offers</button>
+        <button id="shop-offers-toggle" class="offer-motion-toggle" type="button" aria-label="Pause offers" title="Pause offers" aria-controls="shop-offers" data-paused="false" hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path class="offer-pause-symbol" d="M7 4h3v16H7zM14 4h3v16h-3z"/><path class="offer-play-symbol" d="m8 4 12 8-12 8z"/></svg>
+        </button>
       </div>
       <ul id="shop-offers" class="offer-track" tabindex="0" aria-label="Coupon and free-delivery offer cards"></ul>
       <div id="shop-offers-dots" class="offer-pagination" role="group" aria-label="Choose an offers page" hidden></div>

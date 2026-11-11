@@ -72,7 +72,11 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
 .modern .offer-carousel { display: block; min-width: 0; padding: 0; border: 0; background: transparent; }
 .offer-carousel-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .offer-carousel-heading .eyebrow { margin: 0; }
-.offer-carousel-heading button { min-height: 44px; padding: 8px 12px; }
+.offer-motion-toggle { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 8px; border: 1px solid var(--control-border); border-radius: 50%; background: var(--surface); color: var(--brand); }
+.offer-motion-toggle:hover { background: var(--soft-strong); }
+.offer-motion-toggle:active { background: var(--soft); }
+.offer-motion-toggle .offer-play-symbol, .offer-motion-toggle[data-paused="true"] .offer-pause-symbol { display: none; }
+.offer-motion-toggle[data-paused="true"] .offer-play-symbol { display: block; }
 .offer-track { display: flex; gap: 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 2px; scrollbar-width: none; min-width: 0; list-style: none; padding: 4px 2px 12px; margin: 8px 0 0; }
 .offer-track::-webkit-scrollbar { display: none; }
 .offer-track .offer-card { display: flex; flex: 1 0 min(84%, 340px); flex-direction: column; align-items: flex-start; gap: 12px; min-width: 0; min-height: 188px; padding: 18px; border: 1px solid var(--line); border-radius: 22px; background: linear-gradient(135deg, var(--selected-surface), var(--surface)); color: var(--ink); scroll-snap-align: start; line-height: 1.45; }
@@ -150,16 +154,14 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
 .modern .product-card { border-radius: 18px; transition: border-color .16s ease, box-shadow .16s ease; }
 .modern .product-card:hover { border-color: #8270AC; box-shadow: 0 8px 24px #00000030; }
 .modern .product-card.in-cart { border-color: var(--selected-border); box-shadow: inset 0 0 0 1px var(--selected-border); }
-.modern .product-art { min-height: 96px; color: var(--brand); background: radial-gradient(ellipse at 50% 80%, #8B5CF61C, transparent), #151D34; }
+.modern .product-art { min-height: 80px; color: var(--brand); background: radial-gradient(ellipse at 50% 80%, #8B5CF61C, transparent), #151D34; }
 .modern .art-2 { color: #FFAD8D; background: radial-gradient(ellipse at 50% 80%, #FF6B351C, transparent), #191C31; }
 .modern .art-3 { color: var(--accent); background: radial-gradient(ellipse at 50% 80%, #FFC85718, transparent), #171E31; }
-.modern .product-art.media-cover, .modern .product-cover { height: 96px; min-height: 96px; }
+.modern .product-art.media-cover, .modern .product-cover { height: 80px; min-height: 80px; }
 .modern .product-cover { background: var(--surface); }
-.modern .product-illustration { width: 64px; height: 64px; }
-.modern .product-number { top: 10px; left: auto; inset-inline-start: 10px; padding: 4px 8px; border-radius: 6px; background: var(--paper); color: #E4DBFF; font-size: 10px; font-weight: 650; letter-spacing: 1px; z-index: 1; }
-.modern .art-category { font-size: 9px; }
-.modern .product-body { padding: 10px; }
-.modern .product-brand { font-size: 10px; line-height: 1.4; margin-bottom: 2px; }
+.modern .product-illustration { width: 56px; height: 56px; }
+.modern .product-body { padding: 8px; }
+.modern .product-brand { font-size: 10px; line-height: 1.4; margin-bottom: 0; }
 .modern .product-body h3 { font-size: 14px; min-height: 0; line-height: 1.35; font-weight: 650; }
 .modern .product-unit { font-size: 12px; line-height: 1.4; margin-block: 4px 6px; }
 .modern .product-type-labels { color: var(--brand); font-size: 11px; line-height: 1.4; margin-bottom: 6px; }
@@ -280,6 +282,12 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
 .modern:not(.home) .primary:hover { background: var(--brand-hover); color: var(--on-brand); }
 .modern:not(.home) .primary:disabled { background: var(--soft-strong); color: var(--muted); border-color: var(--line); }
 .modern:not(.home) .festival-ribbon strong, .modern:not(.home) .catalogue-year, .modern:not(.home) .discount-row { color: var(--brand); }
+.modern:not(.home) .offer-coupon { background: linear-gradient(135deg, var(--selected-art), var(--accent)); border-color: var(--selected-border); }
+.modern:not(.home) .offer-card-copy > span { background: var(--selected-surface); }
+.modern:not(.home) .offer-carousel .offer-coupon p { color: var(--ink); }
+.modern:not(.home) .offer-delivery { background: linear-gradient(135deg, var(--brand), var(--brand-hover)); border-color: var(--brand); color: var(--on-brand); }
+.modern:not(.home) .offer-carousel .offer-delivery strong { color: var(--on-brand); }
+.modern:not(.home) .offer-carousel .offer-delivery p { color: var(--on-brand-muted); }
 .modern:not(.home) .how-it-works b { color: var(--brand); }
 .modern:not(.home) .category-chip.selected { color: var(--on-brand); }
 .modern:not(.home) .product-card:hover { border-color: var(--control-border); }
@@ -289,7 +297,6 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
 .modern:not(.home) .art-3 { background: #f0f3ff; color: #5b6fb3; }
 .modern:not(.home) .product-card.in-cart .product-art { background: var(--selected-art); }
 .modern:not(.home) .product-cover { background: var(--surface); }
-.modern:not(.home) .product-number { background: var(--surface); color: var(--muted); }
 .modern:not(.home) .notice, .modern:not(.home) .noscript { background: #fff1d5; color: #6b4814; border-color: #d9b477; }
 .modern:not(.home) .error { background: #fff0ed; color: #9a3025; border-color: #d49c91; }
 .modern:not(.home) dialog { color-scheme: light; }
@@ -335,8 +342,7 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
   .modern .home-enquiry { padding: 24px; }
   .modern .home-service h3 { font-size: 22px; }
   .modern .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .modern .product-art, .modern .product-art.media-cover, .modern .product-cover { min-height: 80px; height: 80px; }
-  .modern .product-illustration { width: 64px; height: 64px; }
+  .modern .product-art, .modern .product-art.media-cover, .modern .product-cover { min-height: 72px; height: 72px; }
   .modern .product-body { padding: 8px; }
   .modern .product-bottom { align-items: start; gap: 6px; }
   .category-tiles { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 144px; overflow-x: auto; overscroll-behavior-inline: contain; scroll-snap-type: x proximity; scroll-padding-inline: 8px; padding: 8px 8px 12px; margin-inline: -8px; }

@@ -243,7 +243,6 @@ function renderProducts() {
     const hasMedia = Boolean(product.media?.length);
     const art = element(hasMedia ? "button" : "div", `product-art art-${categories.indexOf(product.category) % 4}${hasMedia ? " media-cover" : ""}`);
     const number = element("span", "product-number", `NO. ${String(product.id).padStart(2, "0")}`);
-    number.setAttribute("aria-hidden", "true");
     if (hasMedia) {
       art.type = "button";
       art.dataset.mediaProduct = String(product.id);
@@ -261,18 +260,18 @@ function renderProducts() {
         art.setAttribute("aria-label", `Preview unavailable. ${label}`);
         const failure = element("span", "media-cover-error", "Preview unavailable");
         failure.setAttribute("aria-hidden", "true");
-        art.replaceChildren(productIllustration(product), failure, expand, number);
+        art.replaceChildren(productIllustration(product), failure, expand);
       }, { once: true });
-      art.append(cover, expand, number);
+      art.append(cover, expand);
       art.addEventListener("click", () => openMedia(product, art));
     } else {
       art.setAttribute("aria-hidden", "true");
-      art.append(number,
-        productIllustration(product),
-        element("span", "art-category", product.category));
+      art.append(productIllustration(product));
     }
     const body = element("div", "product-body");
-    body.append(element("p", "product-brand", product.brand), element("h3", "", product.name),
+    const meta = element("div", "product-meta");
+    meta.append(number, element("p", "product-brand", product.brand));
+    body.append(meta, element("h3", "", product.name),
       element("p", "product-unit", product.unit));
     if (product.types?.length) {
       const types = element("p", "product-type-labels",
