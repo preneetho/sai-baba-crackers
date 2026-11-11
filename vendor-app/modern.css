@@ -94,6 +94,7 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
 .modern .how-it-works { padding: 24px 0; }
 .modern .how-it-works b { color: var(--accent); background: var(--soft); }
 .modern .shop-layout { grid-template-columns: minmax(0, 1fr); padding-block: 40px 60px; }
+.cart-sidebar { display: none; }
 .modern .catalogue-year { display: inline-block; font-size: 12px; color: var(--accent); }
 .modern .search-box { min-height: 56px; border-color: var(--control-border); border-radius: 14px; }
 .modern .search-box input { font-size: 16px; padding-block: 15px; }
@@ -280,6 +281,12 @@ html:has(> body.modern.home) { color-scheme: dark; background: #080D1F; }
   .modern nav { gap: 16px; }
   .modern .festival-ribbon { flex-wrap: wrap; }
   .modern .festival-ribbon p { flex: 1; min-width: 200px; }
+}
+@media (min-width: 1024px) {
+  .modern .shop-layout { grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 380px); gap: 24px; }
+  .modern .product-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .modern .cart-sidebar { display: block; position: sticky; top: calc(var(--modern-header-height, 160px) + 16px); height: calc(100dvh - var(--modern-header-height, 160px) - 32px); border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; }
+  .modern .cart-sidebar .close-cart { display: none; }
 }
 @media (max-width: 760px) {
   .modern main, .modern footer { width: calc(100% - 32px); }

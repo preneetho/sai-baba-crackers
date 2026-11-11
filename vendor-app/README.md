@@ -129,9 +129,13 @@ and retains the static artwork. The hero loads no video, GIF, external font or C
 The separate featured-video section loads the third-party YouTube player lazily
 and never starts playback automatically.
 Older animation assets remain available for cached pages only.
-The native cart dialog opens from the header, mobile shortcut or old `#requirement`
-bookmark. It supports Escape, backdrop dismissal and focus restoration. Checkout
-uses a separate compact dialog above the cart, with a mobile bottom-sheet layout.
+At desktop widths (1024px and up), the cart stays visible in a sticky right-hand
+panel beside the catalogue without blocking shopping. Below that breakpoint the
+same cart content moves into the native dialog, opened from the header, mobile
+shortcut or old `#requirement` bookmark. It supports Escape, backdrop dismissal
+and focus restoration. Resizing preserves quantities, coupon state and expanded
+details; returning from checkout on a smaller screen opens the cart dialog.
+Checkout uses a separate compact dialog above the cart, with a mobile bottom-sheet layout.
 Cart review, customer details and saved WhatsApp handoff are separate steps.
 Long cart items and form content scroll independently of the totals and primary
 actions. The cart gives available height to compact item rows, with Clear cart in

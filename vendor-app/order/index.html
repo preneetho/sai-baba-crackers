@@ -230,10 +230,11 @@
         <div id="no-results" class="empty-state" hidden><span aria-hidden="true">&#10023;</span><h3 id="no-results-title">No products found</h3><p id="no-results-message">Try a different product name or category.</p><button id="reset-filters" class="button secondary" type="button">Clear filters</button></div>
       </section>
 
+      <div id="cart-sidebar" class="cart-sidebar"></div>
       <dialog id="cart-drawer" aria-labelledby="requirement-title">
       <aside id="requirement" class="requirement" aria-labelledby="requirement-title">
         <div class="cart-title">
-          <h2 id="requirement-title">Your cart</h2><span id="cart-count" class="count-pill">0</span>
+          <h2 id="requirement-title" tabindex="-1">Your cart</h2><span id="cart-count" class="count-pill">0</span>
           <button id="clear-cart-top" class="text-button" type="button" hidden>Clear cart</button>
           <button class="icon-button close-cart" type="button" data-close-cart aria-label="Close cart" autofocus>&times;</button>
         </div>

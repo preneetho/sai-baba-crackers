@@ -18,7 +18,7 @@ const today = "2026-11-02";
 test("shopping, cart and checkout use familiar ecommerce labels without implying confirmation", async () => {
   const html = await readFile(new URL("../vendor-app/order/index.html", import.meta.url), "utf8");
   assert.match(html, /<a class="header-cart" href="#requirement">Cart /);
-  assert.match(html, /id="requirement-title">Your cart<\/h2>/);
+  assert.match(html, /id="requirement-title"[^>]*>Your cart<\/h2>/);
   assert.match(html, /id="mobile-cart"[^>]*>[\s\S]*?<span>View cart &#8594;<\/span><\/a>/);
   assert.match(html, /<button id="review" class="button primary wide" type="button" disabled>Continue to checkout <span aria-hidden="true">&#8594;<\/span><\/button>/);
   assert.match(html, /id="checkout-title"[^>]*>Your details<\/h2>/);

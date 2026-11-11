@@ -125,35 +125,55 @@ test("canvas failure leaves the static artwork and reports the degradation", t =
   assert.match(console.warn.mock.calls[0].arguments[0], /static hero artwork remains visible/);
 });
 
-async function drawerFixture(hash = "") {
+async function drawerFixture(hash = "", wide = false) {
   class Node extends EventTarget {
     constructor(id) { super(); this.id = id; this.attributes = {}; this.isConnected = true; }
     setAttribute(key, value) { this.attributes[key] = value; }
-    getClientRects() { return [{}]; }
+    removeAttribute(key) { delete this.attributes[key]; }
+    append(child) { child.parentElement = this; }
+    contains(node) {
+      for (; node; node = node.parentElement) if (node === this) return true;
+      return false;
+    }
+    getClientRects() { return this === close && desktop.matches ? [] : [{}]; }
     closest() { return null; }
     focus() { document.activeElement = this; }
+    scrollIntoView() { this.scrolled = true; }
   }
+  const desktop = Object.assign(new EventTarget(), { matches: wide });
   const trigger = new Node("cart-link");
   const close = new Node("close-cart");
+  const cart = new Node("requirement");
+  const sidebar = new Node("cart-sidebar");
+  const title = new Node("requirement-title");
+  const checkout = Object.assign(new Node("checkout"), { open: false });
   const drawer = Object.assign(new Node("cart-drawer"), {
-    open: false, querySelectorAll: () => [close], querySelector: () => close,
-    contains: node => node === close,
+    open: false, querySelectorAll: () => [close],
+    querySelector: selector => selector === "#requirement" ? cart : close,
     showModal() { this.open = true; close.focus(); },
     close() { this.open = false; this.dispatchEvent(new Event("close")); },
     getBoundingClientRect: () => ({ left: 500, right: 980, top: 0, bottom: 900 }),
   });
+  drawer.append(cart);
+  cart.append(close);
+  cart.append(title);
+  const nodes = [drawer, sidebar, title, checkout];
   const document = {
     activeElement: trigger,
-    querySelector: selector => selector === "#cart-drawer" ? drawer : null,
+    querySelector: selector => nodes.find(node => selector === `#${node.id}`) ?? null,
     querySelectorAll: () => [trigger],
   };
   const location = { hash, pathname: "/order/", search: "?source=bookmark" };
   const replacements = [];
   const window = new EventTarget();
+  window.matchMedia = query => {
+    assert.equal(query, "(min-width: 1024px)");
+    return desktop;
+  };
   const context = vm.createContext({ document, window, location, initializeCanvasFireworks() {},
     history: { state: { existing: true }, replaceState: (...args) => replacements.push(args) } });
   vm.runInContext((await read("vendor-app/modern-ui.mjs")).replace(/^import .*;\r?\n/gm, ""), context);
-  return { trigger, close, drawer, document, location, replacements, window };
+  return { trigger, close, drawer, cart, sidebar, title, checkout, desktop, document, location, replacements, window };
 }
 
 test("cart links open a native modal; closing restores focus and expanded state", async () => {
@@ -189,7 +209,7 @@ test("cart actions restore visible drawer focus when an emptied cart removes or 
   scene.document.activeElement = scene.trigger;
   const click = new Event("click");
   Object.defineProperty(click, "target", { value: { closest: () => ({}) } });
-  scene.drawer.dispatchEvent(click);
+  scene.cart.dispatchEvent(click);
   assert.equal(scene.document.activeElement, scene.close);
   assert.equal(scene.drawer.open, true);
 });
@@ -207,6 +227,53 @@ test("backdrop dismissal requires a pointer press and click outside, never an in
   pointer("pointerdown", 100);
   pointer("click", 100);
   assert.equal(scene.drawer.open, false);
+});
+
+test("desktop cart is an inline sidebar; header and bookmarked links focus it without opening a modal", async () => {
+  const scene = await drawerFixture("", true);
+  assert.equal(scene.cart.parentElement, scene.sidebar);
+  assert.equal(scene.drawer.open, false);
+  assert.equal(scene.document.activeElement, scene.trigger);
+  assert.equal(scene.trigger.attributes["aria-controls"], "requirement");
+  assert.equal(scene.trigger.attributes["aria-expanded"], "true");
+  assert.equal(scene.trigger.attributes["aria-haspopup"], undefined);
+  scene.trigger.dispatchEvent(new Event("click", { cancelable: true }));
+  assert.equal(scene.drawer.open, false);
+  assert.equal(scene.cart.scrolled, true);
+  assert.equal(scene.document.activeElement, scene.title);
+  const bookmarked = await drawerFixture("#requirement", true);
+  assert.equal(bookmarked.drawer.open, false);
+  assert.equal(bookmarked.document.activeElement, bookmarked.title);
+});
+
+test("resizing an open mobile cart reuses its content and retains accessible cart focus", async () => {
+  const scene = await drawerFixture("#requirement");
+  scene.desktop.matches = true;
+  scene.desktop.dispatchEvent(new Event("change"));
+  assert.equal(scene.drawer.open, false);
+  assert.equal(scene.cart.parentElement, scene.sidebar);
+  assert.equal(scene.document.activeElement, scene.title);
+  scene.desktop.matches = false;
+  scene.desktop.dispatchEvent(new Event("change"));
+  assert.equal(scene.cart.parentElement, scene.drawer);
+  assert.equal(scene.drawer.open, true);
+  assert.equal(scene.document.activeElement, scene.title);
+  assert.equal(scene.trigger.attributes["aria-haspopup"], "dialog");
+  assert.equal(scene.trigger.attributes["aria-controls"], "cart-drawer");
+});
+
+test("resizing during desktop checkout keeps checkout focus and returns to a mobile cart on close", async () => {
+  const scene = await drawerFixture("", true);
+  scene.checkout.open = true;
+  scene.checkout.focus();
+  scene.desktop.matches = false;
+  scene.desktop.dispatchEvent(new Event("change"));
+  assert.equal(scene.drawer.open, false);
+  assert.equal(scene.document.activeElement, scene.checkout);
+  scene.checkout.open = false;
+  scene.checkout.dispatchEvent(new Event("close"));
+  assert.equal(scene.drawer.open, true);
+  assert.equal(scene.document.activeElement, scene.close);
 });
 
 test("the public theme does not load on vendor pages and presentation modules do not access business state or APIs", async () => {
