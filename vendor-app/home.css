@@ -139,5 +139,7 @@
 }
 .home-current-offers { padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .home-current-offers #home-coupons { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; padding: 0; }
-.home-current-offers #home-coupons li { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; font-weight: 600; overflow-wrap: anywhere; }
+.home-current-offers #home-coupons li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; max-width: 100%; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; font-weight: 600; overflow-wrap: anywhere; }
+.home-current-offers #home-coupons li span { min-width: 0; }
+.home-current-offers #home-coupons button { flex-shrink: 0; min-height: 44px; }
 .home-current-offers p:not(.eyebrow) { margin-block: 12px; max-width: 72ch; color: var(--muted); font-size: 15px; }

@@ -36,6 +36,9 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
   const storage = new Map(stored ? [[order.CART_KEY, JSON.stringify(stored)]] : []);
   const events = new Map();
   const requests = [];
+  let offerResponse = async (path, options) => options?.method === "POST" ?
+    Response.json({ error: "This coupon is invalid or no longer active." }, { status: 400 }) :
+    Response.json({ offers: offers.DEFAULT_OFFERS, version: null });
   let respond = async () => new Response(JSON.stringify({
     year: 2026, revision: 1, products: [{ ...products[0], price }],
   }));
@@ -67,7 +70,7 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
       addEventListener: (type, callback) => events.set(type, callback) },
     fetch: async (path, options) => {
       requests.push({ path, ...options });
-      if (path === "/api/offers") return Response.json({ offers: offers.DEFAULT_OFFERS, version: null });
+      if (path === "/api/offers") return offerResponse(path, options);
       return respond(path, options);
     },
   });
@@ -77,6 +80,7 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
   return {
     get, storage, requests, events, context, run: source => vm.runInContext(source, context),
     respond(callback) { respond = callback; },
+    respondOffers(callback) { offerResponse = callback; },
     async emit(selector, type) { await get(selector).events.get(type)({ preventDefault() {}, target: get(selector), currentTarget: get(selector) }); await tick(); },
   };
 }
@@ -123,6 +127,50 @@ test("cart keeps total and Continue outside the initially collapsed coupon and p
   assert.match(details, /id="cart-pricing"/);
   assert.doesNotMatch(details, /id="cart-total"|id="review"|id="delivery-progress-text"/);
   assert.match(html, /<\/details>\s*<div class="cart-total">/);
+});
+
+test("unlisted coupons are verified on entry, survive offer reloads and stop applying when disabled", async () => {
+  const ui = await harness();
+  const coupon = { code: "FRIENDS20", percent: 20, enabled: true, showOnWebsite: false };
+  let enabled = true;
+  const settings = { offers: { coupons: [], freeDeliveryMinimum: 2500, deliveryFee: 100 }, version: "version-1" };
+  ui.respondOffers(async (path, options) => {
+    if (options?.method !== "POST") return Response.json(settings);
+    assert.deepEqual(JSON.parse(options.body), { code: "FRIENDS20", version: "version-1" });
+    return enabled ? Response.json({ coupon, version: settings.version }) :
+      Response.json({ error: "This coupon is invalid or no longer active." }, { status: 400 });
+  });
+  await ui.emit("#reload-offers", "click");
+  ui.run("updateQuantity(1, 2, false)");
+  ui.get("#coupon-code").value = "friends20";
+  const applying = ui.emit("#coupon-form", "submit");
+  assert.equal(ui.get("#review").disabled, true);
+  assert.equal(ui.get("#apply-coupon").disabled, true);
+  await applying;
+  assert.equal(ui.run("total(cart)"), 112);
+  assert.equal(ui.run("couponCode"), "FRIENDS20");
+  assert.equal(ui.get("#shop-offers-ribbon").hidden, true);
+  assert.doesNotMatch(ui.get("#shop-offers").textContent, /FRIENDS20/);
+  await ui.emit("#reload-offers", "click");
+  assert.equal(ui.run("total(cart)"), 112);
+  assert.equal(ui.get("#shop-offers-ribbon").hidden, true);
+  enabled = false;
+  await ui.emit("#reload-offers", "click");
+  assert.equal(ui.run("couponCode"), "");
+  assert.equal(ui.run("total(cart)"), 140);
+  assert.match(ui.get("#coupon-status").textContent, /no longer active/);
+});
+
+test("changed offers during private coupon lookup block checkout until current rules are reloaded", async () => {
+  const ui = await harness();
+  ui.run("updateQuantity(1, 2, false)");
+  ui.respondOffers(async () => Response.json({ error: "Offers changed. Reload offers.", offersChanged: true }, { status: 409 }));
+  ui.get("#coupon-code").value = "FRIENDS20";
+  await ui.emit("#coupon-form", "submit");
+  assert.equal(ui.get("#review").disabled, true);
+  assert.equal(ui.get("#reload-offers").hidden, false);
+  assert.equal(ui.run("couponCode"), "");
+  assert.match(ui.get("#offer-status").textContent, /changed/);
 });
 
 test("category tiles and type counts combine with search, sorting and clear filters without changing the cart", async () => {

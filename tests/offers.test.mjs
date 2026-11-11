@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_OFFERS, validOffers, normalizeCoupon } from "../vendor-app/offers-model.mjs";
-import { pricing, createRequirement } from "../vendor-app/order.mjs";
+import vm from "node:vm";
+import { readFile } from "node:fs/promises";
+import { DEFAULT_OFFERS, validOffers, validOfferVersion, normalizeCoupon, isPublicCoupon } from "../vendor-app/offers-model.mjs";
+import { pricing, createRequirement, money } from "../vendor-app/order.mjs";
 import { products } from "../vendor-app/catalog.mjs";
 import { readOffers, saveOffers } from "../netlify/lib/offer-settings.mjs";
 import { handleOffers } from "../netlify/functions/offers.mjs";
@@ -96,6 +98,8 @@ test("offer validation rejects duplicates, noninteger discounts, negative/sub-pa
     { ...offers, coupons: [{ code: "VALID", percent: 1.5, enabled: true }] },
     { ...offers, coupons: [{ code: "VALID", percent: 0, enabled: true }] },
     { ...offers, coupons: [{ code: "VALID", percent: 101, enabled: true }] },
+    { ...offers, coupons: [{ code: "VALID", percent: 20, enabled: true, showOnWebsite: "false" }] },
+    { ...offers, coupons: [{ code: "VALID", percent: 20, enabled: true, unexpected: false }] },
     { ...offers, freeDeliveryMinimum: 1.001 }, { ...offers, deliveryFee: -1 }, { ...offers, extra: true }]) {
     assert.equal(validOffers(invalid), false);
   }
@@ -108,7 +112,8 @@ test("offer persistence defaults only when absent and conditional updates reject
   assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
   assert.equal(results.find(result => result.status === "rejected").reason.code, "OFFERS_CONFLICT");
   const current = await readOffers({ store });
-  assert.deepEqual((await (await handleOffers(request("/api/offers"), { store })).json()), current);
+  assert.deepEqual((await (await handleOffers(request("/api/offers"), { store })).json()),
+    { ...current, offers: { ...offers, coupons: [offers.coupons[0]] } });
   await saveOffers(DEFAULT_OFFERS, current.version, { store });
   await assert.rejects(saveOffers(offers, current.version, { store }), /changed/);
   for (const entry of [{ data: null, etag: "v1" }, { data: offers }, { data: offers, etag: null }]) {
@@ -117,6 +122,94 @@ test("offer persistence defaults only when absent and conditional updates reject
     })).status, 503);
   }
   await assert.rejects(saveOffers(offers, null, { store: { async setJSON() { return { modified: true }; } } }), /acknowledged/);
+});
+
+test("private enabled coupons are omitted from public listings but redeemable by code and preserved in vendor settings", async () => {
+  const store = memoryStore();
+  const hidden = { code: "FRIENDS20", percent: 20, enabled: true, showOnWebsite: false };
+  const privateOffers = { ...offers, coupons: [...offers.coupons, hidden] };
+  const saved = await saveOffers(privateOffers, null, { store });
+  const response = await handleOffers(request("/api/offers"), { store });
+  assert.deepEqual((await response.json()).offers.coupons, [offers.coupons[0]]);
+  const vendor = await handleVendorOffers(request("/api/vendor-offers", undefined, {
+    Cookie: `${settings.sessionCookie}=${cookie}`,
+  }), { env, now: () => now.getTime(), store });
+  assert.deepEqual((await vendor.json()).offers, privateOffers);
+  const resolve = (code, version = saved.version) => handleOffers(request("/api/offers", { code, version }), { store });
+  const applied = await resolve("friends20");
+  assert.equal(applied.status, 200);
+  assert.match(applied.headers.get("cache-control"), /no-store/);
+  assert.deepEqual(await applied.json(), { coupon: hidden, version: saved.version });
+  assert.equal(buildOrder({ ...input, couponCode: hidden.code }, now, undefined, privateOffers).amounts.discountPercent, 20);
+  assert.equal((await resolve("FRIENDS20", "stale")).status, 409);
+  const unknown = await resolve("UNKNOWN");
+  const disabled = await resolve("OLD20");
+  assert.equal(unknown.status, 400);
+  assert.deepEqual(await disabled.json(), await unknown.json());
+  await saveOffers({ ...privateOffers, coupons: [{ ...hidden, enabled: false }] }, saved.version, { store });
+  assert.equal((await resolve("FRIENDS20", "version-2")).status, 400);
+});
+
+test("coupon lookup rejects malformed, oversized and unsupported requests without exposing saved codes", async () => {
+  const store = memoryStore();
+  for (const body of [null, [], { code: "FRIENDS20" }, { code: "", version: null },
+    { code: "FRIENDS20", version: null, extra: true }, { code: {}, version: null }]) {
+    assert.equal((await handleOffers(request("/api/offers", body), { store })).status, 400);
+  }
+  assert.equal((await handleOffers(request("/api/offers", { code: "FRIENDS20", version: null },
+    { "Content-Type": "text/plain" }), { store })).status, 415);
+  assert.equal((await handleOffers(request("/api/offers", { code: "x".repeat(1025), version: null }), { store })).status, 413);
+  assert.equal((await handleOffers(new Request(origin + "/api/offers", { method: "DELETE" }), { store })).status, 405);
+});
+
+async function homepageCoupons(clipboard) {
+  class Node {
+    constructor() { this.children = []; this.events = new Map(); }
+    replaceChildren(...children) { this.children = children; }
+    append(...children) { this.children.push(...children); }
+    addEventListener(type, callback) { this.events.set(type, callback); }
+    setAttribute() {}
+  }
+  const nodes = new Map();
+  const get = id => {
+    if (!nodes.has(id)) nodes.set(id, new Node());
+    return nodes.get(id);
+  };
+  const source = await readFile(new URL("../vendor-app/homepage-offers.mjs", import.meta.url), "utf8");
+  vm.runInNewContext(source.replace(/^import .*;\r?\n/gm, ""), {
+    validOffers, validOfferVersion, isPublicCoupon, money, AbortSignal,
+    document: { getElementById: get, createElement: () => new Node(), querySelectorAll: () => [] },
+    navigator: { clipboard },
+    fetch: async () => Response.json({ offers: { ...offers, coupons: [
+      ...offers.coupons, { code: "FRIENDS20", percent: 20, enabled: true, showOnWebsite: false },
+    ] }, version: "version-1" }),
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  return get;
+}
+
+test("homepage copies only advertised codes and reports success after clipboard acknowledgement", async () => {
+  let copied;
+  const get = await homepageCoupons({ async writeText(code) { copied = code; } });
+  const coupons = get("home-coupons").children;
+  assert.equal(coupons.length, 1);
+  const button = coupons[0].children[1];
+  await button.events.get("click")();
+  assert.equal(copied, "DIWALI15");
+  assert.equal(button.textContent, "Copied");
+  assert.match(get("home-coupon-copy-status").textContent, /DIWALI15 copied/);
+  assert.equal(button.disabled, false);
+});
+
+test("homepage copy failure never claims success and explains manual copying", async () => {
+  for (const clipboard of [undefined, { async writeText() { throw new Error("Permission denied"); } }]) {
+    const get = await homepageCoupons(clipboard);
+    const button = get("home-coupons").children[0].children[1];
+    await button.events.get("click")();
+    assert.equal(button.textContent, "Copy code");
+    assert.match(get("home-coupon-copy-status").textContent, /Could not copy.*DIWALI15/);
+    assert.equal(button.disabled, false);
+  }
 });
 
 test("vendor offer edits require approved authentication, origin, CSRF, valid JSON and expected version", async () => {

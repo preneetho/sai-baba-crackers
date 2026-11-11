@@ -739,7 +739,7 @@ function clearOffers() {
   setOfferBusy(false);
 }
 
-function addCouponRow(coupon = { code: "", percent: 15, enabled: true }) {
+function addCouponRow(coupon = { code: "", percent: 15, enabled: true, showOnWebsite: true }) {
   const row = element("div", undefined, "vendor-coupon-row");
   const codeLabel = element("label", "Code");
   const code = element("input");
@@ -769,6 +769,13 @@ function addCouponRow(coupon = { code: "", percent: 15, enabled: true }) {
   enabled.type = "checkbox";
   enabled.checked = coupon.enabled;
   enabledLabel.prepend(enabled);
+  const visibilityLabel = element("label", "Show on website");
+  visibilityLabel.className = "vendor-coupon-enabled";
+  const visibility = element("input");
+  visibility.dataset.field = "showOnWebsite";
+  visibility.type = "checkbox";
+  visibility.checked = coupon.showOnWebsite !== false;
+  visibilityLabel.prepend(visibility);
   const remove = element("button", "Remove coupon");
   remove.type = "button";
   remove.addEventListener("click", () => {
@@ -777,7 +784,7 @@ function addCouponRow(coupon = { code: "", percent: 15, enabled: true }) {
     setOfferBusy(false);
     $("add-coupon").focus();
   });
-  row.append(codeLabel, percentLabel, enabledLabel, remove);
+  row.append(codeLabel, percentLabel, enabledLabel, visibilityLabel, remove);
   $("vendor-coupons").append(row);
   return code;
 }
@@ -846,6 +853,7 @@ $("offers-form").addEventListener("submit", async event => {
         code: normalizeCoupon(row.querySelector('[data-field="code"]').value),
         percent: Number(row.querySelector('[data-field="percent"]').value),
         enabled: row.querySelector('[data-field="enabled"]').checked,
+        showOnWebsite: row.querySelector('[data-field="showOnWebsite"]').checked,
       })),
       freeDeliveryMinimum: $("free-delivery-minimum").valueAsNumber,
       deliveryFee: $("delivery-fee").valueAsNumber,

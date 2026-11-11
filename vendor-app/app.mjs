@@ -3,7 +3,7 @@ import { vendor } from "./catalog.mjs";
 import { validCatalogue, PRODUCT_TYPES } from "./catalogue-model.mjs";
 import { mediaUrl, isYouTubeMedia } from "./media-model.mjs";
 import { CART_KEY, MAX_QUANTITY, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, money, localDate, validateCustomer, prepareOrderMessage, validateOrderShareLink } from "./order.mjs";
-import { DEFAULT_OFFERS, validOffers, validOfferVersion, normalizeCoupon, couponOffer } from "./offers-model.mjs";
+import { DEFAULT_OFFERS, validOffers, validOfferVersion, normalizeCoupon, isPublicCoupon } from "./offers-model.mjs";
 
 const $ = selector => document.querySelector(selector);
 let products = [];
@@ -470,6 +470,7 @@ function renderCart() {
   $("#coupon-code").disabled = !offers || saving || offersLoading;
   $("#apply-coupon").disabled = !offers || saving || offersLoading;
   $("#remove-coupon").hidden = !couponCode;
+  $("#remove-coupon").disabled = saving || offersLoading;
   if (!lines.length) {
     const empty = element("div", "cart-empty");
     empty.append(element("span", "", "\u2727"), element("h3", "", "Your cart is empty"),
@@ -843,6 +844,25 @@ async function loadCatalogue() {
   }
 }
 $("#reload-catalogue").addEventListener("click", loadCatalogue);
+async function findCoupon(code) {
+  const known = offers.coupons.find(coupon => coupon.enabled && coupon.code === code);
+  if (known) return known;
+  const response = await fetch("/api/offers", { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, version: offerVersion }),
+    cache: "no-store", signal: AbortSignal.timeout(25000) });
+  const result = await response.json();
+  if (!response.ok) {
+    const error = new Error(result.error || "This coupon could not be verified. Try again.");
+    error.status = response.status;
+    throw error;
+  }
+  if (result.version !== offerVersion || result.coupon?.code !== code || !result.coupon.enabled ||
+    !validOffers({ ...offers, coupons: [...offers.coupons, result.coupon] })) {
+    throw new Error("The coupon could not be verified. Reload offers before trying again.");
+  }
+  offers.coupons.push(result.coupon);
+  return result.coupon;
+}
 async function loadOffers() {
   if (saving || offersLoading || $("#checkout").open) return;
   offersLoading = true;
@@ -856,17 +876,18 @@ async function loadOffers() {
     if (!validOffers(result.offers) || !validOfferVersion(result.version)) throw new Error("Offers could not be verified. Reload before checking out.");
     offers = result.offers;
     offerVersion = result.version;
-    try { couponOffer(offers, couponCode); }
+    try { if (couponCode) await findCoupon(couponCode); }
     catch (error) {
+      if (error.status !== 400) throw error;
       couponCode = "";
       $("#coupon-code").value = "";
       $("#coupon-status").textContent = `${error.message} No discount is currently applied.`;
     }
     $("#offer-status").textContent = "";
     $("#reload-offers").hidden = true;
-    $("#shop-offers").textContent = offers.coupons.filter(coupon => coupon.enabled)
+    $("#shop-offers").textContent = offers.coupons.filter(isPublicCoupon)
       .map(coupon => `${coupon.percent}% off with ${coupon.code}`).join(" \u00b7 ");
-    $("#shop-offers-ribbon").hidden = !offers.coupons.some(coupon => coupon.enabled);
+    $("#shop-offers-ribbon").hidden = !offers.coupons.some(isPublicCoupon);
   } catch (error) {
     offers = null;
     $("#offer-status").textContent = error.message;
@@ -877,21 +898,33 @@ async function loadOffers() {
     renderCart();
   }
 }
-$("#coupon-form").addEventListener("submit", event => {
+$("#coupon-form").addEventListener("submit", async event => {
   event.preventDefault();
   if (!offers || saving || offersLoading) return;
+  offersLoading = true;
+  $("#coupon-status").textContent = "Checking coupon...";
+  renderCart();
   try {
     const code = normalizeCoupon($("#coupon-code").value);
     if (!code) throw new Error("Enter a coupon code.");
-    const coupon = couponOffer(offers, code);
+    const coupon = await findCoupon(code);
     couponCode = coupon.code;
     $("#coupon-code").value = couponCode;
     $("#coupon-status").textContent = `${coupon.percent}% discount applied with ${couponCode}.`;
+  } catch (error) {
+    $("#coupon-status").textContent = error.message;
+    if (error.status === 409) {
+      offers = null;
+      $("#offer-status").textContent = error.message;
+      $("#reload-offers").hidden = false;
+    }
+  } finally {
+    offersLoading = false;
     renderCart();
-  } catch (error) { $("#coupon-status").textContent = error.message; }
+  }
 });
 $("#remove-coupon").addEventListener("click", () => {
-  if (saving) return;
+  if (saving || offersLoading) return;
   couponCode = "";
   $("#coupon-code").value = "";
   $("#coupon-status").textContent = "Coupon removed. No discount applied.";

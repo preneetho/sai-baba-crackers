@@ -112,7 +112,8 @@ layout and cart drawer. The private vendor dashboard and request pages retain
 their existing shared styles. There is no framework migration
 or new runtime dependency. Both public pages retain their canonical URLs and SEO data.
 The sticky header adapts to narrow screens and its measured height keeps anchor
-targets visible. The catalogue offer ribbon and homepage show enabled vendor coupon codes.
+targets visible. The catalogue offer ribbon and homepage show enabled vendor coupon codes
+only when **Show on website** is checked; homepage codes can be copied with feedback.
 The vendor-provided `sai-baba-logo.png` is used in the header and as the favicon.
 The hero highlights 35 years in the crackers trade, the Sanathnagar wholesale-market
 experience, coupon savings and delivery/pickup options. Delivery area and timing
@@ -272,7 +273,11 @@ the server function, shared secret or spreadsheet credentials in public files.
   for both options. No delivery radius, minimum order or delivery date guarantee
   is assumed; the vendor confirms arrangements directly.
 - Vendors manage codes, enablement, percentages, minimum and fee under
-  **Coupons & delivery**. Public offers require JavaScript and Netlify Blobs;
+  **Coupons & delivery**. Hide a still-enabled code by unchecking **Show on website**.
+  Hidden codes are not listed in public API responses; the cart verifies an entered
+  unlisted code server-side. Anyone who knows a hidden code can use or forward it;
+  this is not customer-specific access control. Existing codes default to visible.
+  Public offers require JavaScript and Netlify Blobs;
   loading failure blocks checkout instead of silently showing unverified terms.
   Changed rules require cart reload/review. See
   [configuration and deployment](../README.md#coupons-and-delivery-rules),

@@ -62,8 +62,13 @@ See [appearance and preview guidance](vendor-app/README.md#appearance).
 ## Coupons and delivery rules
 
 Approved vendors open **Coupons & delivery** in `/vendor/` to publish up to 20
-unique codes, a whole percentage discount (1-100%) for each, and an enabled flag.
-Enabled codes appear on the homepage and catalogue; customers must apply one in
+unique codes, a whole percentage discount (1-100%) for each, and separate
+**Enabled** and **Show on website** flags. Uncheck **Show on website** for a
+friends-only code while leaving **Enabled** checked. Hidden codes are omitted
+from public offer listings, the homepage and catalogue but work when entered in the
+cart; anyone with the code can use it or share it. Existing codes remain visible
+until explicitly hidden. Advertised codes have a homepage **Copy code** button
+with success/error feedback. Customers must apply one code in
 their cart. There is no automatic discount and no stacking. Disabling or removing
 a code affects new requests, not saved amounts or historical discounts.
 
@@ -79,7 +84,10 @@ Settings persist separately from price lists in Netlify Blobs `site-settings`,
 key `checkout-offers`. The absent-record default is no coupons, minimum 0 and
 fee 0; this intentionally replaces the previous automatic 15%. Storage failures
 never silently use these defaults: checkout is blocked with an offer-reload action.
-`GET /api/offers` is public. `GET/POST /api/vendor-offers` uses existing approved
+`GET /api/offers` lists only enabled, advertised coupons. `POST /api/offers`
+verifies one entered code against the supplied current offer version, returning
+only that matching enabled coupon (including an unlisted code), never all private
+codes. Both are rate-limited and uncached. `GET/POST /api/vendor-offers` uses existing approved
 sessions, same-origin CSRF checks and conditional writes. Stale/uncertain vendor
 saves preserve edits but require reloading before another update.
 
