@@ -125,28 +125,37 @@ test("category tiles and type counts combine with search, sorting and clear filt
   assert.equal(ui.run("total(cart)"), 170);
 });
 
-test("category tiles use uploaded images rather than video thumbnails and keep usable illustrated error fallbacks", async () => {
+test("category tiles always use default category icons while photos and video thumbnails stay on product cards", async () => {
   const ui = await harness();
   const video = { provider: "youtube", resourceType: "video", videoId: "M7lc1UVf-VE", alt: "Synthetic video", credit: "" };
   const photo = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
     resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
     duration: 0, alt: "Synthetic photo", credit: "" };
   ui.respond(async () => Response.json({ year: 2026, revision: 1, products: [
-    { ...products[0], media: [video, photo] },
+    { ...products[0], media: [photo, video] },
     { ...products[1], category: "Rockets", media: [video] },
+    { ...products[2], category: "Crackers", name: "Synthetic Atom Bomb", media: [photo] },
   ] }));
   await ui.emit("#reload-catalogue", "click");
   const tile = ui.get("#categories").children.find(node => node.dataset.category === products[0].category);
   const art = tile.children[0];
-  assert.equal(art.children[0].tagName, "IMG");
-  assert.equal(art.children[0].src, mediaUrl(photo));
-  assert.equal(art.getAttribute("aria-hidden"), "true");
-  art.children[0].events.get("error")();
   assert.equal(art.children[0].tagName, "SVG");
-  assert.equal(art.children[1].textContent, "Photo unavailable");
+  assert.equal(art.children[0].children[0].getAttribute("href"), "#product-art-chakkar");
+  assert.equal(art.getAttribute("aria-hidden"), "true");
+  assert.equal(art.children.length, 1);
+  const descendants = node => [node, ...node.children.flatMap(descendants)];
+  assert.equal(descendants(ui.get("#categories")).some(node => node.tagName === "IMG"), false);
+  const categoryIcon = name => ui.get("#categories").children.find(node => node.dataset.category === name)
+    .children[0].children[0].children[0].getAttribute("href");
+  assert.equal(categoryIcon("All products"), "#product-art-fountain");
+  assert.equal(categoryIcon("Crackers"), "#product-art-crackers");
+  assert.equal(ui.get("#products").children[0].children[0].children[0].src, mediaUrl(photo));
+  assert.equal(ui.get("#products").children[1].children[0].children[0].src, mediaUrl(video));
   assert.equal(ui.get("#categories").children.find(node => node.dataset.category === "Rockets").children[0].children[0].tagName, "SVG");
   await tile.events.get("click")();
   assert.equal(ui.get("#products").children.length, 1);
+  assert.equal(ui.get("#products").children[0].children[0].children[0].src, mediaUrl(photo));
+  assert.equal(categoryIcon(products[0].category), "#product-art-chakkar");
 });
 
 test("untagged catalogues remain browsable and loading failures or empty catalogues hide stale discovery controls", async () => {

@@ -224,11 +224,11 @@ The explicitly selected Sheets backend continues using the original static
 
 ## Category navigation and effect filters
 
-The shopping page has compact **Shop by category** tiles. Each uses an uploaded
-product image from that visible category, or the existing bundled illustration
-when no image is available. Videos and YouTube thumbnails are not category
-photos. Selecting a tile filters the catalogue and moves focus to the results;
-the mobile category rail scrolls horizontally.
+The shopping page has compact **Shop by category** tiles with bundled default
+category icons beside their labels and counts. Uploaded photos and video
+thumbnails appear only on product cards and in their galleries, never in the
+category navigation. Selecting a tile filters the catalogue and moves focus to
+the results; the mobile category rail scrolls horizontally.
 
 **Shop by type** offers Sound, Sky, Colour & Light and Ground. In the vendor
 dashboard, expand a yearly price-list product, select all applicable effects
@@ -244,7 +244,9 @@ category and search before applying the selected type. Zero-count inactive
 types are disabled. Reset filters returns to all products without clearing the
 cart or changing sorting. Compact cards keep the full product name, brand,
 selling pack, price, assigned effects, product number and 44 px quantity buttons.
-Long content wraps rather than being truncated. Shopping keeps its classic
+Shorter image areas and tighter spacing reduce card height without shrinking
+quantity controls or hiding details. Long content wraps rather than being
+truncated. Shopping keeps its classic
 blue-and-white colours; the vibrant homepage is unchanged.
 
 ## Product photos and videos (Cloudinary)

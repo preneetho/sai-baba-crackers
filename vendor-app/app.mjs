@@ -173,21 +173,7 @@ function renderCategories() {
     button.setAttribute("aria-pressed", String(name === category));
     const art = element("span", "category-tile-art");
     art.setAttribute("aria-hidden", "true");
-    const representative = members.find(product => product.media?.some(asset => asset.resourceType === "image")) ?? members[0];
-    const photo = representative?.media?.find(asset => asset.resourceType === "image");
-    if (photo) {
-      const image = element("img");
-      image.src = mediaUrl(photo);
-      image.alt = "";
-      image.loading = "lazy";
-      image.decoding = "async";
-      image.addEventListener("error", () => {
-        art.replaceChildren(productIllustration(representative), element("small", "category-photo-error", "Photo unavailable"));
-      }, { once: true });
-      art.append(image);
-    } else {
-      art.append(productIllustration(representative));
-    }
+    art.append(productIllustration({ category: name, name: "" }));
     button.append(art, element("span", "category-tile-name", name),
       element("small", "category-tile-count", `${members.length} product${members.length === 1 ? "" : "s"}`));
     button.addEventListener("click", () => {

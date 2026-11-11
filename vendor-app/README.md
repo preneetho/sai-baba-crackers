@@ -140,7 +140,9 @@ four/three/two/one-column layout with 44 px quantity controls and consistently p
 product numbers, including photo/video cards.
 The image area and internal spacing are compact; full names, brands, packs,
 prices and assigned effect labels wrap without truncation. **Shop by category**
-uses visible products' uploaded photos, with bundled illustrations when unavailable.
+uses only bundled default category icons, alongside labels and counts in short
+horizontal tiles. Uploaded photos and video thumbnails stay on product cards
+and in galleries, never in category navigation.
 **Shop by type** combines vendor-assigned Sound, Sky, Colour & Light or Ground
 with category/search filters. Expand a product in **Manage yearly price lists**,
 choose all applicable types, and **Save price list** to publish. Untagged products
