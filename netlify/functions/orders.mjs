@@ -6,7 +6,6 @@ import { saveOrderPdf } from "../lib/order-pdfs.mjs";
 import { saveOrderShare } from "../lib/order-shares.mjs";
 import { orderBackend } from "../lib/order-backend.mjs";
 import { validYear } from "../../vendor-app/catalogue-model.mjs";
-import { customerSettings, verifyCustomer } from "../lib/customer-auth.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_BODY_BYTES = 16384;
@@ -116,7 +115,6 @@ export async function handleOrderRequest(request, {
   env = process.env, fetchImpl = fetch, now = () => new Date(), savePdf = saveOrderPdf,
   saveShare = saveOrderShare,
   readOfferSettings = readOffers,
-  authenticate = verifyCustomer,
   databaseFactory = async () => (await import("../lib/order-database.mjs")).getOrderDatabase(),
 } = {}) {
   if (request.method !== "GET" && request.method !== "POST") {
@@ -158,16 +156,6 @@ export async function handleOrderRequest(request, {
   } catch {
     return json({ error: "The order request could not be read. Please retry." }, 400);
   }
-  let identity;
-  try {
-    const settings = customerSettings(env);
-    if (settings.mode !== "off") {
-      if (backend.name !== "netlify-db") return json({ error: "Customer login requires the Netlify order database." }, 503);
-      identity = await authenticate(request, settings);
-    }
-  } catch (error) {
-    return json({ error: error.message }, error.status ?? 503);
-  }
   let order;
   let database;
   let catalogue;
@@ -196,12 +184,6 @@ export async function handleOrderRequest(request, {
   }
   try {
     order = buildOrder(input, now(), catalogue, offerSettings.offers);
-    if (identity) {
-      if (identity.phone !== `+91${order.customer.phone}`) {
-        return json({ error: "The order mobile must match your verified login number. Sign in with that number or correct your details." }, 403);
-      }
-      order.customerIdentity = identity;
-    }
   } catch (error) {
     return json({ error: error.message }, 400);
   }
@@ -255,9 +237,6 @@ export async function handleOrderRequest(request, {
     return json({ error: "We could not confirm the recorded order request time. Keep checkout open and retry, or contact the shop." }, 503);
   }
   const message = order.message.replace("\n", `\nOrder date & time: ${orderTime(savedAt)}\n`);
-  if (identity?.isTest === true) {
-    return json({ orderId: order.orderId, message, summary: message, isTest: true });
-  }
   let share;
   if (input.shareConsent === true) {
     try {

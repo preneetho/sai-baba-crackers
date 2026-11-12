@@ -46,7 +46,6 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
     year: 2026, revision: 1, products: [{ ...products[0], price }],
   }));
   const context = vm.createContext({
-    customerAuthorization: async () => ({ headers: {}, isTest: false }),
     ...offers,
     renderOfferWidgets, initializeOfferCarousel: () => () => {},
     ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "money", "localDate", "validateCustomer",
@@ -588,41 +587,6 @@ function submittedResult(overrides = {}) {
     ...overrides,
   };
 }
-
-test("checkout requires customer verification without losing the cart or submitting an order", async () => {
-  const ui = await harness();
-  ui.run("updateQuantity(1, 2, false)");
-  ui.context.customerAuthorization = async () => {
-    throw Object.assign(new Error("Sign in to verify your mobile."), { code: "CUSTOMER_SIGN_IN_REQUIRED" });
-  };
-  await ui.emit("#customer-form", "submit");
-  assert.equal(ui.get("#customer-login-note").hidden, false);
-  assert.match(ui.get("#form-error").textContent, /Sign in/);
-  assert.equal(ui.run("cart[1]"), 2);
-  assert.equal(ui.requests.filter(request => request.path === "/api/orders").length, 0);
-});
-
-test("test checkout sends the identity token and shows history without WhatsApp, telemetry or bearer links", async () => {
-  const ui = await harness();
-  ui.run("updateQuantity(1, 2, false)");
-  ui.context.customerAuthorization = async () => ({ headers: { Authorization: "Bearer synthetic-token" }, isTest: true });
-  ui.respond(async () => Response.json({
-    orderId: "SBC-00000000-0000-4000-8000-000000000001",
-    message: "Order ID: SBC-00000000-0000-4000-8000-000000000001\nSynthetic test request",
-    summary: "Order ID: SBC-00000000-0000-4000-8000-000000000001\nSynthetic test request",
-    isTest: true,
-  }));
-  let savedEvents = 0;
-  ui.context.track = () => savedEvents++;
-  await ui.emit("#customer-form", "submit");
-  assert.equal(ui.requests.find(request => request.path === "/api/orders").headers.Authorization, "Bearer synthetic-token");
-  assert.equal(ui.get("#message-title").textContent, "Test request saved");
-  assert.equal(ui.get("#message-links").children[0].href, "/account/");
-  assert.equal(ui.get("#message-links").children[0].clicks, undefined);
-  assert.equal(ui.get("#order-details").hidden, true);
-  assert.equal(ui.get("#whatsapp-recovery").hidden, true);
-  assert.equal(savedEvents, 0);
-});
 
 test("checkout submits catalogue metadata and link consent, and even a short order sends only name, amount and details link", async () => {
   const ui = await harness();

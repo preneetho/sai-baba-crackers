@@ -1,6 +1,5 @@
 import { track } from "./telemetry-client.mjs";
 import { vendor } from "./catalog.mjs";
-import { customerAuthorization } from "./customer-client.mjs";
 import { validCatalogue, PRODUCT_TYPES } from "./catalogue-model.mjs";
 import { mediaUrl, isYouTubeMedia } from "./media-model.mjs";
 import { CART_KEY, MAX_QUANTITY, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, money, localDate, validateCustomer, prepareOrderMessage, validateOrderShareLink } from "./order.mjs";
@@ -542,9 +541,8 @@ function setSaving(value) {
   $("#close-checkout").disabled = value;
   $("#back-to-cart").disabled = value;
   $("#customer-form").setAttribute("aria-busy", String(value));
-  const isTest = $("#submit-requirement").dataset.customerMode === "test";
   $("#submit-requirement").textContent = value ?
-    (isTest ? "Saving test request..." : "Saving order request...") : (isTest ? "Save test request" : "Save & open WhatsApp");
+    "Saving order request..." : "Save & open WhatsApp";
   $("#save-status").hidden = !value;
 }
 
@@ -641,12 +639,11 @@ $("#customer-form").addEventListener("submit", async event => {
       submission = { requestId: crypto.randomUUID(), fingerprint };
     }
     setSaving(true);
-    const authorization = await customerAuthorization(customer.phone);
     let response;
     try {
       response = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authorization.headers },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId: submission.requestId, cart: selection, customer,
           catalogue: { year: catalogue.year, revision: catalogue.revision }, couponCode, offerVersion, consent: true, shareConsent: true }),
         signal: AbortSignal.timeout(25000),
@@ -662,7 +659,6 @@ $("#customer-form").addEventListener("submit", async event => {
       throw new Error("The order tracker returned an unreadable response. Keep checkout open and retry, or contact the shop.");
     }
     if (!response.ok) {
-      if (response.status === 401 || response.status === 403) $("#customer-login-note").hidden = false;
       if (result?.offersChanged === true) {
         offers = null;
         $("#shop-offers-ribbon").hidden = true;
@@ -679,29 +675,6 @@ $("#customer-form").addEventListener("submit", async event => {
         typeof result.summary !== "string" ||
         !result.summary.startsWith(`Order ID: ${orderId}\n`) || result.summary.length > 65536) {
       throw new Error("The order tracker did not confirm the expected request ID. Keep checkout open and retry.");
-    }
-    if (authorization.isTest) {
-      if (result.isTest !== true) throw new Error("The tracker did not confirm a test request. Keep checkout open and contact the shop.");
-      $("#order-details").hidden = true;
-      $("#whatsapp-recovery").hidden = true;
-      $("#complete-request").hidden = true;
-      $("#copy-message").hidden = true;
-      $("#download-message").hidden = true;
-      $("#order-reference").textContent = `Test request ID: ${orderId}`;
-      $("#recipient").textContent = "Test mode - not sent to the shop";
-      $("#message-title").textContent = "Test request saved";
-      $("#handoff-instructions").textContent = "No SMS, WhatsApp message or real order was sent. This test request is available in My Orders.";
-      const history = element("a", "button primary wide", "View My Orders");
-      history.href = "/account/";
-      $("#message-links").replaceChildren(history);
-      $("#customer-form").hidden = true;
-      $("#message-preview").hidden = false;
-      $("#checkout-title").textContent = "Test request saved";
-      $("#checkout-step").textContent = "TEST MODE";
-      $("#back-to-cart").hidden = true;
-      $("#message-title").tabIndex = -1;
-      $("#message-title").focus();
-      return;
     }
     track("saved");
     fullMessage = result.message;
@@ -750,9 +723,6 @@ $("#customer-form").addEventListener("submit", async event => {
       $("#handoff-instructions").textContent += " WhatsApp could not open automatically. Use Open WhatsApp or the recovery option below.";
     }
   } catch (error) {
-    if (["CUSTOMER_SIGN_IN_REQUIRED", "CUSTOMER_PHONE_MISMATCH"].includes(error.code)) {
-      $("#customer-login-note").hidden = false;
-    }
     $("#form-error").textContent = error.message;
     $("#form-error").hidden = false;
     $("#form-error").focus();

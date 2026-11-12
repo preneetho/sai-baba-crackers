@@ -82,93 +82,9 @@ before(async () => {
   }
 });
 beforeEach(async () => {
-  await engine.exec("truncate order_items, order_status_history, order_requests, customer_accounts");
+  await engine.exec("truncate order_items, order_status_history, order_requests");
 });
 after(async () => { await engine.close(); });
-
-const identity = (uid = "synthetic-customer", projectId = "synthetic-project") =>
-  ({ uid, projectId, phone: "+919876543210", isTest: true });
-const owned = (number, owner = identity()) => ({ ...build(number), customerIdentity: owner });
-
-test("accounts retain a stable ID and test history is scoped by UID and project, never by matching phone", async () => {
-  const first = owned(1);
-  await database.save(first);
-  await database.save(owned(2));
-  await database.save(owned(3, identity("different-uid")));
-  await database.save(owned(4, identity("synthetic-customer", "different-project")));
-  await database.save(build(5));
-  assert.equal(await count("customer_accounts"), 3);
-  const history = await database.customerOrders(identity());
-  assert.deepEqual(history.orders.map(row => row.orderId), [first.orderId, build(2).orderId]);
-  assert.equal(history.total, 2);
-  assert.equal(history.isTest, true);
-  assert.ok(history.orders.every(row => row.isTest === true));
-  assert.equal((await database.customerOrders(identity("unused"))).total, 0);
-  const ownDetail = await database.customerOrders(identity(), { orderId: first.orderId });
-  assert.equal(ownDetail.order.name, first.customer.name);
-  assert.match(ownDetail.order.items, /Synthetic|Pack:/);
-  for (const number of [3, 4, 5]) {
-    assert.equal((await database.customerOrders(identity(), { orderId: build(number).orderId })).ok, false);
-  }
-  const register = await database.dashboard({ action: "vendor-list", page: 1 });
-  assert.deepEqual(register.orders.map(row => row.orderId), [build(5).orderId]);
-  assert.equal(register.stats.New, 1);
-  assert.equal(register.stats.requestValue, build(5).amounts.total);
-  assert.equal((await database.dashboard({ action: "vendor-detail", orderId: first.orderId })).ok, false);
-  assert.equal((await database.dashboard({ action: "vendor-status", orderId: first.orderId,
-    status: "Confirmed", expectedStatus: "New" }, "synthetic vendor")).ok, false);
-});
-
-test("owned request retries preserve ownership and guest or different-account replays cannot claim an existing ID", async () => {
-  const first = owned(1);
-  assert.equal((await database.save(first)).ok, true);
-  const saved = await database.save({ ...first, createdAt: new Date(now.getTime() + 60000).toISOString() });
-  assert.equal(saved.createdAt, now.toISOString());
-  assert.equal(await count("order_requests"), 1);
-  assert.equal(await count("order_status_history"), 1);
-  assert.equal((await database.save(owned(1, identity("other")))).error, "CONFLICT");
-  assert.equal((await database.save(build(1))).error, "CONFLICT");
-  await database.save(build(2));
-  assert.equal((await database.save(owned(2))).error, "CONFLICT");
-  const history = await database.customerOrders(identity());
-  assert.equal(history.total, 1);
-  assert.equal(history.orders[0].orderId, first.orderId);
-});
-
-test("customer history pagination uses deterministic newest-first ordering", async () => {
-  for (let number = 1; number <= 21; number++) {
-    await database.save({ ...owned(number), createdAt: new Date(now.getTime() + number * 1000).toISOString() });
-  }
-  const first = await database.customerOrders(identity(), { page: 1 });
-  const second = await database.customerOrders(identity(), { page: 2 });
-  assert.equal(first.total, 21);
-  assert.equal(first.orders.length, 20);
-  assert.equal(first.orders[0].orderId, build(21).orderId);
-  assert.deepEqual(second.orders.map(row => row.orderId), [build(1).orderId]);
-});
-
-test("test checkout enforces verification and phone binding and cannot create real WhatsApp, PDF or bearer-share handoffs", async () => {
-  const authEnv = { ...env, CUSTOMER_AUTH_MODE: "test", CUSTOMER_AUTH_TEST_PHONES: "+919876543210",
-    CUSTOMER_FIREBASE_WEB_CONFIG: JSON.stringify({ apiKey: "synthetic-public-key", projectId: "synthetic-project",
-      authDomain: "synthetic-project.firebaseapp.com", appId: "1:123:web:abc123" }) };
-  const fail = async () => { throw new Error("No test request may create an external handoff"); };
-  let response = await submit(input(), { env: authEnv });
-  assert.equal(response.status, 401);
-  assert.equal(await count("order_requests"), 0);
-  response = await submit(input(), { env: authEnv, authenticate: async () => ({ ...identity(), phone: "+919000000001" }) });
-  assert.equal(response.status, 403);
-  assert.equal(await count("order_requests"), 0);
-  response = await submit({ ...input(), shareConsent: true, pdfConsent: true, customerId: "attacker-value" }, {
-    env: authEnv, authenticate: async () => identity(), savePdf: fail, saveShare: fail,
-  });
-  assert.equal(response.status, 200);
-  const result = await response.json();
-  assert.equal(result.isTest, true);
-  assert.equal(result.share, undefined);
-  assert.equal(result.pdf, undefined);
-  assert.equal((await database.customerOrders(identity())).total, 1);
-  assert.equal((await database.dashboard({ action: "vendor-list", page: 1 })).total, 0);
-});
 
 test("backend selection is explicit, defaults to Sheets and never silently falls back", () => {
   assert.equal(orderBackend({}), null);
@@ -248,6 +164,29 @@ test("different details with the same request ID are a conflict and never overwr
   changed.cart = { 1: 3 };
   assert.deepEqual(await database.save(buildOrder(changed, now)), { ok: false, error: "CONFLICT" });
   assert.equal((await engine.query("select quantity from order_items")).rows[0].quantity, 2);
+});
+
+test("retired customer test requests remain hidden and cannot be reused by guest checkout", async () => {
+  const testOrder = build();
+  await database.save(testOrder);
+  await engine.query("update order_requests set is_test = true where order_id = $1", [testOrder.orderId]);
+  const liveOrder = build(2);
+  await database.save(liveOrder);
+  const list = await database.dashboard({ action: "vendor-list", query: "", status: "", page: 1 });
+  assert.equal(list.total, 1);
+  assert.equal(list.stats.New, 1);
+  assert.equal(list.stats.requestValue, liveOrder.amounts.total);
+  assert.deepEqual(list.orders.map(order => order.orderId), [liveOrder.orderId]);
+  assert.deepEqual(await database.dashboard({ action: "vendor-detail", orderId: testOrder.orderId }),
+    { ok: false, error: "NOT_FOUND" });
+  assert.deepEqual(await database.dashboard({
+    action: "vendor-status", orderId: testOrder.orderId, expectedStatus: "New", status: "Confirmed",
+  }, "owner@example.com"), { ok: false, error: "NOT_FOUND" });
+  for (const order of [testOrder, { ...testOrder, catalogueRevision: 1 }]) {
+    assert.deepEqual(await database.save(order), { ok: false, error: "CONFLICT" });
+  }
+  assert.equal((await engine.query("select status from order_requests where order_id = $1", [testOrder.orderId])).rows[0].status, "New");
+  assert.equal(await count("order_status_history"), 2);
 });
 
 test("simultaneous identical submissions record one request and one set of items", async () => {
