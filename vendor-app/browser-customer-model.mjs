@@ -20,7 +20,7 @@ export function validateDemoHistory(result, phone, page) {
         ["orderId", "createdAt", "status", "name", "address", "items", "notes", "fulfilment"].some(key => typeof order[key] !== "string") ||
         !order.orderId || order.orderId.length > 100 || !Number.isFinite(Date.parse(order.createdAt)) ||
         !Number.isFinite(order.total) || order.total < 0)) {
-    throw new Error("The demo history response could not be verified. Retry or contact the shop.");
+    throw new Error("The order history response could not be verified. Retry or contact the shop.");
   }
   return result;
 }
@@ -31,9 +31,9 @@ export function createBrowserCustomerStore({ session, storage, origin, cryptoImp
   function readHistory() {
     if (!historyKey) throw new Error("Enter your mobile number before viewing browser requests.");
     const entries = JSON.parse(storage.getItem(historyKey) ?? "[]");
-    if (!Array.isArray(entries) || entries.length > MAX_HISTORY) throw new Error("Browser history is unreadable. Use Forget history to clear it.");
+    if (!Array.isArray(entries) || entries.length > MAX_HISTORY) throw new Error("Saved links are unreadable. Use Clear saved links on this device to clear them.");
     return entries.map(entry => {
-      if (!entry || !ORDER_ID.test(entry.orderId)) throw new Error("Browser history has an invalid reference. Use Forget history to clear it.");
+      if (!entry || !ORDER_ID.test(entry.orderId)) throw new Error("Saved links contain an invalid reference. Use Clear saved links on this device to clear them.");
       const share = validateOrderShareLink(entry, origin, entry.orderId, Date.parse(entry.expiresAt) - 1);
       return { orderId: entry.orderId, ...share };
     });

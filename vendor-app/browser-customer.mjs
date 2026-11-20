@@ -13,7 +13,7 @@ export function rememberBrowserRequest(orderId, share) {
     status.textContent = "Request link remembered in this browser. Details expire after seven days.";
   } catch {
     console.error("Saved request could not be remembered in browser history.");
-    status.textContent = "Your request is saved with the shop, but browser history could not be updated. Keep the details link from checkout. You can clear unreadable history using My browser requests.";
+    status.textContent = "Your request is saved with the shop, but its link could not be saved on this device. Keep the details link from checkout. You can clear unreadable saved links using My orders.";
   }
 }
 
@@ -34,17 +34,15 @@ export async function initializeBrowserCustomer() {
   let historyAbort;
   const notifyPhoneChange = () => window.dispatchEvent(new Event("browser-customer-change"));
   const refreshModeText = () => {
-    $("#open-browser-history").textContent = demoMode ? "My orders (demo)" : "My browser requests";
-    $("#phone-entry-help").textContent = demoMode ?
-      "DEMO ONLY: no OTP is sent. Anyone entering a number can view its dummy requests. Do not use real customer data." :
-      "No OTP is sent yet. This is not verified login. Server history is disabled; only this browser's remembered links are available.";
+    $("#open-browser-history").textContent = "My orders";
+    $("#phone-entry-help").textContent = "Enter your mobile number to continue. OTP verification is not enabled yet.";
     $("#customer-history-help").textContent = demoMode ?
-      "DEMO ONLY: requests are retrieved by the entered phone number without verification. Saved status and details are shown below. Requests are not confirmed sales." :
-      "Only requests remembered here are listed. Links show submission snapshots, not live status. Details expire after seven days.";
-    $("#browser-history-title").textContent = demoMode ? "Previous orders (demo)" : "My browser requests";
-    $("#browser-session-status").textContent = demoMode ?
-      "DEMO - unverified phone access to dummy orders. Carts are saved separately for each phone in this browser." :
-      "Mobile number entered, not verified. Carts and remembered request links are separate for each phone in this browser.";
+      "View previous order requests for your mobile number, including saved details and status. The shop must confirm availability and final prices." :
+      "Showing order links saved on this device. These links show details at submission and expire after seven days.";
+    $("#browser-history-title").textContent = "My orders";
+    $("#browser-session-status").textContent = store?.phone ?
+      `Shopping with +91 ${store.phone}. Your cart is saved for this number on this browser.` :
+      "Your cart is saved per mobile number on this browser.";
   };
   async function loadMode(signal = AbortSignal.timeout(15000)) {
     const response = await fetch("/api/customer-orders", { cache: "no-store", signal });
@@ -94,7 +92,7 @@ export async function initializeBrowserCustomer() {
       notifyPhoneChange();
       form.reset();
       error.hidden = true;
-      status.textContent = "Phone session ended. Remembered links remain until you forget history or clear site storage.";
+      status.textContent = "Your mobile session ended. Enter a number to continue.";
       showGate();
     } catch {
       status.textContent = "Could not clear the phone session. Clear this site's storage before sharing this device.";
@@ -111,7 +109,7 @@ export async function initializeBrowserCustomer() {
     previous.hidden = true;
     next.hidden = true;
     retry.hidden = true;
-    historyStatus.textContent = "Loading previous requests...";
+    historyStatus.textContent = "Loading your orders...";
     if (!history.open) history.showModal();
     try {
       if (!store) throw new Error("Browser storage is unavailable.");
@@ -149,16 +147,16 @@ export async function initializeBrowserCustomer() {
           item.append(details);
           list.append(item);
         }
-        historyStatus.textContent = data.total ? `${data.total} saved request(s). Page ${page} of ${Math.ceil(data.total / 20)}. Demo access is not verified login.` :
-          "No previous requests found for this phone number.";
+        historyStatus.textContent = data.total ? `${data.total} order request(s). Page ${page} of ${Math.ceil(data.total / 20)}.` :
+          "No previous orders found for this mobile number.";
         previous.hidden = next.hidden = data.total <= 20;
         previous.disabled = page <= 1;
         next.disabled = page * 20 >= data.total;
         return;
       }
       const entries = store.history();
-      historyStatus.textContent = entries.length ? "Server history is disabled. Showing only links remembered in this browser." :
-        "Server history is disabled. No requests remembered for this phone entry in this browser.";
+      historyStatus.textContent = entries.length ? "Full order history is unavailable. Showing only links saved on this device." :
+        "Full order history is unavailable. No order links saved on this device for this mobile number.";
       for (const entry of entries) {
         const item = document.createElement("li");
         const reference = document.createElement("strong");
@@ -199,7 +197,7 @@ export async function initializeBrowserCustomer() {
       if (!store) throw new Error("Browser storage is unavailable.");
       store.forget();
       if (!demoMode) list.replaceChildren();
-      historyStatus.textContent = "Browser links cleared. Requests saved with the shop remain available in demo mode.";
+      historyStatus.textContent = "Saved links cleared from this device. Your requests remain in the shop's order register.";
     } catch {
       historyStatus.textContent = "Could not clear history. Clear this site's storage in browser settings.";
     }
@@ -219,6 +217,6 @@ export async function initializeBrowserCustomer() {
   }
   loadMode().catch(() => {
     console.error("Customer history configuration could not be loaded.");
-    status.textContent = "History configuration could not load. Shopping still works; My browser requests will retry the history configuration.";
+    status.textContent = "Order history could not load. Shopping still works; open My orders to retry.";
   });
 }

@@ -179,10 +179,10 @@
 
   <main>
     <section class="browser-session" aria-label="Browser customer session">
-      <p id="browser-session-status" role="status">Mobile number entered, not verified. History is limited to this browser.</p>
+      <p id="browser-session-status" role="status">Your cart is saved per mobile number on this browser.</p>
       <div class="browser-session-actions">
-        <button id="open-browser-history" class="button secondary" type="button">My browser requests</button>
-        <button id="change-browser-phone" class="button secondary" type="button">Change phone / end session</button>
+        <button id="open-browser-history" class="button secondary" type="button">My orders</button>
+        <button id="change-browser-phone" class="button secondary" type="button">Change mobile number</button>
       </div>
     </section>
     <section class="hero" aria-labelledby="hero-title">
@@ -295,10 +295,10 @@
 
   <dialog id="phone-entry" class="browser-customer-dialog" aria-labelledby="phone-entry-title" aria-describedby="phone-entry-help">
     <div class="dialog-heading"><h2 id="phone-entry-title">Continue with your mobile number</h2></div>
-    <p id="phone-entry-help">No OTP is sent yet. This is not verified login and does not unlock requests from other browsers or devices.</p>
+    <p id="phone-entry-help">Enter your mobile number to continue. OTP verification is not enabled yet.</p>
     <form id="phone-entry-form">
       <label>Indian mobile number<input name="mobile" type="tel" inputmode="tel" autocomplete="tel" required maxlength="20" autofocus></label>
-      <p>We keep your number in this tab's session and remember up to 50 request links in this browser. Anyone using this browser with the same phone entry can view those links. Use a private device.</p>
+      <details><summary>Privacy and this device</summary><p>We keep your number in this tab's session and save up to 50 request links on this device. Until OTP verification is enabled, phone entry does not prove ownership of a number. Use a private device.</p></details>
       <p id="phone-entry-error" role="alert" hidden></p>
       <div class="browser-session-actions">
         <button class="button primary" type="submit">Continue to shop</button>
@@ -307,8 +307,8 @@
     </form>
   </dialog>
   <dialog id="browser-history" class="browser-customer-dialog" aria-labelledby="browser-history-title">
-    <div class="dialog-heading"><h2 id="browser-history-title">My browser requests</h2><button id="close-browser-history" class="icon-button" type="button" aria-label="Close browser history" autofocus>&times;</button></div>
-    <p id="customer-history-help">Only requests remembered here are listed. Server phone lookup is available only in explicitly enabled dummy-data demo mode.</p>
+    <div class="dialog-heading"><h2 id="browser-history-title">My orders</h2><button id="close-browser-history" class="icon-button" type="button" aria-label="Close order history" autofocus>&times;</button></div>
+    <p id="customer-history-help">View previous order requests, saved details and status.</p>
     <p id="browser-history-status" role="status"></p>
     <ul id="browser-history-list"></ul>
     <div class="browser-session-actions">
@@ -316,7 +316,7 @@
       <button id="next-customer-orders" class="button secondary" type="button" hidden>Next page</button>
       <button id="retry-customer-orders" class="button secondary" type="button" hidden>Retry previous orders</button>
     </div>
-    <button id="forget-browser-history" class="button secondary" type="button">Forget history for this phone entry</button>
+    <button id="forget-browser-history" class="button secondary" type="button">Clear saved links on this device</button>
   </dialog>
   <dialog id="product-media-dialog" aria-labelledby="product-media-title">
     <div class="dialog-heading"><h2 id="product-media-title">Product media</h2><button id="close-product-media" class="icon-button" type="button" aria-label="Close product media" autofocus>&times;</button></div>
@@ -335,7 +335,7 @@
         <label>Your name <span aria-hidden="true">*</span><input name="name" autocomplete="name" required minlength="2" maxlength="80" placeholder="Full name"></label>
         <label>Mobile number <span aria-hidden="true">*</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required readonly maxlength="20" aria-describedby="checkout-phone-help" placeholder="10-digit number"></label>
       </div>
-      <p id="checkout-phone-help">To change your mobile number, close checkout and use Change phone / end session. This number has not been verified.</p>
+      <p id="checkout-phone-help">To change your mobile number, close checkout and use Change mobile number.</p>
       <fieldset class="fulfilment-options">
         <legend>Receive your items <span aria-hidden="true">*</span></legend>
         <div class="fulfilment-grid">

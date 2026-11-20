@@ -23,14 +23,14 @@ export async function handleCustomerOrders(request, {
     return json({ error: "Customer history configuration is invalid. Contact the shop." }, 503);
   }
   if (!["GET", "POST"].includes(request.method)) {
-    const response = json({ error: "Use POST to view demo requests." }, 405);
+    const response = json({ error: "Use POST to view order history." }, 405);
     response.headers.set("Allow", "GET, POST");
     return response;
   }
   if (request.method === "GET") return json({ enabled: mode === "demo", mode });
   if (mode !== "demo") return json({ error: "Phone-only server history is disabled. Verified access is required for real customer data." }, 403);
   if (request.headers.get("origin") !== new URL(request.url).origin) {
-    return json({ error: "View demo requests from this website." }, 403);
+    return json({ error: "View order history from this website." }, 403);
   }
   if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
     return json({ error: "Send the phone entry as JSON." }, 415);
@@ -53,7 +53,7 @@ export async function handleCustomerOrders(request, {
     return json({ error: "The phone entry could not be read. Enter a valid Indian mobile number." }, 400);
   }
   if (orderBackend(env)?.name !== "netlify-db") {
-    return json({ error: "Demo phone history requires the Netlify Database backend." }, 503);
+    return json({ error: "Order history requires the Netlify Database backend." }, 503);
   }
   try {
     const result = await (await databaseFactory()).demoPhoneHistory(phone, input.page);
