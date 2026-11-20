@@ -1,10 +1,16 @@
-import { createBrowserCustomerStore, validateDemoHistory, validateDemoOrder } from "./browser-customer-model.mjs";
+import { createBrowserCustomerStore, validateDemoHistory, validateDemoOrder, validateDemoProfile } from "./browser-customer-model.mjs";
 import { money } from "./order.mjs";
 import { renderRevisionHistory } from "./order-revision-view.mjs";
 
 const orderDate = value => new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short",
 }).format(new Date(value));
+
+export function prefillCustomerDetails(form, profile, editedFields) {
+  for (const key of ["name", "address", "fulfilment"]) {
+    if (!editedFields.has(key)) form.elements[key].value = profile[key];
+  }
+}
 
 export function renderCustomerOrderTable(orders, tbody, onSelect) {
   const document = tbody.ownerDocument;
@@ -119,6 +125,12 @@ export async function initializeBrowserCustomer() {
   const previous = $("#previous-customer-orders");
   const next = $("#next-customer-orders");
   const retry = $("#retry-customer-orders");
+  const customerForm = $("#customer-form");
+  const profileStatus = $("#customer-profile-status");
+  const profileRetry = $("#retry-customer-profile");
+  const editedProfileFields = new Set();
+  let profileAbort;
+  let applyingProfile = false;
   let demoMode = null;
   let page = 1;
   let historyAbort;
@@ -147,6 +159,78 @@ export async function initializeBrowserCustomer() {
     demoMode = result.enabled;
     refreshModeText();
   }
+  function clearProfile() {
+    profileAbort?.abort();
+    editedProfileFields.clear();
+    for (const key of ["name", "address"]) customerForm.elements[key].value = "";
+    for (const radio of customerForm.querySelectorAll('[name="fulfilment"]')) radio.checked = false;
+    profileStatus.textContent = "";
+    profileRetry.hidden = true;
+  }
+  async function loadProfile() {
+    profileAbort?.abort();
+    if (!store?.phone) return;
+    const phone = store.phone;
+    const controller = new AbortController();
+    profileAbort = controller;
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]);
+    profileRetry.hidden = true;
+    profileRetry.disabled = true;
+    profileStatus.textContent = "Loading your saved customer details. You can still enter or edit them.";
+    try {
+      if (demoMode === null) await loadMode(signal);
+      if (controller.signal.aborted || phone !== store.phone) return;
+      signal.throwIfAborted();
+      if (!demoMode) {
+        profileStatus.textContent = "Enter your details for this order.";
+        return;
+      }
+      const response = await fetch("/api/customer-orders", {
+        method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, profile: true }), signal,
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Saved customer details could not be loaded.");
+      const profile = validateDemoProfile(result, phone);
+      if (controller.signal.aborted || phone !== store.phone) return;
+      signal.throwIfAborted();
+      if (!profile) {
+        profileStatus.textContent = "Enter your details. They will be remembered after you submit an order.";
+        return;
+      }
+      const changeFulfilment = !editedProfileFields.has("fulfilment") &&
+        customerForm.elements.fulfilment.value !== profile.fulfilment;
+      applyingProfile = true;
+      try {
+        prefillCustomerDetails(customerForm, profile, editedProfileFields);
+        if (changeFulfilment) {
+          customerForm.querySelector(`[name="fulfilment"][value="${profile.fulfilment}"]`)
+            .dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      } finally { applyingProfile = false; }
+      profileStatus.textContent = editedProfileFields.size ?
+        "Saved customer details loaded; your edits have been kept. Review before submitting." :
+        "Your previous name, delivery type and address are filled in. You can edit all three.";
+    } catch (problem) {
+      if (controller.signal.aborted || phone !== store?.phone) return;
+      console.error("Saved customer details could not be loaded.");
+      profileStatus.textContent = `${problem.message || "Saved details could not be loaded."} You can enter your details manually.`;
+      profileRetry.hidden = false;
+    } finally {
+      if (profileAbort === controller) profileRetry.disabled = false;
+    }
+  }
+  for (const type of ["input", "change"]) {
+    customerForm.addEventListener(type, event => {
+      if (!applyingProfile && ["name", "address", "fulfilment"].includes(event.target.name)) {
+        editedProfileFields.add(event.target.name);
+      }
+    });
+  }
+  customerForm.addEventListener("submit", () => {
+    for (const key of ["name", "address", "fulfilment"]) editedProfileFields.add(key);
+  });
+  profileRetry.addEventListener("click", () => { demoMode = null; loadProfile(); });
   const showGate = () => {
     if (!gate.open) gate.showModal();
     form.elements.mobile.focus();
@@ -164,11 +248,13 @@ export async function initializeBrowserCustomer() {
     try {
       if (!store) store = createBrowserCustomerStore({ session: sessionStorage, storage: localStorage, origin: location.origin });
       const phone = await store.enter(form.elements.mobile.value);
+      clearProfile();
       $("#customer-form").elements.phone.value = phone;
       notifyPhoneChange();
       refreshModeText();
       gate.close();
       $("#hero-title").focus({ preventScroll: true });
+      loadProfile();
     } catch (problem) {
       console.error("Browser phone entry could not be retained.");
       report(`${problem.message} If storage is blocked, allow site storage and retry.`);
@@ -179,6 +265,7 @@ export async function initializeBrowserCustomer() {
   $("#change-browser-phone").addEventListener("click", () => {
     try {
       store?.end();
+      clearProfile();
       historyAbort?.abort();
       if (history.open) history.close();
       $("#customer-form").reset();
@@ -340,6 +427,7 @@ export async function initializeBrowserCustomer() {
     store = createBrowserCustomerStore({ session: sessionStorage, storage: localStorage, origin: location.origin });
     const phone = await store.restore();
     if (phone) {
+      clearProfile();
       $("#customer-form").elements.phone.value = phone;
       notifyPhoneChange();
       gate.close();
@@ -348,7 +436,8 @@ export async function initializeBrowserCustomer() {
     console.error("Browser phone session could not be restored.");
     report("Your session could not be restored. Enter your number again; site storage must be enabled.");
   }
-  loadMode().catch(() => {
+  if (store?.phone) loadProfile();
+  else loadMode().catch(() => {
     console.error("Customer history configuration could not be loaded.");
     status.textContent = "Order history could not load. Shopping still works; open My orders to retry.";
   });

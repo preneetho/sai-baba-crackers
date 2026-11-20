@@ -14,6 +14,17 @@ export function normalizeBrowserPhone(value) {
   return digits;
 }
 
+export function validateDemoProfile(result, phone) {
+  const profile = result?.profile;
+  if (!result || result.mode !== "demo" || result.verified !== false || result.phone !== phone ||
+      (profile !== null && (!profile || typeof profile.name !== "string" || profile.name.length > 80 ||
+        typeof profile.address !== "string" || profile.address.length > 500 ||
+        !["delivery", "pickup"].includes(profile.fulfilment)))) {
+    throw new Error("Saved customer details could not be verified. Enter your details manually or retry.");
+  }
+  return profile;
+}
+
 function validCustomerOrder(order, phone) {
   return !!order && (order.revision === undefined || validRevisionView(order)) && order.phone === `+91 ${phone}` &&
     ["orderId", "createdAt", "status", "name", "address", "items", "notes", "fulfilment", "preferredDate"].every(key => typeof order[key] === "string") &&

@@ -196,6 +196,16 @@ export function createOrderDatabase(db) {
         return { ok: true, orderId: order.orderId, createdAt: order.createdAt };
       });
     },
+    async demoPhoneProfile(phone) {
+      if (!/^[6-9]\d{9}$/.test(phone)) throw new Error("Invalid customer profile lookup.");
+      return transaction(async tx => {
+        const [profile] = await tx.select({
+          name: orderRequests.name, fulfilment: orderRequests.fulfilment, address: orderRequests.address,
+        }).from(orderRequests).where(and(eq(orderRequests.phone, phone), eq(orderRequests.isTest, false)))
+          .orderBy(desc(orderRequests.createdAt), asc(orderRequests.orderId)).limit(1);
+        return profile ?? null;
+      }, true);
+    },
     async demoPhoneHistory(phone, page = 1) {
       if (!/^[6-9]\d{9}$/.test(phone) || !Number.isSafeInteger(page) || page < 1 || page > 100000) {
         throw new Error("Invalid demo history lookup.");

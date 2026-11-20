@@ -182,6 +182,18 @@ the original request, with dated snapshots and customer-visible reasons.
 Narrow screens keep date, status and amount visible; the full reference remains
 available in order details.
 
+Returning customers also get their name, delivery/store-pickup choice and address
+prefilled from their latest successful order for the entered phone number. All
+three fields remain editable; submitting a new order saves the revised details
+for the next visit, including on another device. Unsaved edits are not stored as
+a profile and older orders are not rewritten. Preferred dates and notes are not
+copied. Phone changes clear the previous customer's fields and cancel pending
+lookups; late responses never overwrite fields the customer has already edited.
+Lookup failures show a retry control while allowing manual entry. This uses the
+existing phone-access mode and Netlify Database, with no new migration or
+environment variable; it remains limited to the confirmed dummy dataset until
+verified customer access is implemented.
+
 ### Vendor order availability edits
 
 In **Vendor dashboard → open an order → Edit items and prices**, uncheck unavailable

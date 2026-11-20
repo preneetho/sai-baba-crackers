@@ -1,4 +1,4 @@
-import { normalizeBrowserPhone } from "../../vendor-app/browser-customer-model.mjs";
+import { normalizeBrowserPhone, validateDemoProfile } from "../../vendor-app/browser-customer-model.mjs";
 import { orderBackend } from "../lib/order-backend.mjs";
 
 function json(body, status = 200) {
@@ -46,7 +46,11 @@ export async function handleCustomerOrders(request, {
       return json({ error: "Enter a valid Indian mobile number." }, 400);
     }
     phone = normalizeBrowserPhone(input.phone);
-    if (input.orderId !== undefined) {
+    if (input.profile !== undefined) {
+      if (input.profile !== true || input.orderId !== undefined || input.page !== undefined) {
+        return json({ error: "Use a valid saved-details request." }, 400);
+      }
+    } else if (input.orderId !== undefined) {
       if (typeof input.orderId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(input.orderId)) {
         return json({ error: "The requested order reference is invalid." }, 400);
       }
@@ -61,6 +65,14 @@ export async function handleCustomerOrders(request, {
   }
   try {
     const database = await databaseFactory();
+    if (input.profile === true) {
+      const saved = await database.demoPhoneProfile(phone);
+      const result = { profile: saved === null ? null : {
+        name: saved.name, fulfilment: saved.fulfilment, address: saved.address,
+      }, phone, mode: "demo", verified: false };
+      validateDemoProfile(result, phone);
+      return json(result);
+    }
     if (input.orderId !== undefined) {
       const result = await database.demoPhoneOrder(phone, input.orderId);
       if (!result.ok) return json({ error: "This order was not found for your mobile number." }, 404);
@@ -70,7 +82,9 @@ export async function handleCustomerOrders(request, {
     return json({ ...result, mode: "demo", verified: false });
   } catch {
     console.error("Demo customer request history could not be loaded.");
-    return json({ error: "Previous requests could not be loaded. Retry or contact the shop." }, 503);
+    return json({ error: input.profile === true ?
+      "Saved customer details could not be loaded. Enter them manually or retry." :
+      "Previous requests could not be loaded. Retry or contact the shop." }, 503);
   }
 }
 

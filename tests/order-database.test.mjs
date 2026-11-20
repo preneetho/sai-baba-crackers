@@ -57,6 +57,29 @@ const dashboard = (path = "/api/vendor-orders", body, overrides = {}) => handleV
 });
 const count = async table => Number((await engine.query(`select count(*) as count from ${table}`)).rows[0].count);
 
+test("saved customer details follow the latest submitted order, stay phone-scoped and exclude retired test records", async () => {
+  const first = build(1);
+  await database.save(first);
+  assert.deepEqual(await database.demoPhoneProfile(first.customer.phone), {
+    name: first.customer.name, address: first.customer.address, fulfilment: "pickup",
+  });
+  const next = build(2, new Date(now.getTime() + 1000));
+  next.customer = { ...next.customer, name: "Updated synthetic customer", address: "Updated synthetic delivery address", fulfilment: "delivery" };
+  await database.save(next);
+  const other = build(3, new Date(now.getTime() + 2000));
+  other.customer = { ...other.customer, phone: "9876543211", name: "Other synthetic customer" };
+  await database.save(other);
+  const retired = build(4, new Date(now.getTime() + 3000));
+  await database.save(retired);
+  await engine.query("update order_requests set is_test = true where order_id = $1", [retired.orderId]);
+  assert.deepEqual(await database.demoPhoneProfile("9876543210"), {
+    name: next.customer.name, address: next.customer.address, fulfilment: "delivery",
+  });
+  assert.equal((await database.demoPhoneProfile("9876543211")).name, other.customer.name);
+  assert.equal(await database.demoPhoneProfile("9876543212"), null);
+  await assert.rejects(() => database.demoPhoneProfile("9876543210 OR 1=1"));
+});
+
 test("database initialization retries failed configuration and shares one adapter across concurrent calls", async () => {
   const previousUrl = process.env.NETLIFY_DB_URL;
   const previousDriver = process.env.NETLIFY_DB_DRIVER;

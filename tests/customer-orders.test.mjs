@@ -67,6 +67,7 @@ test("selected order is fetched by exact phone and reference, with inaccessible 
       },
     }),
   });
+
   assert.equal(response.status, 200);
   assert.deepEqual(lookup, { phone: "9876543210", orderId: "SBC-LEGACY-ORDER" });
   assert.equal((await response.json()).order.status, "Confirmed");
@@ -75,4 +76,49 @@ test("selected order is fetched by exact phone and reference, with inaccessible 
   });
   assert.equal(missing.status, 404);
   assert.equal((await handleCustomerOrders(request({ phone: "9876543210", orderId: "x' OR 1=1" }), { env })).status, 400);
+});
+
+test("saved-details lookup returns only the latest profile fields for the exact normalized phone", async () => {
+  let lookup;
+  const response = await handleCustomerOrders(request({ phone: "+91 98765 43210", profile: true }), {
+    env, databaseFactory: async () => ({
+      async demoPhoneProfile(phone) {
+        lookup = phone;
+        return { name: "Synthetic customer", fulfilment: "delivery", address: "Synthetic delivery address",
+          orderId: "must-not-expose", items: "must-not-expose" };
+      },
+    }),
+  });
+  assert.equal(response.status, 200);
+  assert.equal(lookup, "9876543210");
+  assert.deepEqual(await response.json(), {
+    profile: { name: "Synthetic customer", fulfilment: "delivery", address: "Synthetic delivery address" },
+    phone: "9876543210", mode: "demo", verified: false,
+  });
+  assert.match(response.headers.get("cache-control"), /private, no-store/);
+});
+
+test("new customers have no saved profile; outages and invalid requests are not treated as missing profiles", async () => {
+  const body = { phone: "9876543210", profile: true };
+  const missing = await handleCustomerOrders(request(body), {
+    env, databaseFactory: async () => ({ demoPhoneProfile: async () => null }),
+  });
+  assert.equal(missing.status, 200);
+  assert.equal((await missing.json()).profile, null);
+  for (const saved of [{ name: 5, address: "", fulfilment: "pickup" }, undefined]) {
+    assert.equal((await handleCustomerOrders(request(body), {
+      env, databaseFactory: async () => ({ demoPhoneProfile: async () => saved }),
+    })).status, 503);
+  }
+  assert.equal((await handleCustomerOrders(request(body), {
+    env, databaseFactory: async () => { throw new Error("offline"); },
+  })).status, 503);
+  const blocked = { env, databaseFactory: async () => { throw new Error("Must not access database"); } };
+  for (const extra of [{ profile: false }, { profile: "true" }, { page: 1 }, { orderId: "SBC-TEST" }]) {
+    assert.equal((await handleCustomerOrders(request({ ...body, ...extra }), blocked)).status, 400);
+  }
+  assert.equal((await handleCustomerOrders(request(body), { ...blocked, env: {} })).status, 403);
+  assert.equal((await handleCustomerOrders(request(body, {
+    headers: { Origin: "https://elsewhere.example", "Content-Type": "application/json" },
+  }), blocked)).status, 403);
 });

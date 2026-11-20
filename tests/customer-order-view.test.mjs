@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderCustomerOrderTable, renderCustomerOrderDetails } from "../vendor-app/browser-customer.mjs";
+import { renderCustomerOrderTable, renderCustomerOrderDetails, prefillCustomerDetails } from "../vendor-app/browser-customer.mjs";
+import { validateDemoProfile } from "../vendor-app/browser-customer-model.mjs";
 import { validRevisionView, revisionAcknowledged } from "../vendor-app/order-revision-model.mjs";
 
 function dom() {
@@ -25,6 +26,34 @@ const order = {
     { changedAt: "2026-11-20T05:00:00.000Z", fromStatus: "New", toStatus: "Confirmed" },
   ],
 };
+
+test("saved details prefill editable name/address/delivery fields without changing phone or overwriting edits", () => {
+  const form = { elements: {
+    name: { value: "", readOnly: false }, address: { value: "", readOnly: false },
+    fulfilment: { value: "" }, phone: { value: "9876543210", readOnly: true },
+  } };
+  const profile = { name: "Synthetic returning customer", address: "Saved synthetic address", fulfilment: "delivery" };
+  prefillCustomerDetails(form, profile, new Set());
+  assert.equal(form.elements.name.value, profile.name);
+  assert.equal(form.elements.address.value, profile.address);
+  assert.equal(form.elements.fulfilment.value, "delivery");
+  assert.equal(form.elements.name.readOnly, false);
+  assert.equal(form.elements.address.readOnly, false);
+  assert.equal(form.elements.phone.value, "9876543210");
+  form.elements.name.value = "Edited customer";
+  form.elements.fulfilment.value = "pickup";
+  prefillCustomerDetails(form, profile, new Set(["name", "fulfilment"]));
+  assert.equal(form.elements.name.value, "Edited customer");
+  assert.equal(form.elements.fulfilment.value, "pickup");
+});
+
+test("saved profile validation rejects another phone's data and malformed delivery choices", () => {
+  const result = { phone: "9876543210", mode: "demo", verified: false,
+    profile: { name: "Synthetic", address: "Synthetic address", fulfilment: "pickup" } };
+  assert.deepEqual(validateDemoProfile(result, result.phone), result.profile);
+  assert.throws(() => validateDemoProfile(result, "9876543211"), /could not be verified/);
+  assert.throws(() => validateDemoProfile({ ...result, profile: { ...result.profile, fulfilment: "courier" } }, result.phone));
+});
 
 test("customer table has date/status/amount columns and one activation per row or reference click", () => {
   const { root } = dom();
