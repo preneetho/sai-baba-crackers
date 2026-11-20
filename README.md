@@ -211,8 +211,11 @@ check both the expected revision and status under a transaction row lock, and
 check the catalogue version before adding replacement products; a
 conflict or uncertain response requires reloading before another save. Drafts are
 retained on save failure and closing/signing out warns about unsaved changes.
-Apply the tracked `order_revisions` migration before deploying the matching
+Deploy the tracked `order_revisions` migration together with the matching
 Functions and frontend. No new environment variable or dependency is required.
+Netlify applies production migrations through its deployment pipeline before activation. Migration
+SQL uses LF line endings on every platform so applied files retain their exact
+bytes; do not edit an already-applied migration.
 
 With Node.js 22.12 or later:
 
