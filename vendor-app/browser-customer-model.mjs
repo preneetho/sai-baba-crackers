@@ -1,4 +1,5 @@
 import { CART_KEY, validateOrderShareLink } from "./order.mjs";
+import { ORDER_STATUSES } from "./vendor-model.mjs";
 
 const PHONE_KEY = "sai-baba-browser-phone-v1";
 const HISTORY_PREFIX = "sai-baba-browser-requests-v1:";
@@ -12,14 +13,30 @@ export function normalizeBrowserPhone(value) {
   return digits;
 }
 
+function validCustomerOrder(order, phone) {
+  return !!order && order.phone === `+91 ${phone}` &&
+    ["orderId", "createdAt", "status", "name", "address", "items", "notes", "fulfilment", "preferredDate"].every(key => typeof order[key] === "string") &&
+    /^[A-Za-z0-9_-]{1,100}$/.test(order.orderId) && Number.isFinite(Date.parse(order.createdAt)) &&
+    ORDER_STATUSES.includes(order.status) &&
+    ["total", "subtotal", "discount", "deliveryCharge"].every(key => Number.isFinite(order[key]) && order[key] >= 0) &&
+    Array.isArray(order.statusHistory) && order.statusHistory.every(entry => entry &&
+      typeof entry.changedAt === "string" && Number.isFinite(Date.parse(entry.changedAt)) &&
+      (entry.fromStatus === null || ORDER_STATUSES.includes(entry.fromStatus)) && ORDER_STATUSES.includes(entry.toStatus));
+}
+
+export function validateDemoOrder(result, phone, orderId) {
+  if (!result || result.mode !== "demo" || result.verified !== false ||
+      !validCustomerOrder(result.order, phone) || result.order.orderId !== orderId) {
+    throw new Error("The order details could not be verified. Retry or contact the shop.");
+  }
+  return result.order;
+}
+
 export function validateDemoHistory(result, phone, page) {
   if (!result || result.mode !== "demo" || result.verified !== false || result.page !== page ||
       result.pageSize !== 20 || !Number.isSafeInteger(result.total) || result.total < 0 ||
       !Array.isArray(result.orders) || result.orders.length > 20 ||
-      result.orders.some(order => !order || order.phone !== `+91 ${phone}` ||
-        ["orderId", "createdAt", "status", "name", "address", "items", "notes", "fulfilment"].some(key => typeof order[key] !== "string") ||
-        !order.orderId || order.orderId.length > 100 || !Number.isFinite(Date.parse(order.createdAt)) ||
-        !Number.isFinite(order.total) || order.total < 0)) {
+      result.orders.some(order => !validCustomerOrder(order, phone))) {
     throw new Error("The order history response could not be verified. Retry or contact the shop.");
   }
   return result;

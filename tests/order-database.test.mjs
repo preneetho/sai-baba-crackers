@@ -168,6 +168,27 @@ test("demo phone history uses exact matching, returns saved details and paginate
   await assert.rejects(database.demoPhoneHistory("987654321"), /Invalid demo/);
 });
 
+test("customer details return latest status and chronological status history without vendor identity", async () => {
+  const order = build();
+  await database.save(order);
+  await database.dashboard({
+    action: "vendor-status", orderId: order.orderId, expectedStatus: "New", status: "Contacted",
+  }, "private-vendor@example.com");
+  await database.dashboard({
+    action: "vendor-status", orderId: order.orderId, expectedStatus: "Contacted", status: "Confirmed",
+  }, "private-vendor@example.com");
+  const result = await database.demoPhoneOrder("9876543210", order.orderId);
+  assert.equal(result.ok, true);
+  assert.equal(result.order.status, "Confirmed");
+  assert.deepEqual(result.order.statusHistory.map(entry => entry.toStatus), ["New", "Contacted", "Confirmed"]);
+  assert.equal(result.order.statusHistory[0].changedAt, order.createdAt);
+  assert.equal(result.order.statusHistory[1].fromStatus, "New");
+  assert.ok(result.order.statusHistory.every(entry => !Object.hasOwn(entry, "actor")));
+  assert.ok(!JSON.stringify(result).includes("private-vendor"));
+  assert.deepEqual(await database.demoPhoneOrder("9876543211", order.orderId), { ok: false, error: "NOT_FOUND" });
+  assert.equal((await database.demoPhoneHistory("9876543210")).orders[0].status, "Confirmed");
+});
+
 test("retries keep the original timestamp and vendor status without duplicate rows or audit entries", async () => {
   const order = build();
   await database.save(order);

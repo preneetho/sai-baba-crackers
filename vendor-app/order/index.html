@@ -173,6 +173,7 @@
       <a href="/">Home</a>
       <a class="nav-active" href="#catalogue" aria-current="page">Catalogue</a>
       <a href="#contact">Contact us</a>
+      <a id="open-browser-history" href="#my-orders" aria-haspopup="dialog" aria-controls="browser-history">My orders</a>
     </nav>
     <a class="header-cart" href="#requirement">Cart <span id="header-count">0</span></a>
   </header>
@@ -181,7 +182,6 @@
     <section class="browser-session" aria-label="Browser customer session">
       <p id="browser-session-status" role="status">Your cart is saved per mobile number on this browser.</p>
       <div class="browser-session-actions">
-        <button id="open-browser-history" class="button secondary" type="button">My orders</button>
         <button id="change-browser-phone" class="button secondary" type="button">Change mobile number</button>
       </div>
     </section>
@@ -310,10 +310,25 @@
     <div class="dialog-heading"><h2 id="browser-history-title">My orders</h2><button id="close-browser-history" class="icon-button" type="button" aria-label="Close order history" autofocus>&times;</button></div>
     <p id="customer-history-help">View previous order requests, saved details and status.</p>
     <p id="browser-history-status" role="status"></p>
-    <ul id="browser-history-list"></ul>
+    <div id="customer-order-list-view">
+      <div id="customer-orders-table-wrap" class="customer-orders-table-wrap" role="region" aria-label="Your order requests" tabindex="0" hidden>
+        <table class="customer-orders-table">
+          <caption>Amounts are estimates until confirmed by the shop.</caption>
+          <thead><tr><th scope="col">Order reference</th><th scope="col">Date (IST)</th><th scope="col">Status</th><th scope="col">Amount</th></tr></thead>
+          <tbody id="customer-order-rows"></tbody>
+        </table>
+      </div>
+      <ul id="browser-history-list"></ul>
+      <div class="browser-session-actions">
+        <button id="previous-customer-orders" class="button secondary" type="button" hidden>Previous page</button>
+        <button id="next-customer-orders" class="button secondary" type="button" hidden>Next page</button>
+      </div>
+    </div>
+    <section id="customer-order-detail" aria-label="Latest saved order details" hidden>
+      <button id="back-to-customer-orders" class="button secondary" type="button">Back to orders</button>
+      <div id="customer-order-detail-content"></div>
+    </section>
     <div class="browser-session-actions">
-      <button id="previous-customer-orders" class="button secondary" type="button" hidden>Previous page</button>
-      <button id="next-customer-orders" class="button secondary" type="button" hidden>Next page</button>
       <button id="retry-customer-orders" class="button secondary" type="button" hidden>Retry previous orders</button>
     </div>
     <button id="forget-browser-history" class="button secondary" type="button">Clear saved links on this device</button>

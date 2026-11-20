@@ -34,6 +34,29 @@ body { margin: 0; }
 #browser-history-list { padding-inline-start: 20px; }
 #browser-history-list li { overflow-wrap: anywhere; margin-bottom: 16px; }
 #browser-history-list pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+#browser-history { width: min(900px, calc(100% - 24px)); max-width: 900px; }
+.customer-orders-table-wrap { overflow-x: auto; }
+.customer-orders-table { width: 100%; border-collapse: collapse; text-align: start; }
+.customer-orders-table caption { text-align: start; padding-block: 12px; color: var(--muted); }
+.customer-orders-table th, .customer-orders-table td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.customer-orders-table th { background: var(--soft); }
+.customer-orders-table td:last-child, .customer-orders-table th:last-child { text-align: end; white-space: nowrap; }
+.customer-orders-table td:first-child { overflow-wrap: anywhere; }
+.customer-orders-table tbody tr { cursor: pointer; }
+.customer-orders-table tbody tr:hover, .customer-orders-table tbody tr:focus-within { background: var(--soft); }
+.customer-order-reference { border: 0; background: none; color: var(--brand); text-align: start; text-decoration: underline; overflow-wrap: anywhere; min-height: 44px; }
+#customer-order-detail-content { margin-top: 16px; overflow-wrap: anywhere; }
+#customer-order-detail-content dl { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr); gap: 8px 16px; }
+#customer-order-detail-content dt { font-weight: 600; }
+#customer-order-detail-content dd { margin: 0; }
+#customer-order-detail-content pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+#customer-order-detail-content h4 { margin-block: 16px; }
+#customer-order-detail-content li { margin-bottom: 12px; }
+.customer-orders-table-wrap:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 4px; }
+@media (max-width: 600px) {
+  .customer-orders-table th:first-child, .customer-orders-table td:first-child { display: none; }
+  .customer-orders-table th, .customer-orders-table td { padding: 8px; }
+}
 button, input, select, textarea { font: inherit; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button, select { cursor: pointer; }

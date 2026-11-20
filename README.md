@@ -172,6 +172,16 @@ When disabled, history shows only this browser's remembered seven-day links. Ser
 history failures show an error/retry rather than claiming there are no requests.
 Phone entries never grant vendor access or permission to change saved orders.
 
+**My orders** is in the catalogue's top navigation beside Home, Catalogue and
+Contact us. Its table shows the order reference, IST date, saved status and estimated
+amount. Selecting the date (keyboard accessible) or row loads the latest saved
+details from the server, including the recorded status-change history without staff
+identities. Returning to the table preserves its page and reflects the refreshed
+status/amount. Item and price revisions are not currently tracked; vendor availability
+editing and customer-visible item revisions remain a separate planned flow.
+Narrow screens keep date, status and amount visible; the full reference remains
+available in order details.
+
 With Node.js 22.12 or later:
 
 ```powershell

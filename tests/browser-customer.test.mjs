@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { webcrypto } from "node:crypto";
-import { createBrowserCustomerStore, normalizeBrowserPhone, validateDemoHistory } from "../vendor-app/browser-customer-model.mjs";
+import { createBrowserCustomerStore, normalizeBrowserPhone, validateDemoHistory, validateDemoOrder } from "../vendor-app/browser-customer-model.mjs";
 
 const origin = "https://shop.example";
 const orderId = "SBC-12345678-1234-4234-8234-123456789012";
@@ -58,12 +58,17 @@ test("demo history refuses another phone's records and invalid pagination respon
     orderId, createdAt: new Date().toISOString(), status: "New", name: "Synthetic",
     phone: "+91 9876543210", address: "Synthetic only", items: "Synthetic line item",
     notes: "", fulfilment: "Store pickup", total: 100,
+    preferredDate: "", subtotal: 100, discount: 0, deliveryCharge: 0,
+    statusHistory: [{ changedAt: new Date().toISOString(), fromStatus: null, toStatus: "New" }],
   };
   const result = { orders: [order], total: 1, page: 1, pageSize: 20, mode: "demo", verified: false };
   assert.equal(validateDemoHistory(result, "9876543210", 1), result);
   assert.throws(() => validateDemoHistory(result, "9876543211", 1));
   assert.throws(() => validateDemoHistory({ ...result, page: 2 }, "9876543210", 1));
   assert.throws(() => validateDemoHistory({ ...result, verified: true }, "9876543210", 1));
+  assert.equal(validateDemoOrder({ mode: "demo", verified: false, order }, "9876543210", orderId), order);
+  assert.throws(() => validateDemoOrder({ mode: "demo", verified: false, order }, "9876543210", "SBC-WRONG"));
+  assert.throws(() => validateDemoHistory({ ...result, orders: [{ ...order, statusHistory: undefined }] }, "9876543210", 1));
 });
 
 test("history rejects untrusted links and retains an expired reference without a customer-data snapshot", async () => {

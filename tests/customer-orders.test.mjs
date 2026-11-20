@@ -56,3 +56,23 @@ test("database failure and unsupported backends are explicit failures, not empty
   })).status, 503);
   assert.equal((await handleCustomerOrders(request(body), { env: { ...env, ORDER_BACKEND: "sheets" } })).status, 503);
 });
+
+test("selected order is fetched by exact phone and reference, with inaccessible orders returning 404", async () => {
+  let lookup;
+  const response = await handleCustomerOrders(request({ phone: "+91 98765 43210", orderId: "SBC-LEGACY-ORDER" }), {
+    env, databaseFactory: async () => ({
+      async demoPhoneOrder(phone, orderId) {
+        lookup = { phone, orderId };
+        return { ok: true, order: { orderId, status: "Confirmed", statusHistory: [] } };
+      },
+    }),
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(lookup, { phone: "9876543210", orderId: "SBC-LEGACY-ORDER" });
+  assert.equal((await response.json()).order.status, "Confirmed");
+  const missing = await handleCustomerOrders(request({ phone: "9876543211", orderId: "SBC-LEGACY-ORDER" }), {
+    env, databaseFactory: async () => ({ async demoPhoneOrder() { return { ok: false, error: "NOT_FOUND" }; } }),
+  });
+  assert.equal(missing.status, 404);
+  assert.equal((await handleCustomerOrders(request({ phone: "9876543210", orderId: "x' OR 1=1" }), { env })).status, 400);
+});

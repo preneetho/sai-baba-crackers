@@ -37,6 +37,21 @@ async function detail(tx, orderId) {
   } };
 }
 
+async function customerDetail(tx, orderId) {
+  const result = await detail(tx, orderId);
+  if (!result.ok) return result;
+  const history = await tx.select({
+    changedAt: orderStatusHistory.changedAt,
+    fromStatus: orderStatusHistory.fromStatus,
+    toStatus: orderStatusHistory.toStatus,
+  }).from(orderStatusHistory).where(eq(orderStatusHistory.orderId, orderId))
+    .orderBy(asc(orderStatusHistory.changedAt), asc(orderStatusHistory.id));
+  return { ok: true, order: {
+    ...result.order,
+    statusHistory: history.map(entry => ({ ...entry, changedAt: new Date(entry.changedAt).toISOString() })),
+  } };
+}
+
 export function createOrderDatabase(db) {
   async function transaction(operation, readOnly = false) {
     return db.transaction(async tx => {
@@ -162,11 +177,21 @@ export function createOrderDatabase(db) {
           .orderBy(desc(orderRequests.createdAt), asc(orderRequests.orderId)).limit(20).offset((page - 1) * 20);
         const orders = [];
         for (const row of rows) {
-          const result = await detail(tx, row.orderId);
+          const result = await customerDetail(tx, row.orderId);
           if (!result.ok) throw new Error("A recorded demo request could not be read.");
           orders.push(result.order);
         }
         return { orders, total: count.total, page, pageSize: 20 };
+      }, true);
+    },
+    async demoPhoneOrder(phone, orderId) {
+      if (!/^[6-9]\d{9}$/.test(phone) || typeof orderId !== "string" ||
+          !/^[A-Za-z0-9_-]{1,100}$/.test(orderId)) throw new Error("Invalid customer order lookup.");
+      return transaction(async tx => {
+        const [row] = await tx.select({ orderId: orderRequests.orderId }).from(orderRequests).where(and(
+          eq(orderRequests.orderId, orderId), eq(orderRequests.phone, phone), eq(orderRequests.isTest, false),
+        ));
+        return row ? customerDetail(tx, row.orderId) : { ok: false, error: "NOT_FOUND" };
       }, true);
     },
     async dashboard(input, actor) {

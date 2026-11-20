@@ -46,7 +46,11 @@ export async function handleCustomerOrders(request, {
       return json({ error: "Enter a valid Indian mobile number." }, 400);
     }
     phone = normalizeBrowserPhone(input.phone);
-    if (!Number.isSafeInteger(input.page) || input.page < 1 || input.page > 100000) {
+    if (input.orderId !== undefined) {
+      if (typeof input.orderId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(input.orderId)) {
+        return json({ error: "The requested order reference is invalid." }, 400);
+      }
+    } else if (!Number.isSafeInteger(input.page) || input.page < 1 || input.page > 100000) {
       return json({ error: "The requested page is invalid." }, 400);
     }
   } catch {
@@ -56,7 +60,13 @@ export async function handleCustomerOrders(request, {
     return json({ error: "Order history requires the Netlify Database backend." }, 503);
   }
   try {
-    const result = await (await databaseFactory()).demoPhoneHistory(phone, input.page);
+    const database = await databaseFactory();
+    if (input.orderId !== undefined) {
+      const result = await database.demoPhoneOrder(phone, input.orderId);
+      if (!result.ok) return json({ error: "This order was not found for your mobile number." }, 404);
+      return json({ order: result.order, mode: "demo", verified: false });
+    }
+    const result = await database.demoPhoneHistory(phone, input.page);
     return json({ ...result, mode: "demo", verified: false });
   } catch {
     console.error("Demo customer request history could not be loaded.");
