@@ -1,9 +1,25 @@
-import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
-import { orderRequests, orderItems, orderStatusHistory } from "./order-schema.mjs";
+import { and, asc, desc, eq, getTableColumns, ilike, inArray, or, sql } from "drizzle-orm";
+import { orderRequests, orderItems, orderStatusHistory, orderRevisions } from "./order-schema.mjs";
 import { ORDER_STATUSES, PAGE_SIZE } from "../../vendor-app/vendor-model.mjs";
 import { vendor } from "../../vendor-app/catalog.mjs";
 import { approvedImportMetadata, ImportPreviewRollback } from "./approved-import.mjs";
 import { createCatalogueDatabase, activeCatalogue, catalogueLock, catalogueConflict } from "./catalogue-database.mjs";
+import { calculateRevision, revisionInputError } from "../../vendor-app/order-revision-model.mjs";
+
+const latestRevision = and(eq(orderRevisions.orderId, orderRequests.orderId), eq(orderRevisions.revision, orderRequests.revision));
+const latestTotal = sql`coalesce(${orderRevisions.totalPaise}, ${orderRequests.totalPaise})`.mapWith(Number);
+const latestDelivery = sql`coalesce(${orderRevisions.deliveryChargePaise}, ${orderRequests.deliveryChargePaise})`.mapWith(Number);
+
+function snapshot(row, items = row.items) {
+  return {
+    items, subtotal: row.subtotalPaise / 100, discountPercent: row.discountPercent,
+    discount: row.discountPaise / 100, deliveryCharge: row.deliveryChargePaise / 100, total: row.totalPaise / 100,
+  };
+}
+
+function revisionSnapshot(row) {
+  return { revision: row.revision, changedAt: new Date(row.changedAt).toISOString(), reason: row.reason, ...snapshot(row) };
+}
 
 function paise(value) {
   const amount = Math.round(value * 100);
@@ -23,22 +39,35 @@ function summary(row) {
   };
 }
 
-async function detail(tx, orderId) {
+async function detail(tx, orderId, includeHistory = true) {
   const [row] = await tx.select().from(orderRequests).where(eq(orderRequests.orderId, orderId));
   if (!row || row.isTest) return { ok: false, error: "NOT_FOUND" };
   const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId)).orderBy(asc(orderItems.position));
   if (!items.length) throw new Error("Recorded order has no line items.");
+  let current = snapshot(row, items.map(item => ({
+    id: item.productId, name: item.name, brand: item.brand, unit: item.unit,
+    quantity: item.quantity, price: item.unitPricePaise / 100, amount: item.amountPaise / 100,
+  })));
+  if (row.revision > 0) {
+    const [saved] = await tx.select().from(orderRevisions).where(and(
+      eq(orderRevisions.orderId, orderId), eq(orderRevisions.revision, row.revision),
+    ));
+    if (!saved) throw new Error("Latest order revision is missing.");
+    current = snapshot(saved);
+  }
+  const history = includeHistory && row.revision > 0 ? await tx.select().from(orderRevisions)
+    .where(eq(orderRevisions.orderId, orderId)).orderBy(asc(orderRevisions.revision)) : [];
   return { ok: true, order: {
-    ...summary(row), address: row.address, preferredDate: row.preferredDate, notes: row.notes,
-    subtotal: row.subtotalPaise / 100, discountPercent: row.discountPercent,
+    ...summary({ ...row, totalPaise: paise(current.total), deliveryChargePaise: paise(current.deliveryCharge) }),
+    address: row.address, preferredDate: row.preferredDate, notes: row.notes,
+    ...current, revision: row.revision, lineItems: current.items, revisionHistory: history.map(revisionSnapshot),
     couponCode: row.couponCode,
-    discount: row.discountPaise / 100, deliveryCharge: row.deliveryChargePaise / 100,
-    items: items.map(item => `#${item.productId} ${item.name} | ${item.brand}\nPack: ${item.unit}\n${item.quantity} pack${item.quantity === 1 ? "" : "s"} x Rs.${(item.unitPricePaise / 100).toFixed(2)} = Rs.${(item.amountPaise / 100).toFixed(2)}`).join("\n\n"),
+    items: current.items.map(item => `#${item.id} ${item.name} | ${item.brand}\nPack: ${item.unit}\n${item.quantity} pack${item.quantity === 1 ? "" : "s"} x Rs.${item.price.toFixed(2)} = Rs.${item.amount.toFixed(2)}`).join("\n\n"),
   } };
 }
 
-async function customerDetail(tx, orderId) {
-  const result = await detail(tx, orderId);
+async function customerDetail(tx, orderId, includeHistory = true) {
+  const result = await detail(tx, orderId, includeHistory);
   if (!result.ok) return result;
   const history = await tx.select({
     changedAt: orderStatusHistory.changedAt,
@@ -68,6 +97,7 @@ export function createOrderDatabase(db) {
         await tx.select().from(orderRequests).limit(0);
         await tx.select().from(orderItems).limit(0);
         await tx.select().from(orderStatusHistory).limit(0);
+        await tx.select().from(orderRevisions).limit(0);
       }, true);
     },
     async importApprovedSql(statement, approvedHash, actor, preview = false) {
@@ -177,7 +207,7 @@ export function createOrderDatabase(db) {
           .orderBy(desc(orderRequests.createdAt), asc(orderRequests.orderId)).limit(20).offset((page - 1) * 20);
         const orders = [];
         for (const row of rows) {
-          const result = await customerDetail(tx, row.orderId);
+          const result = await customerDetail(tx, row.orderId, false);
           if (!result.ok) throw new Error("A recorded demo request could not be read.");
           orders.push(result.order);
         }
@@ -197,6 +227,62 @@ export function createOrderDatabase(db) {
     async dashboard(input, actor) {
       return transaction(async tx => {
         if (input.action === "vendor-detail") return detail(tx, input.orderId);
+        if (input.action === "vendor-revise") {
+          const invalid = revisionInputError(input);
+          if (invalid || typeof actor !== "string" || !actor.trim() || !ORDER_STATUSES.includes(input.expectedStatus)) {
+            return { ok: false, error: "INVALID_REVISION", message: invalid || "Invalid vendor revision." };
+          }
+          const [row] = await tx.select().from(orderRequests).where(and(
+            eq(orderRequests.orderId, input.orderId), eq(orderRequests.isTest, false),
+          )).for("update");
+          if (!row) return { ok: false, error: "NOT_FOUND" };
+          if (row.revision !== input.expectedRevision || row.status !== input.expectedStatus) {
+            return { ok: false, error: "REVISION_CONFLICT" };
+          }
+          if (row.fulfilment === "pickup" && input.deliveryCharge !== 0) {
+            return { ok: false, error: "INVALID_REVISION", message: "Store-pickup orders cannot have a delivery charge." };
+          }
+          const current = (await detail(tx, input.orderId, false)).order;
+          const known = new Map(current.lineItems.map(item => [item.id, item]));
+          if (input.items.some(item => !known.has(item.id))) {
+            await tx.execute(catalogueLock);
+            const catalogue = await activeCatalogue(tx);
+            if (catalogue.year !== input.catalogue.year || catalogue.revision !== input.catalogue.revision) {
+              return { ok: false, error: "REVISION_CONFLICT" };
+            }
+            for (const product of catalogue.products) {
+              if (!known.has(product.id) && product.hidden !== true) known.set(product.id, product);
+            }
+          }
+          if (input.items.some(item => !known.has(item.id))) {
+            return { ok: false, error: "INVALID_REVISION", message: "A replacement product is unavailable. Reload the editor and choose a visible catalogue product." };
+          }
+          const revised = calculateRevision(input.items.map(item => ({
+            id: item.id, name: known.get(item.id).name, brand: known.get(item.id).brand,
+            unit: known.get(item.id).unit, quantity: item.quantity, price: item.price,
+          })), current.discountPercent, input.deliveryCharge);
+          if (revised.items.length === current.lineItems.length && revised.items.every((item, index) =>
+            ["id", "quantity", "price"].every(key => item[key] === current.lineItems[index][key])) &&
+              revised.deliveryCharge === current.deliveryCharge) {
+            return { ok: false, error: "INVALID_REVISION", message: "Change an item, quantity, price or delivery charge before saving a revision." };
+          }
+          const values = amounts => ({
+            items: amounts.items, subtotalPaise: paise(amounts.subtotal), discountPercent: amounts.discountPercent,
+            discountPaise: paise(amounts.discount), deliveryChargePaise: paise(amounts.deliveryCharge), totalPaise: paise(amounts.total),
+          });
+          if (row.revision === 0) {
+            await tx.insert(orderRevisions).values({
+              orderId: row.orderId, revision: 0, changedAt: row.createdAt, actor: "customer submission",
+              reason: "Original customer request.", ...values({ ...current, items: current.lineItems }),
+            });
+          }
+          await tx.insert(orderRevisions).values({
+            orderId: row.orderId, revision: row.revision + 1, changedAt: sql`clock_timestamp()`,
+            actor, reason: input.reason.trim(), ...values(revised),
+          });
+          await tx.update(orderRequests).set({ revision: row.revision + 1 }).where(eq(orderRequests.orderId, row.orderId));
+          return detail(tx, row.orderId);
+        }
         if (input.action === "vendor-status") {
           const updated = await tx.update(orderRequests).set({ status: input.status }).where(and(
             eq(orderRequests.orderId, input.orderId), eq(orderRequests.status, input.expectedStatus),
@@ -230,8 +316,8 @@ export function createOrderDatabase(db) {
         const where = and(...filters);
         const grouped = await tx.select({
           status: orderRequests.status, count: sql`count(*)`.mapWith(Number),
-          amount: sql`coalesce(sum(${orderRequests.totalPaise}), 0)`.mapWith(Number),
-        }).from(orderRequests).where(where).groupBy(orderRequests.status);
+          amount: sql`coalesce(sum(coalesce(${orderRevisions.totalPaise}, ${orderRequests.totalPaise})), 0)`.mapWith(Number),
+        }).from(orderRequests).leftJoin(orderRevisions, latestRevision).where(where).groupBy(orderRequests.status);
         const stats = { requestValue: 0, ...Object.fromEntries(ORDER_STATUSES.map(status => [status, 0])) };
         let total = 0;
         for (const group of grouped) {
@@ -240,11 +326,13 @@ export function createOrderDatabase(db) {
           if (group.status !== "Cancelled") stats.requestValue += group.amount;
         }
         stats.requestValue /= 100;
-        const rows = await tx.select().from(orderRequests).where(where)
+        const rows = await tx.select({
+          ...getTableColumns(orderRequests), totalPaise: latestTotal, deliveryChargePaise: latestDelivery,
+        }).from(orderRequests).leftJoin(orderRevisions, latestRevision).where(where)
           .orderBy(desc(orderRequests.createdAt), asc(orderRequests.orderId))
           .limit(PAGE_SIZE).offset((input.page - 1) * PAGE_SIZE);
         return { ok: true, orders: rows.map(summary), total, page: input.page, stats };
-      }, input.action !== "vendor-status");
+      }, !["vendor-status", "vendor-revise"].includes(input.action));
     },
   };
 }

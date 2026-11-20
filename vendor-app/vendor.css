@@ -59,6 +59,10 @@
 .vendor-items { padding: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.9 "Segoe UI", Arial, sans-serif; margin: 12px 0; }
 .vendor-status-form { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; padding-top: 20px; margin-top: 20px; border-top: 1px solid var(--line); }
 .vendor-status-form label { flex: 1 1 200px; }
+.vendor-order-edit-form, .vendor-order-edit-items { display: grid; gap: 16px; }
+.vendor-order-edit-item { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; border: 1px solid var(--line); border-radius: 9px; padding: 12px; }
+.vendor-order-edit-item legend { overflow-wrap: anywhere; font-weight: 600; font-size: 13px; }
+.vendor-order-edit-form > button { justify-self: start; }
 .vendor-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .vendor-homepage-panel { margin-top: 24px; }
 .vendor-homepage-form { display: grid; gap: 12px; max-width: 680px; margin-top: 20px; }

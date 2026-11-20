@@ -1,9 +1,31 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, integer, timestamp, uuid, boolean, index, uniqueIndex, primaryKey, check } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, uuid, boolean, jsonb, index, uniqueIndex, primaryKey, check } from "drizzle-orm/pg-core";
 import { ORDER_STATUSES } from "../../vendor-app/vendor-model.mjs";
 
 const statuses = sql.raw(ORDER_STATUSES.map(status => `'${status}'`).join(", "));
 const instant = name => timestamp(name, { withTimezone: true, precision: 3, mode: "string" });
+
+export const orderRevisions = pgTable("order_revisions", {
+  orderId: text("order_id").notNull().references(() => orderRequests.orderId),
+  revision: integer("revision").notNull(),
+  changedAt: instant("changed_at").notNull().defaultNow(),
+  actor: text("actor").notNull(),
+  reason: text("reason").notNull(),
+  items: jsonb("items").notNull(),
+  subtotalPaise: integer("subtotal_paise").notNull(),
+  discountPercent: integer("discount_percent").notNull(),
+  discountPaise: integer("discount_paise").notNull(),
+  deliveryChargePaise: integer("delivery_charge_paise").notNull(),
+  totalPaise: integer("total_paise").notNull(),
+}, table => [
+  primaryKey({ columns: [table.orderId, table.revision] }),
+  check("order_revisions_values_check", sql`${table.revision} >= 0 and length(trim(${table.reason})) between 1 and 500
+    and jsonb_typeof(${table.items}) = 'array' and jsonb_array_length(${table.items}) between 1 and 200`),
+  check("order_revisions_money_check", sql`${table.subtotalPaise} >= 0 and ${table.discountPaise} >= 0
+    and ${table.deliveryChargePaise} >= 0 and ${table.discountPercent} between 0 and 100
+    and ${table.totalPaise} >= 0
+    and ${table.totalPaise} = ${table.subtotalPaise} - ${table.discountPaise} + ${table.deliveryChargePaise}`),
+]);
 
 export const customerAccounts = pgTable("customer_accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -26,6 +48,7 @@ export const orderRequests = pgTable("order_requests", {
   isTest: boolean("is_test").notNull().default(false),
   createdAt: instant("created_at").notNull(),
   status: text("status").notNull().default("New"),
+  revision: integer("revision").notNull().default(0),
   name: text("name").notNull(),
   phone: text("phone").notNull(),
   address: text("address").notNull(),
@@ -44,6 +67,7 @@ export const orderRequests = pgTable("order_requests", {
   index("order_requests_season_idx").on(table.season),
   index("order_requests_customer_time_idx").on(table.customerId, table.createdAt.desc(), table.orderId),
   check("order_requests_status_check", sql`${table.status} in (${statuses})`),
+  check("order_requests_revision_check", sql`${table.revision} >= 0`),
   check("order_requests_fulfilment_check", sql`${table.fulfilment} in ('delivery', 'pickup')`),
   check("order_requests_season_check", sql`${table.season} between 2000 and 9999`),
   check("order_requests_money_check", sql`${table.subtotalPaise} >= 0 and ${table.discountPaise} >= 0

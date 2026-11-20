@@ -75,7 +75,7 @@ before(async () => {
   migrationSeed = await database.activeCatalogue();
 });
 beforeEach(async () => {
-  await engine.exec("truncate order_items, order_status_history, order_requests, catalogue_settings, catalogue_revisions, catalogue_years");
+  await engine.exec("truncate order_items, order_status_history, order_revisions, order_requests, catalogue_settings, catalogue_revisions, catalogue_years");
   await engine.exec("insert into catalogue_years values (2026, 1); insert into catalogue_settings values (1, 2026)");
   await engine.query("insert into catalogue_revisions (year, revision, products, actor) values (2026, 1, $1::jsonb, 'synthetic seed')",
     [JSON.stringify(migrationSeed.products)]);

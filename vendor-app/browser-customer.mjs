@@ -1,5 +1,6 @@
 import { createBrowserCustomerStore, validateDemoHistory, validateDemoOrder } from "./browser-customer-model.mjs";
 import { money } from "./order.mjs";
+import { renderRevisionHistory } from "./order-revision-view.mjs";
 
 const orderDate = value => new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short",
@@ -59,7 +60,7 @@ export function renderCustomerOrderDetails(order, container) {
     fields.append(term, description);
   }
   const itemsHeading = document.createElement("h4");
-  itemsHeading.textContent = "Requested items";
+  itemsHeading.textContent = order.revision > 0 ? `Latest items (revision ${order.revision})` : "Requested items";
   const items = document.createElement("pre");
   items.textContent = order.items;
   const historyHeading = document.createElement("h4");
@@ -79,8 +80,8 @@ export function renderCustomerOrderDetails(order, container) {
     empty.textContent = "No status-change history is recorded for this request.";
     container.append(empty);
   }
-  const revisions = document.createElement("p");
-  revisions.textContent = "Product and price revisions are not tracked yet. This view shows the saved item list and recorded status changes.";
+  const revisions = document.createElement("section");
+  renderRevisionHistory(order, revisions);
   container.append(revisions);
   return heading;
 }

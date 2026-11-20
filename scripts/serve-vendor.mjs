@@ -18,6 +18,7 @@ import { handleVendorHomepage } from "../netlify/functions/vendor-homepage.mjs";
 import { handleOffers } from "../netlify/functions/offers.mjs";
 import { handleVendorOffers } from "../netlify/functions/vendor-offers.mjs";
 import { handleCustomerOrders } from "../netlify/functions/customer-orders.mjs";
+import { handleVendorOrderRevisions } from "../netlify/functions/vendor-order-revisions.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -47,6 +48,9 @@ const files = new Map([
   ["/vendor.css", ["vendor.css", "text/css; charset=utf-8"]],
   ["/vendor.mjs", ["vendor.mjs", "text/javascript; charset=utf-8"]],
   ["/vendor-model.mjs", ["vendor-model.mjs", "text/javascript; charset=utf-8"]],
+  ["/order-revision-model.mjs", ["order-revision-model.mjs", "text/javascript; charset=utf-8"]],
+  ["/order-revision-view.mjs", ["order-revision-view.mjs", "text/javascript; charset=utf-8"]],
+  ["/vendor-order-editor.mjs", ["vendor-order-editor.mjs", "text/javascript; charset=utf-8"]],
   ["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
   ["/app.mjs", ["app.mjs", "text/javascript; charset=utf-8"]],
   ["/browser-customer-model.mjs", ["browser-customer-model.mjs", "text/javascript; charset=utf-8"]],
@@ -84,7 +88,7 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (pathname === "/api/orders" || pathname === "/api/customer-orders" || pathname === "/api/order-pdf" ||
-      pathname === "/api/vendor-orders" || pathname === "/api/vendor-import" ||
+      pathname === "/api/vendor-orders" || pathname === "/api/vendor-order-revisions" || pathname === "/api/vendor-import" ||
       pathname === "/api/homepage" || pathname === "/api/vendor-homepage" ||
       pathname === "/api/offers" || pathname === "/api/vendor-offers" ||
       pathname === "/api/catalogue" || pathname === "/api/vendor-catalogue" || pathname === "/api/vendor-price-list-pdf" ||
@@ -98,6 +102,7 @@ const server = createServer(async (request, response) => {
       }
       const url = new URL(request.url, `http://127.0.0.1:${port}`);
       const handler = pathname === "/api/customer-orders" ? handleCustomerOrders :
+        pathname === "/api/vendor-order-revisions" ? handleVendorOrderRevisions :
         pathname === "/api/offers" ? handleOffers :
         pathname === "/api/vendor-offers" ? handleVendorOffers :
         pathname === "/api/homepage" ? handleHomepage :

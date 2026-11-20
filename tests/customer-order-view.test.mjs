@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { renderCustomerOrderTable, renderCustomerOrderDetails } from "../vendor-app/browser-customer.mjs";
+import { validRevisionView, revisionAcknowledged } from "../vendor-app/order-revision-model.mjs";
 
 function dom() {
   const document = { createElement: tag => new Node(tag) };
@@ -52,5 +53,40 @@ test("detail view shows saved items and genuine status changes while rendering c
   assert.match(content, /New to Confirmed/);
   assert.match(content, /<script>not executable<\/script>/);
   assert.ok(!root.children.some(node => node.tag === "script"));
-  assert.match(content, /Product and price revisions are not tracked yet/);
+  assert.match(content, /No item or price changes have been recorded/);
+});
+
+test("customer detail history shows original and latest line-item snapshots with literal revision reasons", () => {
+  const { root } = dom();
+  const original = { items: [{ id: 1, name: "Original pack", brand: "Synthetic", unit: "Box",
+    quantity: 2, price: 70, amount: 140 }], subtotal: 140, discountPercent: 0, discount: 0, deliveryCharge: 0, total: 140 };
+  const latest = { ...original, items: [{ ...original.items[0], name: "Replacement pack", quantity: 1, amount: 70 }], subtotal: 70, total: 70 };
+  renderCustomerOrderDetails({ ...order, revision: 1, revisionHistory: [
+    { ...original, revision: 0, changedAt: order.createdAt, reason: "Original customer request." },
+    { ...latest, revision: 1, changedAt: order.createdAt, reason: "<script>Unavailability reason</script>" },
+  ] }, root);
+  const content = text(root);
+  assert.match(content, /Original request/);
+  assert.match(content, /Revision 1 \(latest\)/);
+  assert.match(content, /Original pack/);
+  assert.match(content, /Replacement pack/);
+  assert.match(content, /<script>Unavailability reason<\/script>/);
+});
+
+test("revision validation preserves recorded manual discounts but rejects inconsistent amounts and wrong save acknowledgements", () => {
+  const item = { id: 1, name: "Synthetic pack", brand: "", unit: "Box", quantity: 1, price: 100, amount: 100 };
+  const amounts = { items: [item], subtotal: 100, discountPercent: 0, discount: 10, deliveryCharge: 0, total: 90 };
+  const original = { ...order, ...amounts, lineItems: [item], revision: 0, revisionHistory: [] };
+  assert.equal(validRevisionView(original), true);
+  assert.equal(validRevisionView({ ...original, total: 91 }), false);
+  assert.equal(validRevisionView({ ...original, lineItems: [{ ...item, amount: 99 }] }), false);
+  const revised = { ...original, revision: 1, revisionHistory: [
+    { ...amounts, revision: 0, changedAt: order.createdAt, reason: "Original customer request." },
+    { ...amounts, revision: 1, changedAt: order.createdAt, reason: "Agreed price correction." },
+  ] };
+  const input = { orderId: order.orderId, expectedRevision: 0, expectedStatus: order.status,
+    deliveryCharge: 0, items: [{ id: 1, quantity: 1, price: 100 }], reason: "Agreed price correction." };
+  assert.equal(revisionAcknowledged(revised, input), true);
+  assert.equal(revisionAcknowledged(revised, { ...input, items: [{ id: 1, quantity: 2, price: 100 }] }), false);
+  assert.equal(revisionAcknowledged(revised, { ...input, reason: "Another reason." }), false);
 });

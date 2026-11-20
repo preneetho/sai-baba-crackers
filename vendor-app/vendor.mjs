@@ -4,6 +4,9 @@ import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } fr
 import { inspectMediaFile, transferMedia } from "./media-upload.mjs";
 import { validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl } from "./homepage-model.mjs";
 import { validOffers, validOfferVersion, checkOffers, normalizeCoupon } from "./offers-model.mjs";
+import { createOrderEditor } from "./vendor-order-editor.mjs";
+import { renderRevisionHistory } from "./order-revision-view.mjs";
+import { revisionInputError, revisionAcknowledged } from "./order-revision-model.mjs";
 
 const $ = id => document.getElementById(id);
 const money = value => `Rs.${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -20,6 +23,10 @@ let listVersion = 0;
 let detailVersion = 0;
 let expiryTimer;
 let saving = false;
+let revisionEditor = null;
+let revisionDirty = false;
+let revisionLoading = false;
+let revisionNeedsReload = false;
 let listController;
 let detailController;
 let shareController;
@@ -77,6 +84,7 @@ function clearPrivateView() {
   listController?.abort();
   detailController?.abort();
   selected = null;
+  clearRevisionEditor();
   clearShare();
   detailId = "";
   $("order-dialog").close();
@@ -91,6 +99,7 @@ function clearPrivateView() {
   for (const id of ["detail-id", "detail-time", "detail-items", "detail-message", "list-message", "last-refreshed", "account-message"]) $(id).textContent = "";
   $("detail-customer").replaceChildren();
   $("detail-amounts").replaceChildren();
+  $("detail-revisions").replaceChildren();
   for (const id of ["stat-new", "stat-active", "stat-completed", "stat-value"]) $(id).textContent = "";
   $("order-search").value = "";
   $("status-filter").value = "";
@@ -1014,12 +1023,35 @@ function detailFields(id, pairs) {
   for (const [label, value] of pairs) $(id).append(element("dt", label), element("dd", value || "Not provided"));
 }
 
+function clearRevisionEditor() {
+  revisionEditor = null;
+  revisionDirty = false;
+  revisionLoading = false;
+  revisionNeedsReload = false;
+  $("order-edit-form").replaceChildren();
+  $("order-edit-form").hidden = true;
+  $("cancel-order-edit").hidden = true;
+}
+
+function revisionControls() {
+  const editing = revisionLoading || revisionEditor !== null;
+  $("open-order-editor").disabled = saving || revisionLoading || !selected || revisionNeedsReload;
+  $("cancel-order-edit").disabled = saving || revisionLoading;
+  $("detail-status").disabled = saving || editing || !selected;
+  $("save-status").disabled = saving || editing || !selected || $("detail-status").value === selected.status;
+  $("create-share").disabled = saving || editing || !selected;
+  $("reload-detail").disabled = saving || revisionLoading;
+  $("close-details").disabled = saving;
+  $("sign-out").disabled = saving || priceBusy || homepageBusy || offerBusy;
+}
+
 function renderDetail(order) {
+  clearRevisionEditor();
   clearShare();
   selected = order;
   $("detail-content").hidden = false;
   $("detail-id").textContent = order.orderId;
-  $("detail-time").textContent = `Recorded ${orderTime(order.createdAt)}`;
+  $("detail-time").textContent = `Recorded ${orderTime(order.createdAt)}${order.revision > 0 ? `; latest item/price revision ${order.revision}` : ""}`;
   detailFields("detail-customer", [
     ["Customer", order.name], ["Mobile", order.phone], ["Fulfilment", order.fulfilment],
     ["Address", order.address], ["Preferred date", order.preferredDate], ["Notes", order.notes],
@@ -1033,10 +1065,16 @@ function renderDetail(order) {
   $("detail-status").disabled = false;
   $("save-status").disabled = true;
   $("reload-detail").hidden = true;
+  $("open-order-editor").hidden = order.revision === undefined;
+  $("detail-revisions").replaceChildren();
+  if (order.revision !== undefined) renderRevisionHistory(order, $("detail-revisions"));
+  revisionControls();
 }
 
 async function openDetails(id) {
   if (!session || saving) return;
+  if (revisionDirty && !window.confirm("Discard the unsaved order revision and reload details?")) return;
+  clearRevisionEditor();
   clearShare();
   detailId = id;
   selected = null;
@@ -1315,30 +1353,124 @@ $("price-form").addEventListener("submit", event => {
   changePrices({ action: "save", year: priceList.year, expectedRevision: priceList.revision, products });
 });
 window.addEventListener("beforeunload", event => {
-  if (priceDirty || priceBusy || homepageDirty() || homepageBusy || offerDirty || offerBusy) { event.preventDefault(); event.returnValue = ""; }
+  if (priceDirty || priceBusy || homepageDirty() || homepageBusy || offerDirty || offerBusy || revisionDirty || saving) { event.preventDefault(); event.returnValue = ""; }
 });
-$("close-details").addEventListener("click", () => $("order-dialog").close());
-$("order-dialog").addEventListener("cancel", event => { if (saving) event.preventDefault(); });
+$("close-details").addEventListener("click", () => {
+  if (!saving && (!revisionDirty || window.confirm("Discard the unsaved order revision?"))) $("order-dialog").close();
+});
+$("order-dialog").addEventListener("cancel", event => {
+  if (saving || (revisionDirty && !window.confirm("Discard the unsaved order revision?"))) event.preventDefault();
+});
 $("order-dialog").addEventListener("close", () => {
   const trigger = $(`order-open-${detailId}`);
   detailVersion++;
   detailController?.abort();
   clearShare();
   selected = null;
+  clearRevisionEditor();
   detailId = "";
   $("detail-content").hidden = true;
   $("detail-customer").replaceChildren();
   $("detail-amounts").replaceChildren();
   $("detail-items").textContent = "";
+  $("detail-revisions").replaceChildren();
   if (session) (trigger ?? $("refresh-orders")).focus({ preventScroll: true });
 });
 $("reload-detail").addEventListener("click", () => openDetails(detailId));
 $("detail-status").addEventListener("change", () => {
-  $("save-status").disabled = !selected || saving || $("detail-status").value === selected.status;
+  revisionControls();
+});
+$("open-order-editor").addEventListener("click", async () => {
+  if (!selected || !session || saving || revisionLoading || revisionNeedsReload) return;
+  const order = selected;
+  const version = detailVersion;
+  revisionLoading = true;
+  clearShare();
+  revisionControls();
+  notice("detail-message", "Loading replacement products...");
+  try {
+    const result = await api("/api/vendor-catalogue", {
+      signal: AbortSignal.any([detailController.signal, AbortSignal.timeout(25000)]),
+    });
+    if (version !== detailVersion || !session) return;
+    if (!validCatalogue(result.catalogue)) throw new Error("The replacement catalogue could not be verified. Retry loading the editor.");
+    revisionEditor = createOrderEditor(order, result.catalogue, $("order-edit-form"), dirty => {
+      revisionDirty = dirty;
+      revisionControls();
+    });
+    $("order-edit-form").hidden = false;
+    $("cancel-order-edit").hidden = false;
+    $("open-order-editor").hidden = true;
+    notice("detail-message", "Review the revised total and enter a reason. Saving updates the customer's My orders; no notification is sent automatically.");
+    $("order-edit-form").querySelector("input").focus();
+  } catch (error) {
+    if (version !== detailVersion || !session) return;
+    notice("detail-message", error.message || "The order editor could not be loaded. Retry.", true);
+  } finally {
+    if (version === detailVersion && session) {
+      revisionLoading = false;
+      revisionControls();
+    }
+  }
+});
+$("cancel-order-edit").addEventListener("click", () => {
+  if (saving || (revisionDirty && !window.confirm("Discard the unsaved order revision?"))) return;
+  const uncertain = revisionNeedsReload;
+  clearRevisionEditor();
+  $("open-order-editor").hidden = selected?.revision === undefined;
+  revisionControls();
+  notice("detail-message", uncertain ? "Draft discarded. Reload to check the saved order." : "Editing cancelled. The saved order has not changed.");
+  (selected ? $("open-order-editor") : $("reload-detail")).focus();
+});
+$("order-edit-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!selected || !session || saving || !revisionEditor || revisionNeedsReload) return;
+  let input;
+  try {
+    input = revisionEditor.build();
+    const invalid = revisionInputError(input);
+    if (invalid) throw new Error(invalid);
+  } catch (error) {
+    notice("detail-message", error.message, true);
+    return;
+  }
+  const version = detailVersion;
+  saving = true;
+  clearShare();
+  revisionEditor.setBusy(true);
+  revisionControls();
+  notice("detail-message", "Saving the order revision...");
+  try {
+    const result = await api("/api/vendor-order-revisions", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Vendor-CSRF": session.csrf },
+      body: JSON.stringify(input),
+    });
+    if (version !== detailVersion || !session) return;
+    if (!validOrder(result.order, true) || !revisionAcknowledged(result.order, input)) {
+      throw new Error("The revision was not acknowledged.");
+    }
+    renderDetail(result.order);
+    $("detail-id").tabIndex = -1;
+    $("detail-id").focus({ preventScroll: true });
+    notice("detail-message", `Revision ${result.order.revision} saved. The customer can see the latest items and history in My orders. No notification was sent.`);
+    await loadOrders();
+  } catch (error) {
+    if (version !== detailVersion || !session) return;
+    selected = null;
+    revisionNeedsReload = true;
+    notice("detail-message", `${error.message} Reload the order before trying again. Your draft is kept until you reload or cancel.`, true);
+    $("reload-detail").hidden = false;
+  } finally {
+    saving = false;
+    if (version === detailVersion && session) {
+      revisionEditor?.setBusy(revisionNeedsReload);
+      revisionControls();
+    }
+  }
 });
 $("status-form").addEventListener("submit", async event => {
   event.preventDefault();
-  if (!selected || !session || saving || $("detail-status").value === selected.status) return;
+  if (!selected || !session || saving || revisionEditor || revisionLoading || $("detail-status").value === selected.status) return;
   const id = selected.orderId;
   const version = detailVersion;
   const status = $("detail-status").value;
@@ -1368,13 +1500,12 @@ $("status-form").addEventListener("submit", async event => {
     $("reload-detail").hidden = false;
   } finally {
     saving = false;
-    $("create-share").disabled = false;
-    $("close-details").disabled = false;
+    revisionControls();
   }
 });
 $("sign-out").addEventListener("click", async () => {
-  if (!session || priceBusy || homepageBusy || offerBusy ||
-      ((priceDirty || homepageDirty() || offerDirty) && !window.confirm("Sign out and discard unsaved dashboard edits?"))) return;
+  if (!session || saving || priceBusy || homepageBusy || offerBusy ||
+      ((priceDirty || homepageDirty() || offerDirty || revisionDirty) && !window.confirm("Sign out and discard unsaved dashboard edits?"))) return;
   $("sign-out").disabled = true;
   try {
     await api("/api/vendor-auth/logout", {

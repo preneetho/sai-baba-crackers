@@ -107,7 +107,10 @@ test("creation snapshots only the fresh saved request and works with database an
         databaseFactory: async () => ({ dashboard: async (input, actor) => {
           calls.push(input);
           assert.equal(actor, "owner@example.com");
-          return { ok: true, order: { ...order, fingerprint: "never-share", auditEmail: "private@example.com" } };
+          return { ok: true, order: { ...order, revision: 0, lineItems: [
+            { id: 1, name: "Synthetic pack", brand: "", unit: "Box", quantity: 1, price: 100, amount: 100 },
+            { id: 2, name: "తెలుగు pack", brand: "", unit: "Box", quantity: 2, price: 0, amount: 0 },
+          ], revisionHistory: [], fingerprint: "never-share", auditEmail: "private@example.com" } };
         } }),
       } : {
         env: { ...env, ORDER_BACKEND: "sheets",

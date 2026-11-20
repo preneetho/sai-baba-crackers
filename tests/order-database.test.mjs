@@ -7,6 +7,7 @@ import { createOrderDatabase, getOrderDatabase } from "../netlify/lib/order-data
 import { orderBackend } from "../netlify/lib/order-backend.mjs";
 import { buildOrder, handleOrderRequest } from "../netlify/functions/orders.mjs";
 import { handleVendorOrders } from "../netlify/functions/vendor-orders.mjs";
+import { handleVendorOrderRevisions } from "../netlify/functions/vendor-order-revisions.mjs";
 import { createSession, unseal, vendorSettings } from "../netlify/lib/vendor-auth.mjs";
 import { products, vendor } from "../vendor-app/catalog.mjs";
 import { DEFAULT_OFFERS } from "../vendor-app/offers-model.mjs";
@@ -82,9 +83,165 @@ before(async () => {
   }
 });
 beforeEach(async () => {
-  await engine.exec("truncate order_items, order_status_history, order_requests");
+  await engine.exec("truncate order_items, order_status_history, order_revisions, order_requests");
 });
 after(async () => { await engine.close(); });
+
+const revise = body => handleVendorOrderRevisions(request("/api/vendor-order-revisions", body, true), {
+  env, now: () => now.getTime(), databaseFactory: factory,
+});
+const revisionInput = (order, overrides = {}) => ({
+  orderId: order.orderId, expectedRevision: 0, expectedStatus: "New",
+  reason: "Requested item unavailable; replacement agreed with customer.",
+  catalogue: { year: 2026, revision: 1 },
+  items: [{ id: 2, quantity: 3, price: 50.25 }], deliveryCharge: 0, ...overrides,
+});
+
+test("vendor revisions preserve original snapshots and update customer details, totals, shares and dashboard summaries", async () => {
+  const original = build();
+  await database.save(original);
+  const response = await revise(revisionInput(original));
+  assert.equal(response.status, 200);
+  const revised = (await response.json()).order;
+  assert.equal(revised.revision, 1);
+  assert.equal(revised.total, 150.75);
+  assert.equal(revised.lineItems[0].name, products.find(product => product.id === 2).name);
+  assert.equal(revised.revisionHistory.length, 2);
+  assert.equal(revised.revisionHistory[0].total, original.amounts.total);
+  assert.equal(revised.revisionHistory[0].items[0].quantity, 2);
+  assert.equal(revised.revisionHistory[1].reason, revisionInput(original).reason);
+  assert.ok(!JSON.stringify(revised).includes("owner@example.com"));
+  const row = (await engine.query("select subtotal_paise, total_paise, fingerprint, revision from order_requests")).rows[0];
+  assert.equal(row.total_paise, original.amounts.total * 100);
+  assert.equal(row.fingerprint, original.fingerprint);
+  assert.equal(row.revision, 1);
+  assert.equal((await engine.query("select product_id from order_items")).rows[0].product_id, 1);
+  assert.deepEqual(await database.save(original), { ok: true, orderId: original.orderId, createdAt: original.createdAt });
+  const list = await database.dashboard({ action: "vendor-list", page: 1 });
+  assert.equal(list.orders[0].total, 150.75);
+  assert.equal(list.stats.requestValue, 150.75);
+  const customer = await database.demoPhoneOrder("9876543210", original.orderId);
+  assert.equal(customer.order.total, 150.75);
+  assert.equal(customer.order.revisionHistory[0].items[0].id, 1);
+  assert.equal(customer.order.revisionHistory[1].items[0].id, 2);
+  assert.ok(!JSON.stringify(customer).includes("owner@example.com"));
+  assert.equal((await database.demoPhoneHistory("9876543210")).orders[0].total, 150.75);
+  assert.equal((await database.dashboard({ action: "vendor-detail", orderId: original.orderId })).order.total, 150.75);
+});
+
+test("stale revisions and status races cannot overwrite an order, and unchanged revisions are not saved", async () => {
+  const original = build();
+  await database.save(original);
+  assert.equal((await revise(revisionInput(original))).status, 200);
+  assert.equal((await revise(revisionInput(original))).status, 409);
+  assert.equal((await revise(revisionInput(original, { expectedRevision: 1 }))).status, 400);
+  await database.dashboard({ action: "vendor-status", orderId: original.orderId, status: "Confirmed", expectedStatus: "New" }, "owner@example.com");
+  assert.equal((await revise(revisionInput(original, {
+    expectedRevision: 1, items: [{ id: 2, quantity: 4, price: 50.25 }],
+  }))).status, 409);
+  const updated = await revise(revisionInput(original, {
+    expectedRevision: 1, expectedStatus: "Confirmed", items: [{ id: 2, quantity: 4, price: 50.25 }],
+  }));
+  assert.equal(updated.status, 200);
+  assert.equal((await updated.json()).order.revisionHistory.length, 3);
+  assert.equal(await count("order_revisions"), 3);
+});
+
+test("revision calculations retain the saved coupon and use explicit delivery charges without repricing originals", async () => {
+  const payload = { ...input(), couponCode: "SALE15", customer: { ...input().customer, fulfilment: "delivery" } };
+  const original = buildOrder(payload, now, undefined, {
+    coupons: [{ code: "SALE15", percent: 15, enabled: true }], freeDeliveryMinimum: 500, deliveryFee: 50,
+  });
+  await database.save(original);
+  const response = await revise(revisionInput(original, {
+    items: [{ id: 1, quantity: 1, price: 100.05 }], deliveryCharge: 60,
+  }));
+  assert.equal(response.status, 200);
+  const order = (await response.json()).order;
+  assert.equal(order.subtotal, 100.05);
+  assert.equal(order.discount, 15.01);
+  assert.equal(order.total, 145.04);
+  assert.equal(order.couponCode, "SALE15");
+  assert.equal(order.revisionHistory[0].deliveryCharge, 50);
+});
+
+test("invalid or hidden replacements, empty revisions and pickup fees fail without leaving partial history", async () => {
+  const original = build();
+  await database.save(original);
+  const catalogue = await database.priceLists();
+  const product = catalogue.catalogue.products.find(product => product.id === 2);
+  product.hidden = true;
+  await database.priceLists({ action: "save", year: catalogue.catalogue.year,
+    expectedRevision: catalogue.catalogue.revision, products: catalogue.catalogue.products }, "owner@example.com");
+  try {
+    assert.equal((await revise(revisionInput(original))).status, 409);
+    for (const overrides of [
+      { items: [] }, { items: [{ id: 2, quantity: 1, price: 50 }] },
+      { items: [{ id: 99999, quantity: 1, price: 50 }] }, { deliveryCharge: 10 },
+      { items: [{ id: 1, quantity: 100, price: 50 }] }, { reason: " " },
+    ]) assert.equal((await revise(revisionInput(original, {
+      catalogue: { year: catalogue.catalogue.year, revision: catalogue.catalogue.revision + 1 }, ...overrides,
+    }))).status, 400);
+    assert.equal(await count("order_revisions"), 0);
+    assert.equal((await database.demoPhoneOrder("9876543210", original.orderId)).order.revision, 0);
+  } finally {
+    await engine.query("update catalogue_years set revision = $1 where year = $2",
+      [catalogue.catalogue.revision, catalogue.catalogue.year]);
+    await engine.query("delete from catalogue_revisions where year = $1 and revision > $2",
+      [catalogue.catalogue.year, catalogue.catalogue.revision]);
+  }
+});
+
+test("only authenticated same-origin vendors can revise orders; missing and retired requests stay inaccessible", async () => {
+  const original = build();
+  const body = revisionInput(original);
+  const options = { env, now: () => now.getTime(), databaseFactory: factory };
+  assert.equal((await handleVendorOrderRevisions(request("/api/vendor-order-revisions", body), options)).status, 401);
+  const forged = new Request(`${origin}/api/vendor-order-revisions`, {
+    method: "POST", headers: { Cookie: `${settings.sessionCookie}=${cookie}`, "Content-Type": "application/json", Origin: "https://elsewhere.example" },
+    body: JSON.stringify(body),
+  });
+  assert.equal((await handleVendorOrderRevisions(forged, options)).status, 403);
+  assert.equal((await revise(body)).status, 404);
+  await database.save(original);
+  await engine.exec(`update order_requests set is_test = true where order_id = '${original.orderId}'`);
+  assert.equal((await revise(body)).status, 404);
+  assert.equal(await count("order_revisions"), 0);
+});
+
+test("a late revision write failure rolls back both history and the current-version pointer", async () => {
+  const original = build();
+  await database.save(original);
+  await engine.exec(`create function reject_test_revision() returns trigger language plpgsql as $$
+    begin if new.revision > 0 then raise exception 'Synthetic revision failure'; end if; return new; end $$;
+    create trigger reject_test_revision before insert on order_revisions for each row execute function reject_test_revision();`);
+  try {
+    assert.equal((await revise(revisionInput(original))).status, 503);
+    assert.equal(await count("order_revisions"), 0);
+    const current = (await database.demoPhoneOrder("9876543210", original.orderId)).order;
+    assert.equal(current.revision, 0);
+    assert.equal(current.total, original.amounts.total);
+  } finally {
+    await engine.exec("drop trigger reject_test_revision on order_revisions; drop function reject_test_revision();");
+  }
+});
+
+test("revision transport validation rejects malformed bodies before opening the database", async () => {
+  let reads = 0;
+  const options = { env, now: () => now.getTime(), databaseFactory: async () => { reads++; throw new Error("Unexpected database access"); } };
+  const valid = revisionInput(build());
+  for (const [body, expected] of [
+    [{ ...valid, orderId: [valid.orderId] }, 400], [{ ...valid, reason: "x".repeat(501) }, 400],
+    [{ ...valid, items: [{ id: 1, quantity: 1, price: 0.001 }] }, 400],
+    [{ ...valid, items: [{ id: 1, quantity: 1, price: 10 }, { id: 1, quantity: 1, price: 10 }] }, 400],
+  ]) assert.equal((await handleVendorOrderRevisions(request("/api/vendor-order-revisions", body, true), options)).status, expected);
+  const malformed = new Request(`${origin}/api/vendor-order-revisions`, {
+    method: "POST", headers: { Origin: origin, "Content-Type": "application/json",
+      Cookie: `${settings.sessionCookie}=${cookie}`, "X-Vendor-CSRF": csrf }, body: "{",
+  });
+  assert.equal((await handleVendorOrderRevisions(malformed, options)).status, 400);
+  assert.equal(reads, 0);
+});
 
 test("backend selection is explicit, defaults to Sheets and never silently falls back", () => {
   assert.equal(orderBackend({}), null);

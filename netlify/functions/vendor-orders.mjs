@@ -1,6 +1,7 @@
 import { vendorSettings, vendorJson, vendorSession, sameOriginMutation } from "../lib/vendor-auth.mjs";
 import { orderBackend } from "../lib/order-backend.mjs";
 import { ORDER_STATUSES, ORDER_ID, PAGE_SIZE, validOrder } from "../../vendor-app/vendor-model.mjs";
+import { revisionFields } from "../../vendor-app/order-revision-model.mjs";
 
 export async function handleVendorOrders(request, {
   env = process.env, fetchImpl = fetch, now = Date.now,
@@ -83,7 +84,10 @@ export async function handleVendorOrders(request, {
       }
       const keys = ["orderId", "createdAt", "status", "name", "phone", "fulfilment", "total",
         "address", "preferredDate", "items", "subtotal", "discountPercent", "discount", "deliveryCharge", "notes", "couponCode"];
-      return vendorJson({ order: Object.fromEntries(keys.map(key => [key, result.order[key]])) });
+      return vendorJson({ order: {
+        ...Object.fromEntries(keys.map(key => [key, result.order[key]])),
+        ...(backend.name === "netlify-db" ? revisionFields(result.order) : {}),
+      } });
     }
     if (!Array.isArray(result.orders) || result.orders.length > PAGE_SIZE || !result.orders.every(order => validOrder(order)) ||
         !Number.isSafeInteger(result.total) || result.total < 0 || (backend.name === "sheets" && result.total > 10000) ||

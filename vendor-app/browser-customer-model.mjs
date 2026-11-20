@@ -1,5 +1,6 @@
 import { CART_KEY, validateOrderShareLink } from "./order.mjs";
 import { ORDER_STATUSES } from "./vendor-model.mjs";
+import { validRevisionView } from "./order-revision-model.mjs";
 
 const PHONE_KEY = "sai-baba-browser-phone-v1";
 const HISTORY_PREFIX = "sai-baba-browser-requests-v1:";
@@ -14,7 +15,7 @@ export function normalizeBrowserPhone(value) {
 }
 
 function validCustomerOrder(order, phone) {
-  return !!order && order.phone === `+91 ${phone}` &&
+  return !!order && (order.revision === undefined || validRevisionView(order)) && order.phone === `+91 ${phone}` &&
     ["orderId", "createdAt", "status", "name", "address", "items", "notes", "fulfilment", "preferredDate"].every(key => typeof order[key] === "string") &&
     /^[A-Za-z0-9_-]{1,100}$/.test(order.orderId) && Number.isFinite(Date.parse(order.createdAt)) &&
     ORDER_STATUSES.includes(order.status) &&

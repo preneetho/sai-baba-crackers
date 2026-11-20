@@ -146,9 +146,17 @@
       <p id="detail-id" class="vendor-request-id"></p>
       <p id="detail-time" class="vendor-muted"></p>
       <dl id="detail-customer" class="vendor-detail-fields"></dl>
-      <h3>Requested items</h3><pre id="detail-items" class="vendor-items"></pre>
+      <h3>Latest saved items</h3><pre id="detail-items" class="vendor-items"></pre>
       <dl id="detail-amounts" class="vendor-detail-fields"></dl>
       <p class="vendor-muted">Listed quantities are selling packs/units. Stock, final price and arrangements need shop confirmation.</p>
+      <section id="detail-revisions"></section>
+      <section class="vendor-share" aria-labelledby="order-edit-title">
+        <h3 id="order-edit-title">Edit order for availability</h3>
+        <p class="vendor-muted">Saving creates a dated revision visible in the customer's My orders. No customer notification or approval is sent automatically.</p>
+        <button id="open-order-editor" type="button" hidden>Edit items and prices</button>
+        <form id="order-edit-form" class="vendor-order-edit-form" hidden></form>
+        <button id="cancel-order-edit" type="button" hidden>Cancel editing</button>
+      </section>
       <section class="vendor-share" aria-labelledby="share-title">
         <h3 id="share-title">Share request</h3>
         <p class="vendor-muted">Anyone with the link can view customer details and all items for seven days. It is a read-only snapshot of saved details, not live updates or unsaved status selections. Share only with trusted recipients.</p>

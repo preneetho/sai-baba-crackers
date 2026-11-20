@@ -1,3 +1,5 @@
+import { validRevisionView } from "./order-revision-model.mjs";
+
 export const ORDER_STATUSES = Object.freeze([
   "New", "Contacted", "Confirmed", "Preparing", "Out for delivery",
   "Ready for pickup", "Completed", "Cancelled",
@@ -20,6 +22,7 @@ export function validImportSummary(result) {
 }
 
 export function validOrder(order, full = false) {
+  if (order?.revision !== undefined && !validRevisionView(order)) return false;
   if (order?.couponCode !== undefined && (typeof order.couponCode !== "string" ||
       (order.couponCode !== "" && !/^[A-Z0-9][A-Z0-9_-]{1,23}$/.test(order.couponCode)))) return false;
   if (!order || !ORDER_ID.test(order.orderId ?? "") || !ORDER_STATUSES.includes(order.status) ||

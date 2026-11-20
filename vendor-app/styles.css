@@ -349,3 +349,6 @@ textarea { resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+.order-revision-items { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+#detail-revisions details, #customer-order-detail-content details { padding-block: 12px; border-bottom: 1px solid var(--line); }
+#detail-revisions summary, #customer-order-detail-content summary { cursor: pointer; overflow-wrap: anywhere; min-height: 44px; }

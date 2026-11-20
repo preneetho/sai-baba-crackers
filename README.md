@@ -177,10 +177,42 @@ Contact us. Its table shows the order reference, IST date, saved status and esti
 amount. Selecting the date (keyboard accessible) or row loads the latest saved
 details from the server, including the recorded status-change history without staff
 identities. Returning to the table preserves its page and reflects the refreshed
-status/amount. Item and price revisions are not currently tracked; vendor availability
-editing and customer-visible item revisions remain a separate planned flow.
+status/amount. Vendor availability edits save item/price revisions separately from
+the original request, with dated snapshots and customer-visible reasons.
 Narrow screens keep date, status and amount visible; the full reference remains
 available in order details.
+
+### Vendor order availability edits
+
+In **Vendor dashboard → open an order → Edit items and prices**, uncheck unavailable
+items, change selling-pack quantities or agreed unit prices, and add replacement
+products from the visible active catalogue. Review the delivery charge and enter
+a customer-visible reason, then **Save order revision**. At least one item must
+remain; use the existing Cancelled status if nothing can be supplied. Pickup
+requests cannot have a delivery charge.
+
+The server recalculates all line amounts and totals in integer paise, retaining
+the saved coupon percentage. Delivery charges are reviewed explicitly rather than
+silently applying today's offer rules. Editing does not change order status,
+deduct stock, collect payment, request approval or send a notification.
+
+The `order_revisions` migration adds immutable item/amount snapshots and a current
+revision pointer. Original `order_items`, recorded amounts, submission fingerprints
+and submission/PDF/share snapshots remain unchanged. The first edit preserves
+revision 0 as the original request; each save adds a dated revision and reason.
+Customer **My orders** and vendor details show the latest items and totals, with
+expandable original and subsequent snapshots. Vendor lists/statistics use the
+latest revised amounts. Newly created vendor share links snapshot the latest saved
+details; old links do not change.
+
+Editing requires the existing approved Google vendor session, same-origin CSRF,
+and `ORDER_BACKEND=netlify-db`. Customer phone access cannot modify orders. Saves
+check both the expected revision and status under a transaction row lock, and
+check the catalogue version before adding replacement products; a
+conflict or uncertain response requires reloading before another save. Drafts are
+retained on save failure and closing/signing out warns about unsaved changes.
+Apply the tracked `order_revisions` migration before deploying the matching
+Functions and frontend. No new environment variable or dependency is required.
 
 With Node.js 22.12 or later:
 
