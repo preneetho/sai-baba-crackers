@@ -151,6 +151,24 @@ export function createOrderDatabase(db) {
         return { ok: true, orderId: order.orderId, createdAt: order.createdAt };
       });
     },
+    async demoPhoneHistory(phone, page = 1) {
+      if (!/^[6-9]\d{9}$/.test(phone) || !Number.isSafeInteger(page) || page < 1 || page > 100000) {
+        throw new Error("Invalid demo history lookup.");
+      }
+      return transaction(async tx => {
+        const where = and(eq(orderRequests.phone, phone), eq(orderRequests.isTest, false));
+        const [count] = await tx.select({ total: sql`count(*)`.mapWith(Number) }).from(orderRequests).where(where);
+        const rows = await tx.select({ orderId: orderRequests.orderId }).from(orderRequests).where(where)
+          .orderBy(desc(orderRequests.createdAt), asc(orderRequests.orderId)).limit(20).offset((page - 1) * 20);
+        const orders = [];
+        for (const row of rows) {
+          const result = await detail(tx, row.orderId);
+          if (!result.ok) throw new Error("A recorded demo request could not be read.");
+          orders.push(result.order);
+        }
+        return { orders, total: count.total, page, pageSize: 20 };
+      }, true);
+    },
     async dashboard(input, actor) {
       return transaction(async tx => {
         if (input.action === "vendor-detail") return detail(tx, input.orderId);

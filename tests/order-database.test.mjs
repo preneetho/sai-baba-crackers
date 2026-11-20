@@ -143,6 +143,31 @@ test("saved coupon codes and paid delivery remain immutable in database details"
   assert.equal(detail.fulfilment, "Home delivery");
 });
 
+test("demo phone history uses exact matching, returns saved details and paginates without retired test orders", async () => {
+  for (let index = 1; index <= 22; index++) {
+    await database.save(build(index, new Date(now.getTime() + index * 1000)));
+  }
+  const other = build(23);
+  other.customer.phone = "9876543211";
+  await database.save(other);
+  await engine.exec(`update order_requests set is_test = true where order_id = '${build(1).orderId}'`);
+  const first = await database.demoPhoneHistory("9876543210", 1);
+  assert.equal(first.total, 21);
+  assert.equal(first.orders.length, 20);
+  assert.equal(first.orders[0].orderId, build(22).orderId);
+  assert.ok(first.orders.every(order => order.phone === "+91 9876543210"));
+  assert.equal(first.orders[0].address, "Synthetic test address only");
+  assert.ok(first.orders[0].items.includes(products[0].name));
+  const second = await database.demoPhoneHistory("9876543210", 2);
+  assert.equal(second.orders.length, 1);
+  assert.equal(second.orders[0].orderId, build(2).orderId);
+  const otherHistory = await database.demoPhoneHistory("9876543211");
+  assert.equal(otherHistory.total, 1);
+  assert.equal(otherHistory.orders[0].orderId, other.orderId);
+  assert.deepEqual((await database.demoPhoneHistory("9876543212")).orders, []);
+  await assert.rejects(database.demoPhoneHistory("987654321"), /Invalid demo/);
+});
+
 test("retries keep the original timestamp and vendor status without duplicate rows or audit entries", async () => {
   const order = build();
   await database.save(order);

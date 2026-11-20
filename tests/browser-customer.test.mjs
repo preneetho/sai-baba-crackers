@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { webcrypto } from "node:crypto";
-import { createBrowserCustomerStore, normalizeBrowserPhone } from "../vendor-app/browser-customer-model.mjs";
+import { createBrowserCustomerStore, normalizeBrowserPhone, validateDemoHistory } from "../vendor-app/browser-customer-model.mjs";
 
 const origin = "https://shop.example";
 const orderId = "SBC-12345678-1234-4234-8234-123456789012";
@@ -34,18 +34,36 @@ test("history needs this browser's saved links, not merely a matching phone numb
   const restored = makeStore(session, storage).store;
   await restored.restore();
   assert.equal(restored.phone, "9876543210");
+  const firstCartKey = restored.cartKey;
+  assert.equal(firstCartKey, store.cartKey);
+  assert.ok(!firstCartKey.includes("9876543210"));
   assert.equal(restored.history().length, 1);
   await restored.enter("9876543211");
+  assert.notEqual(restored.cartKey, firstCartKey);
   assert.deepEqual(restored.history(), []);
   const otherBrowser = makeStore().store;
   await otherBrowser.enter("9876543210");
   assert.deepEqual(otherBrowser.history(), []);
   restored.end();
   assert.equal(restored.phone, "");
+  assert.equal(restored.cartKey, null);
   assert.throws(() => restored.history(), /Enter your mobile/);
   await restored.enter("9876543210");
   restored.forget();
   assert.deepEqual(restored.history(), []);
+});
+
+test("demo history refuses another phone's records and invalid pagination responses", () => {
+  const order = {
+    orderId, createdAt: new Date().toISOString(), status: "New", name: "Synthetic",
+    phone: "+91 9876543210", address: "Synthetic only", items: "Synthetic line item",
+    notes: "", fulfilment: "Store pickup", total: 100,
+  };
+  const result = { orders: [order], total: 1, page: 1, pageSize: 20, mode: "demo", verified: false };
+  assert.equal(validateDemoHistory(result, "9876543210", 1), result);
+  assert.throws(() => validateDemoHistory(result, "9876543211", 1));
+  assert.throws(() => validateDemoHistory({ ...result, page: 2 }, "9876543210", 1));
+  assert.throws(() => validateDemoHistory({ ...result, verified: true }, "9876543210", 1));
 });
 
 test("history rejects untrusted links and retains an expired reference without a customer-data snapshot", async () => {

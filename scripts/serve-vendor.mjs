@@ -17,6 +17,7 @@ import { handleHomepage } from "../netlify/functions/homepage.mjs";
 import { handleVendorHomepage } from "../netlify/functions/vendor-homepage.mjs";
 import { handleOffers } from "../netlify/functions/offers.mjs";
 import { handleVendorOffers } from "../netlify/functions/vendor-offers.mjs";
+import { handleCustomerOrders } from "../netlify/functions/customer-orders.mjs";
 
 const port = Number(process.env.VENDOR_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -82,7 +83,7 @@ const server = createServer(async (request, response) => {
     response.end("Invalid URL");
     return;
   }
-  if (pathname === "/api/orders" || pathname === "/api/order-pdf" ||
+  if (pathname === "/api/orders" || pathname === "/api/customer-orders" || pathname === "/api/order-pdf" ||
       pathname === "/api/vendor-orders" || pathname === "/api/vendor-import" ||
       pathname === "/api/homepage" || pathname === "/api/vendor-homepage" ||
       pathname === "/api/offers" || pathname === "/api/vendor-offers" ||
@@ -96,7 +97,8 @@ const server = createServer(async (request, response) => {
         init.duplex = "half";
       }
       const url = new URL(request.url, `http://127.0.0.1:${port}`);
-      const handler = pathname === "/api/offers" ? handleOffers :
+      const handler = pathname === "/api/customer-orders" ? handleCustomerOrders :
+        pathname === "/api/offers" ? handleOffers :
         pathname === "/api/vendor-offers" ? handleVendorOffers :
         pathname === "/api/homepage" ? handleHomepage :
         pathname === "/api/vendor-homepage" ? handleVendorHomepage :

@@ -138,8 +138,11 @@ registration is performed by these source changes.
 
 Shopping asks for an Indian mobile number and prefills checkout. No OTP is sent,
 and this is not authenticated login. The number stays in tab session storage;
-**Change phone / end session** clears it. There is no public server order-history
-lookup by phone, and older or cross-device orders cannot be retrieved this way.
+**Change phone / end session** clears it. Carts are stored separately for each
+entered phone number using a hashed browser-storage key. Changing phones restores
+that phone entry's cart and clears the previous checkout/coupon state. Carts are
+device-local, not synchronized between browsers. Older shared carts are not
+assigned to a phone automatically.
 
 After successful submission, the browser remembers up to 50 request references
 and their existing seven-day details links, grouped by a hash of the entered
@@ -150,6 +153,23 @@ the selected phone entry's links without deleting the vendor's saved records.
 Changing the phone does not delete earlier history. Clearing site storage deletes
 all browser history. Expired entries show only a reference. These are submission
 snapshots, not live order status. Verified customer accounts remain pending OTP.
+
+### Dummy-data server history (demo only)
+
+Set `CUSTOMER_PHONE_ACCESS_MODE=demo` in Netlify's production **Functions** environment
+and redeploy to enable **My orders (demo)**. The default is `off`; invalid values
+fail explicitly. With the Netlify Database backend, this read-only endpoint retrieves
+saved requests by exact normalized phone number, newest first, 20 per page. Details
+include line items, address, estimates and saved status. Retired Firebase test records
+remain excluded. No OTP, verified identity, or customer authorization is provided.
+The UI displays an explicit dummy-data demo warning; any visitor can enter a number
+and view matching records in this mode. Enable it only on a dataset confirmed to be
+entirely synthetic. Disable it and redeploy **before** adding any real customer data.
+It is not a substitute for verified login. The Google Sheets backend is not supported.
+
+When disabled, history shows only this browser's remembered seven-day links. Server
+history failures show an error/retry rather than claiming there are no requests.
+Phone entries never grant vendor access or permission to change saved orders.
 
 With Node.js 22.12 or later:
 

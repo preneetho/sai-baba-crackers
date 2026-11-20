@@ -308,9 +308,14 @@
   </dialog>
   <dialog id="browser-history" class="browser-customer-dialog" aria-labelledby="browser-history-title">
     <div class="dialog-heading"><h2 id="browser-history-title">My browser requests</h2><button id="close-browser-history" class="icon-button" type="button" aria-label="Close browser history" autofocus>&times;</button></div>
-    <p>Only requests remembered here are listed, not orders looked up by mobile number. Links show submission snapshots, not live status. Details expire after seven days. Clearing browser storage removes this history.</p>
+    <p id="customer-history-help">Only requests remembered here are listed. Server phone lookup is available only in explicitly enabled dummy-data demo mode.</p>
     <p id="browser-history-status" role="status"></p>
     <ul id="browser-history-list"></ul>
+    <div class="browser-session-actions">
+      <button id="previous-customer-orders" class="button secondary" type="button" hidden>Previous page</button>
+      <button id="next-customer-orders" class="button secondary" type="button" hidden>Next page</button>
+      <button id="retry-customer-orders" class="button secondary" type="button" hidden>Retry previous orders</button>
+    </div>
     <button id="forget-browser-history" class="button secondary" type="button">Forget history for this phone entry</button>
   </dialog>
   <dialog id="product-media-dialog" aria-labelledby="product-media-title">

@@ -1,4 +1,4 @@
-import { validateOrderShareLink } from "./order.mjs";
+import { CART_KEY, validateOrderShareLink } from "./order.mjs";
 
 const PHONE_KEY = "sai-baba-browser-phone-v1";
 const HISTORY_PREFIX = "sai-baba-browser-requests-v1:";
@@ -10,6 +10,19 @@ export function normalizeBrowserPhone(value) {
   if (/^91[6-9]\d{9}$/.test(digits)) digits = digits.slice(2);
   if (!/^[6-9]\d{9}$/.test(digits)) throw new Error("Enter a valid 10-digit Indian mobile number.");
   return digits;
+}
+
+export function validateDemoHistory(result, phone, page) {
+  if (!result || result.mode !== "demo" || result.verified !== false || result.page !== page ||
+      result.pageSize !== 20 || !Number.isSafeInteger(result.total) || result.total < 0 ||
+      !Array.isArray(result.orders) || result.orders.length > 20 ||
+      result.orders.some(order => !order || order.phone !== `+91 ${phone}` ||
+        ["orderId", "createdAt", "status", "name", "address", "items", "notes", "fulfilment"].some(key => typeof order[key] !== "string") ||
+        !order.orderId || order.orderId.length > 100 || !Number.isFinite(Date.parse(order.createdAt)) ||
+        !Number.isFinite(order.total) || order.total < 0)) {
+    throw new Error("The demo history response could not be verified. Retry or contact the shop.");
+  }
+  return result;
 }
 
 export function createBrowserCustomerStore({ session, storage, origin, cryptoImpl = globalThis.crypto }) {
@@ -27,6 +40,7 @@ export function createBrowserCustomerStore({ session, storage, origin, cryptoImp
   }
   return {
     get phone() { return phone; },
+    get cartKey() { return historyKey ? `${CART_KEY}:${historyKey.slice(HISTORY_PREFIX.length)}` : null; },
     async enter(value) {
       const normalized = normalizeBrowserPhone(value);
       const digest = await cryptoImpl.subtle.digest("SHA-256", new TextEncoder().encode(normalized));

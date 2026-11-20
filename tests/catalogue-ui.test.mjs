@@ -49,6 +49,7 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
     ...offers,
     renderOfferWidgets, initializeOfferCarousel: () => () => {},
     rememberBrowserRequest() {},
+    browserCartKey: () => order.CART_KEY,
     ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "money", "localDate", "validateCustomer",
       "prepareOrderMessage", "validateOrderShareLink"].map(key => [key, order[key]])),
     checkCart: order.sanitizeCart, getLines: order.cartLines, getPricing: order.pricing, getTotal: order.total,
@@ -122,6 +123,25 @@ test("cart coupon apply/remove updates post-discount delivery progress and picku
   assert.equal(ui.get("#cart-total").textContent, order.money(140));
   assert.equal(ui.get("#cart-details-label").textContent, "Coupon & price details");
   assert.equal(ui.get("#cart-savings").textContent, "");
+});
+
+test("switching phone sessions restores separate carts and resets checkout/coupon state", async () => {
+  const ui = await harness();
+  ui.run("updateQuantity(1, 2, false)");
+  ui.context.browserCartKey = () => "phone-b-cart";
+  ui.events.get("browser-customer-change")();
+  assert.equal(ui.run("total(cart)"), 0);
+  ui.run("updateQuantity(1, 3, false)");
+  assert.equal(JSON.parse(ui.storage.get("phone-b-cart")).cart["1"], 3);
+  ui.context.browserCartKey = () => order.CART_KEY;
+  ui.run('couponCode = "SALE15"; submission = { requestId: "old" };');
+  ui.events.get("browser-customer-change")();
+  assert.equal(ui.run("total(cart)"), 140);
+  assert.equal(ui.run("couponCode"), "");
+  assert.equal(ui.run("submission"), null);
+  ui.context.browserCartKey = () => "phone-b-cart";
+  ui.events.get("browser-customer-change")();
+  assert.equal(ui.run("total(cart)"), 210);
 });
 
 test("cart keeps total and Continue outside the initially collapsed coupon and price details", async () => {

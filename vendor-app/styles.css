@@ -33,6 +33,7 @@ body { margin: 0; }
 .browser-customer-dialog input { width: 100%; margin-top: 8px; }
 #browser-history-list { padding-inline-start: 20px; }
 #browser-history-list li { overflow-wrap: anywhere; margin-bottom: 16px; }
+#browser-history-list pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 button, input, select, textarea { font: inherit; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button, select { cursor: pointer; }

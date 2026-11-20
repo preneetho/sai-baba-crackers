@@ -2,12 +2,13 @@ import { track } from "./telemetry-client.mjs";
 import { vendor } from "./catalog.mjs";
 import { validCatalogue, PRODUCT_TYPES } from "./catalogue-model.mjs";
 import { mediaUrl, isYouTubeMedia } from "./media-model.mjs";
-import { CART_KEY, MAX_QUANTITY, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, money, localDate, validateCustomer, prepareOrderMessage, validateOrderShareLink } from "./order.mjs";
+import { MAX_QUANTITY, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, money, localDate, validateCustomer, prepareOrderMessage, validateOrderShareLink } from "./order.mjs";
 import { DEFAULT_OFFERS, validOffers, validOfferVersion, normalizeCoupon } from "./offers-model.mjs";
 import { renderOfferWidgets, initializeOfferCarousel } from "./offer-widgets.mjs";
-import { rememberBrowserRequest } from "./browser-customer.mjs";
+import { browserCartKey, rememberBrowserRequest } from "./browser-customer.mjs";
 
 const $ = selector => document.querySelector(selector);
+let CART_KEY = browserCartKey();
 let products = [];
 let categories = ["All products"];
 let catalogue = null;
@@ -48,6 +49,7 @@ function showStorageWarning(message, reset = false) {
     button.textContent = "Discard invalid saved cart";
     button.addEventListener("click", () => {
       try {
+        if (!CART_KEY) throw new Error("No phone session.");
         localStorage.removeItem(CART_KEY);
         warning.hidden = true;
       } catch {
@@ -71,6 +73,7 @@ function restoredCart(text) {
 
 function saveCart() {
   try {
+    if (!CART_KEY) throw new Error("Enter your phone number before saving a cart.");
     localStorage.setItem(CART_KEY, JSON.stringify({ year: catalogue.year, revision: catalogue.revision, cart }));
     warning.hidden = true;
   } catch {
@@ -771,6 +774,26 @@ $("#download-message").addEventListener("click", () => {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
+window.addEventListener("browser-customer-change", () => {
+  CART_KEY = browserCartKey();
+  cart = {};
+  retainedCart = null;
+  submission = null;
+  couponCode = "";
+  fullMessage = "";
+  $("#coupon-code").value = "";
+  $("#coupon-status").textContent = "";
+  warning.hidden = true;
+  if (!catalogue) return;
+  try {
+    const stored = CART_KEY ? localStorage.getItem(CART_KEY) : null;
+    if (stored) cart = restoredCart(stored);
+  } catch {
+    showStorageWarning("This phone entry's saved cart could not be restored. Select items again.", true);
+  }
+  renderProducts();
+  renderCart();
+});
 window.addEventListener("storage", event => {
   if (event.key !== CART_KEY && event.key !== null) return;
   if ($("#checkout").open) {
@@ -810,7 +833,7 @@ async function loadCatalogue() {
     cart = {};
     submission = null;
     try {
-      const stored = retainedCart ?? localStorage.getItem(CART_KEY);
+      const stored = retainedCart ?? (CART_KEY ? localStorage.getItem(CART_KEY) : null);
       if (stored) cart = restoredCart(stored);
       else if (localStorage.getItem("sai-baba-cart-v1")) {
         showStorageWarning("Your old cart used the previous catalogue format. Please select items again using the current prices.");
