@@ -1,7 +1,8 @@
 import { calculateRevision } from "./order-revision-model.mjs";
 import { money } from "./order.mjs";
+import { PACKING_STATES, validPacking } from "./order-packing-model.mjs";
 
-export function createOrderEditor(order, catalogue, form, onChange) {
+export function createOrderEditor(order, catalogue, form, onChange, onPacking) {
   const products = catalogue.products;
   const document = form.ownerDocument;
   const node = (tag, text) => {
@@ -27,7 +28,7 @@ export function createOrderEditor(order, catalogue, form, onChange) {
   let busy = false;
   const draft = order.lineItems.map(item => ({ ...item, included: true }));
   form.replaceChildren();
-  const help = node("p", "Uncheck unavailable items, adjust selling packs/prices, or add a replacement. The original request is preserved. The saved coupon percentage is retained; review the delivery charge.");
+  const help = node("p", "Packing buttons save immediately, privately for the vendor. Change packs or mark unavailable, then save the order changes below. Quantity changes reset that product's packing progress. Prices can be expanded when needed.");
   help.className = "vendor-muted";
   const rows = node("div");
   rows.className = "vendor-order-edit-items";
@@ -46,11 +47,15 @@ export function createOrderEditor(order, catalogue, form, onChange) {
   reason.required = true;
   reason.maxLength = 500;
   reason.rows = 3;
+  let reasonEdited = false;
   const preview = node("p");
   preview.setAttribute("role", "status");
-  const save = node("button", "Save order revision");
+  const progress = node("p");
+  progress.className = "vendor-packing-progress";
+  progress.setAttribute("role", "status");
+  const save = node("button", "Save order changes");
   save.type = "submit";
-  save.className = "vendor-primary";
+  save.className = "vendor-primary vendor-order-save";
   const pickup = order.fulfilment === "Store pickup";
   const payload = () => ({
     items: draft.filter(item => item.included).map(({ id, quantity, price }) => ({ id, quantity, price })),
@@ -62,38 +67,111 @@ export function createOrderEditor(order, catalogue, form, onChange) {
       input.items.some((item, index) => ["id", "quantity", "price"].some(key => item[key] !== order.lineItems[index]?.[key]));
   };
   const update = () => {
+    if (!reasonEdited) {
+      const selected = draft.filter(item => item.included);
+      const changes = [
+        ["Unavailable", order.lineItems.filter(saved => !selected.some(item => item.id === saved.id))],
+        ["Added products", selected.filter(item => !order.lineItems.some(saved => saved.id === item.id))],
+        ["Pack quantities changed", selected.filter(item => order.lineItems.some(saved => saved.id === item.id && saved.quantity !== item.quantity))],
+        ["Pack prices adjusted", selected.filter(item => order.lineItems.some(saved => saved.id === item.id && saved.price !== item.price))],
+      ].filter(([, items]) => items.length).map(([label, items]) =>
+        `${label}: ${items.slice(0, 3).map(item => `#${item.id}`).join(", ")}${items.length > 3 ? ` and ${items.length - 3} more` : ""}.`);
+      if (Number(delivery.value) !== order.deliveryCharge) changes.push("Delivery charge adjusted.");
+      reason.value = changes.join(" ");
+    }
     try {
       const input = payload();
       const amounts = calculateRevision(input.items, order.discountPercent, input.deliveryCharge);
       preview.textContent = `Revised subtotal: ${money(amounts.subtotal)}; discount (${amounts.discountPercent}%): ${money(amounts.discount)}; delivery: ${money(amounts.deliveryCharge)}; total: ${money(amounts.total)}.`;
+      save.textContent = `Save changes - ${money(amounts.total)}`;
       save.disabled = busy || !changed();
     } catch (error) {
       preview.textContent = error.message;
       save.disabled = true;
     }
+    save.hidden = !changed();
     add.disabled = busy || !select.value || draft.filter(item => item.included).length >= 200;
     for (const option of Array.from(select.options).slice(1)) {
       option.disabled = draft.some(item => item.included && item.id === Number(option.value));
     }
+    const savedPacked = order.packing?.items.filter(item => item.state === "Packed").length ?? 0;
+    progress.textContent = validPacking(order.packing) ?
+      `${savedPacked} of ${order.lineItems.length} saved products packed. Packing progress is visible only to the vendor.` :
+      "Packing progress is unavailable. Reload the order before marking products.";
+    for (const group of rows.children) group.syncControls();
     onChange(changed() || reason.value.length > 0);
   };
   const appendRow = item => {
     const group = node("fieldset");
     group.className = "vendor-order-edit-item";
     group.append(node("legend", `#${item.id} ${item.name} | ${item.brand} (${item.unit})`));
-    const available = node("input");
-    available.type = "checkbox";
-    available.checked = item.included;
-    const availability = labelled("Available for this order", available);
-    availability.className = "vendor-price-visibility";
+    const availability = node("button");
+    availability.type = "button";
+    availability.className = "vendor-availability";
     const quantity = number(item.quantity, "99", "1");
+    quantity.setAttribute("aria-label", `Selling packs for ${item.name}`);
     const price = number(item.price, "100000", "0.01");
+    const minus = node("button", "-");
+    const plus = node("button", "+");
+    for (const [button, direction] of [[minus, -1], [plus, 1]]) {
+      button.type = "button";
+      button.setAttribute("aria-label", `${direction > 0 ? "Increase" : "Decrease"} packs for ${item.name}`);
+      button.addEventListener("click", () => {
+        if (busy || !item.included || !Number.isInteger(item.quantity)) return;
+        const next = item.quantity + direction;
+        if (next < 1 || next > 99) return;
+        item.quantity = next;
+        quantity.value = String(next);
+        update();
+      });
+    }
+    const quantityControls = node("div");
+    quantityControls.className = "vendor-cart-quantity";
+    quantityControls.append(minus, quantity, plus);
+    const total = node("p");
+    total.className = "vendor-cart-line-total";
+    const priceSummary = node("summary");
+    const packing = node("div");
+    packing.className = "vendor-packing-actions";
+    packing.setAttribute("aria-label", `Packing progress for ${item.name}`);
+    const original = order.lineItems.find(saved => saved.id === item.id);
+    const packingButtons = PACKING_STATES.map(state => {
+      const button = node("button", state);
+      button.type = "button";
+      button.setAttribute("aria-label", `${state}: ${item.name}`);
+      button.addEventListener("click", () => {
+        if (!button.disabled) onPacking(item.id, state);
+      });
+      packing.append(button);
+      return button;
+    });
+    const packingHelp = node("p");
+    packingHelp.className = "vendor-muted";
     const controls = () => {
       quantity.disabled = price.disabled = busy || !item.included;
+      availability.disabled = busy;
+      availability.textContent = item.included ? "Mark not available" : "Restore item";
+      availability.setAttribute("aria-pressed", String(!item.included));
+      group.dataset.unavailable = String(!item.included);
+      minus.disabled = busy || !item.included || !Number.isInteger(item.quantity) || item.quantity <= 1;
+      plus.disabled = busy || !item.included || !Number.isInteger(item.quantity) || item.quantity >= 99;
+      const state = order.packing?.items.find(mark => mark.id === item.id)?.state ?? "Not started";
+      packingButtons.forEach((button, index) => {
+        button.disabled = busy || !onPacking || !validPacking(order.packing) || !item.included ||
+          !original || original.quantity !== item.quantity || PACKING_STATES[index] === state;
+        button.setAttribute("aria-pressed", String(PACKING_STATES[index] === state));
+      });
+      packingHelp.textContent = !item.included ? "Excluded when you save the order changes." :
+        !original || original.quantity !== item.quantity ? "Save this product's revised quantity before marking packing progress." : "";
+      total.textContent = !item.included ? "Not available - removed from revised total" :
+        Number.isFinite(item.price) && Number.isInteger(item.quantity) ?
+          `${item.quantity} x ${money(item.price)} = ${money(Math.round(item.price * 100) * item.quantity / 100)}` :
+          "Enter a valid quantity and price.";
+      priceSummary.textContent = Number.isFinite(item.price) ? `Unit price: ${money(item.price)} - edit` : "Unit price - enter a valid amount";
     };
-    available.addEventListener("change", () => {
+    availability.addEventListener("click", () => {
       if (busy) return;
-      item.included = available.checked;
+      item.included = !item.included;
       controls();
       update();
     });
@@ -104,7 +182,9 @@ export function createOrderEditor(order, catalogue, form, onChange) {
         update();
       });
     }
-    group.append(availability, labelled("Selling packs", quantity), labelled("Price per pack (Rs.)", price));
+    const priceDetails = node("details");
+    priceDetails.append(priceSummary, labelled("Price per pack (Rs.)", price));
+    group.append(labelled("Selling packs", quantityControls), total, packing, availability, packingHelp, priceDetails);
     group.syncControls = controls;
     rows.append(group);
     controls();
@@ -130,15 +210,20 @@ export function createOrderEditor(order, catalogue, form, onChange) {
     rows.lastChild.querySelector("input[type=number]").focus();
   });
   delivery.addEventListener("input", update);
-  reason.addEventListener("input", update);
+  reason.addEventListener("input", () => { reasonEdited = true; update(); });
   const toolbar = node("div");
   toolbar.className = "vendor-price-toolbar";
   toolbar.append(labelled("Replacement or additional product", select), add);
-  form.append(help, rows, toolbar, labelled("Delivery charge (Rs.)", delivery),
+  form.append(help, progress, rows, toolbar, labelled("Delivery charge (Rs.)", delivery),
     labelled("Reason for changes (shown to the customer)", reason), preview, save);
   delivery.disabled = pickup;
   update();
   return {
+    setPacking(packing) {
+      if (!validPacking(packing)) throw new Error("Packing progress could not be verified.");
+      order.packing = packing;
+      update();
+    },
     build() {
       const input = payload();
       calculateRevision(input.items, order.discountPercent, input.deliveryCharge);

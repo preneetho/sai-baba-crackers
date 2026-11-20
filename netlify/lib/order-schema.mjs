@@ -49,6 +49,8 @@ export const orderRequests = pgTable("order_requests", {
   createdAt: instant("created_at").notNull(),
   status: text("status").notNull().default("New"),
   revision: integer("revision").notNull().default(0),
+  packingVersion: integer("packing_version").notNull().default(0),
+  packingItems: jsonb("packing_items").notNull().default(sql`'[]'::jsonb`),
   name: text("name").notNull(),
   phone: text("phone").notNull(),
   address: text("address").notNull(),
@@ -68,6 +70,8 @@ export const orderRequests = pgTable("order_requests", {
   index("order_requests_customer_time_idx").on(table.customerId, table.createdAt.desc(), table.orderId),
   check("order_requests_status_check", sql`${table.status} in (${statuses})`),
   check("order_requests_revision_check", sql`${table.revision} >= 0`),
+  check("order_requests_packing_check", sql`${table.packingVersion} >= 0 and
+    jsonb_typeof(${table.packingItems}) = 'array' and jsonb_array_length(${table.packingItems}) <= 200`),
   check("order_requests_fulfilment_check", sql`${table.fulfilment} in ('delivery', 'pickup')`),
   check("order_requests_season_check", sql`${table.season} between 2000 and 9999`),
   check("order_requests_money_check", sql`${table.subtotalPaise} >= 0 and ${table.discountPaise} >= 0

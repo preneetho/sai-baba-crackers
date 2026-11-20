@@ -7,6 +7,7 @@ import { validOffers, validOfferVersion, checkOffers, normalizeCoupon } from "./
 import { createOrderEditor } from "./vendor-order-editor.mjs";
 import { renderRevisionHistory } from "./order-revision-view.mjs";
 import { revisionInputError, revisionAcknowledged } from "./order-revision-model.mjs";
+import { validPacking } from "./order-packing-model.mjs";
 
 const $ = id => document.getElementById(id);
 const money = value => `Rs.${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1034,7 +1035,7 @@ function clearRevisionEditor() {
 }
 
 function revisionControls() {
-  const editing = revisionLoading || revisionEditor !== null;
+  const editing = revisionLoading || revisionDirty || revisionNeedsReload;
   $("open-order-editor").disabled = saving || revisionLoading || !selected || revisionNeedsReload;
   $("cancel-order-edit").disabled = saving || revisionLoading;
   $("detail-status").disabled = saving || editing || !selected;
@@ -1057,6 +1058,7 @@ function renderDetail(order) {
     ["Address", order.address], ["Preferred date", order.preferredDate], ["Notes", order.notes],
   ]);
   $("detail-items").textContent = order.items;
+  $("detail-items").hidden = false;
   detailFields("detail-amounts", [
     ["Subtotal", money(order.subtotal)], ...(order.couponCode ? [["Coupon", order.couponCode]] : []), ["Discount", `${order.discountPercent}% (${money(order.discount)})`],
     ["Delivery charge", money(order.deliveryCharge)], ["Estimated total", money(order.total)],
@@ -1069,6 +1071,7 @@ function renderDetail(order) {
   $("detail-revisions").replaceChildren();
   if (order.revision !== undefined) renderRevisionHistory(order, $("detail-revisions"));
   revisionControls();
+  if (order.revision !== undefined) loadOrderEditor();
 }
 
 async function openDetails(id) {
@@ -1380,8 +1383,8 @@ $("reload-detail").addEventListener("click", () => openDetails(detailId));
 $("detail-status").addEventListener("change", () => {
   revisionControls();
 });
-$("open-order-editor").addEventListener("click", async () => {
-  if (!selected || !session || saving || revisionLoading || revisionNeedsReload) return;
+async function loadOrderEditor(focus = false) {
+  if (!selected || !session || revisionLoading || revisionNeedsReload || revisionEditor) return;
   const order = selected;
   const version = detailVersion;
   revisionLoading = true;
@@ -1397,12 +1400,14 @@ $("open-order-editor").addEventListener("click", async () => {
     revisionEditor = createOrderEditor(order, result.catalogue, $("order-edit-form"), dirty => {
       revisionDirty = dirty;
       revisionControls();
-    });
+    }, savePacking);
+    revisionEditor.setBusy(saving);
     $("order-edit-form").hidden = false;
+    $("detail-items").hidden = true;
     $("cancel-order-edit").hidden = false;
     $("open-order-editor").hidden = true;
-    notice("detail-message", "Review the revised total and enter a reason. Saving updates the customer's My orders; no notification is sent automatically.");
-    $("order-edit-form").querySelector("input").focus();
+    notice("detail-message", "Tap Packing or Packed to save progress. Adjust packs or mark unavailable, then save changes with a reason.");
+    if (focus) $("order-edit-form").querySelector("input").focus();
   } catch (error) {
     if (version !== detailVersion || !session) return;
     notice("detail-message", error.message || "The order editor could not be loaded. Retry.", true);
@@ -1412,11 +1417,52 @@ $("open-order-editor").addEventListener("click", async () => {
       revisionControls();
     }
   }
-});
+}
+$("open-order-editor").addEventListener("click", () => loadOrderEditor(true));
+
+async function savePacking(productId, state) {
+  if (!selected || !session || saving || revisionLoading || revisionNeedsReload || !validPacking(selected.packing)) return;
+  const order = selected;
+  const version = detailVersion;
+  const input = {
+    action: "packing", orderId: order.orderId, productId, state, expectedRevision: order.revision,
+    expectedStatus: order.status, expectedPackingVersion: order.packing.version,
+  };
+  saving = true;
+  revisionEditor.setBusy(true);
+  revisionControls();
+  notice("detail-message", `Saving packing progress for product #${productId}...`);
+  try {
+    const result = await api("/api/vendor-order-revisions", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Vendor-CSRF": session.csrf },
+      body: JSON.stringify(input),
+    });
+    if (version !== detailVersion || !session || selected !== order) return;
+    if (!validPacking(result.packing) || result.packing.version !== input.expectedPackingVersion + 1 ||
+        (result.packing.items.find(item => item.id === productId)?.state ?? "Not started") !== state) {
+      throw new Error("Packing progress was not acknowledged.");
+    }
+    revisionEditor.setPacking(result.packing);
+    notice("detail-message", `Product #${productId}: ${state} saved. Visible only to the vendor.`);
+  } catch (error) {
+    if (version !== detailVersion || !session) return;
+    revisionNeedsReload = true;
+    $("reload-detail").hidden = false;
+    notice("detail-message", `${error.message} Reload to check saved packing progress before trying again. Your order edits are kept.`, true);
+    selected = null;
+  } finally {
+    saving = false;
+    if (version === detailVersion && session) {
+      revisionEditor?.setBusy(revisionNeedsReload);
+      revisionControls();
+    }
+  }
+}
 $("cancel-order-edit").addEventListener("click", () => {
   if (saving || (revisionDirty && !window.confirm("Discard the unsaved order revision?"))) return;
   const uncertain = revisionNeedsReload;
   clearRevisionEditor();
+  $("detail-items").hidden = false;
   $("open-order-editor").hidden = selected?.revision === undefined;
   revisionControls();
   notice("detail-message", uncertain ? "Draft discarded. Reload to check the saved order." : "Editing cancelled. The saved order has not changed.");
@@ -1470,7 +1516,8 @@ $("order-edit-form").addEventListener("submit", async event => {
 });
 $("status-form").addEventListener("submit", async event => {
   event.preventDefault();
-  if (!selected || !session || saving || revisionEditor || revisionLoading || $("detail-status").value === selected.status) return;
+  if (!selected || !session || saving || revisionDirty || revisionLoading || revisionNeedsReload ||
+      $("detail-status").value === selected.status) return;
   const id = selected.orderId;
   const version = detailVersion;
   const status = $("detail-status").value;
@@ -1481,6 +1528,8 @@ $("status-form").addEventListener("submit", async event => {
   $("detail-status").disabled = true;
   $("close-details").disabled = true;
   notice("detail-message", "Saving status to the order register...");
+  revisionEditor?.setBusy(true);
+  revisionControls();
   try {
     const result = await api("/api/vendor-orders", {
       method: "POST", headers: { "Content-Type": "application/json", "X-Vendor-CSRF": session.csrf },
@@ -1497,9 +1546,11 @@ $("status-form").addEventListener("submit", async event => {
     if (version !== detailVersion || !session) return;
     selected = null;
     notice("detail-message", `${error.message} Reload the request before trying another status change.`, true);
+    revisionNeedsReload = true;
     $("reload-detail").hidden = false;
   } finally {
     saving = false;
+    revisionEditor?.setBusy(revisionNeedsReload);
     revisionControls();
   }
 });

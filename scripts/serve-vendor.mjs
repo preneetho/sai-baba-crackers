@@ -51,6 +51,7 @@ const files = new Map([
   ["/order-revision-model.mjs", ["order-revision-model.mjs", "text/javascript; charset=utf-8"]],
   ["/order-revision-view.mjs", ["order-revision-view.mjs", "text/javascript; charset=utf-8"]],
   ["/vendor-order-editor.mjs", ["vendor-order-editor.mjs", "text/javascript; charset=utf-8"]],
+  ["/order-packing-model.mjs", ["order-packing-model.mjs", "text/javascript; charset=utf-8"]],
   ["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
   ["/app.mjs", ["app.mjs", "text/javascript; charset=utf-8"]],
   ["/browser-customer-model.mjs", ["browser-customer-model.mjs", "text/javascript; charset=utf-8"]],

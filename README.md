@@ -196,7 +196,23 @@ verified customer access is implemented.
 
 ### Vendor order availability edits
 
-In **Vendor dashboard → open an order → Edit items and prices**, uncheck unavailable
+Opening a vendor order now opens a cart-style product list automatically. Use the
+large minus/plus buttons (or type a pack quantity), **Mark not available**, or
+expand a unit price to edit it. A suggested, editable change reason is filled in;
+the sticky **Save changes** button shows the revised total and records the revised
+items and totals in customer history.
+
+Each saved product also has **Not started / Packing / Packed** controls. Packing
+progress saves immediately to Netlify Database and survives reloads; it is
+vendor-only, not included in customer history, shared links or PDFs. Packing does
+not change the overall order status, prices or stock, or send notifications.
+New/revised quantities must be saved before marking packing. Quantity changes
+reset that product's progress; removed products lose their marks, while unchanged
+products retain them. Concurrent changes or uncertain saves require a reload and
+keep any unsaved order edits visible. Deploy the tracked `order_packing` migration
+through Netlify's normal deployment pipeline before using these controls.
+
+In **Vendor dashboard → open an order → Products to pack**, mark unavailable
 items, change selling-pack quantities or agreed unit prices, and add replacement
 products from the visible active catalogue. Review the delivery charge and enter
 a customer-visible reason, then **Save order revision**. At least one item must

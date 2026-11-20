@@ -5,6 +5,7 @@ import { vendor } from "../../vendor-app/catalog.mjs";
 import { approvedImportMetadata, ImportPreviewRollback } from "./approved-import.mjs";
 import { createCatalogueDatabase, activeCatalogue, catalogueLock, catalogueConflict } from "./catalogue-database.mjs";
 import { calculateRevision, revisionInputError } from "../../vendor-app/order-revision-model.mjs";
+import { validPacking, validPackingInput } from "../../vendor-app/order-packing-model.mjs";
 
 const latestRevision = and(eq(orderRevisions.orderId, orderRequests.orderId), eq(orderRevisions.revision, orderRequests.revision));
 const latestTotal = sql`coalesce(${orderRevisions.totalPaise}, ${orderRequests.totalPaise})`.mapWith(Number);
@@ -39,7 +40,7 @@ function summary(row) {
   };
 }
 
-async function detail(tx, orderId, includeHistory = true) {
+async function detail(tx, orderId, includeHistory = true, includePacking = false) {
   const [row] = await tx.select().from(orderRequests).where(eq(orderRequests.orderId, orderId));
   if (!row || row.isTest) return { ok: false, error: "NOT_FOUND" };
   const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId)).orderBy(asc(orderItems.position));
@@ -57,10 +58,13 @@ async function detail(tx, orderId, includeHistory = true) {
   }
   const history = includeHistory && row.revision > 0 ? await tx.select().from(orderRevisions)
     .where(eq(orderRevisions.orderId, orderId)).orderBy(asc(orderRevisions.revision)) : [];
+  const packing = { version: row.packingVersion, items: row.packingItems };
+  if (includePacking && !validPacking(packing)) throw new Error("Recorded packing progress is invalid.");
   return { ok: true, order: {
     ...summary({ ...row, totalPaise: paise(current.total), deliveryChargePaise: paise(current.deliveryCharge) }),
     address: row.address, preferredDate: row.preferredDate, notes: row.notes,
     ...current, revision: row.revision, lineItems: current.items, revisionHistory: history.map(revisionSnapshot),
+    ...(includePacking ? { packing } : {}),
     couponCode: row.couponCode,
     items: current.items.map(item => `#${item.id} ${item.name} | ${item.brand}\nPack: ${item.unit}\n${item.quantity} pack${item.quantity === 1 ? "" : "s"} x Rs.${item.price.toFixed(2)} = Rs.${item.amount.toFixed(2)}`).join("\n\n"),
   } };
@@ -236,7 +240,25 @@ export function createOrderDatabase(db) {
     },
     async dashboard(input, actor) {
       return transaction(async tx => {
-        if (input.action === "vendor-detail") return detail(tx, input.orderId);
+        if (input.action === "vendor-detail") return detail(tx, input.orderId, true, true);
+        if (input.action === "vendor-pack") {
+          if (!validPackingInput(input) || !ORDER_STATUSES.includes(input.expectedStatus) ||
+              typeof actor !== "string" || !actor.trim()) return { ok: false, error: "INVALID_PACKING" };
+          const [row] = await tx.select().from(orderRequests).where(and(
+            eq(orderRequests.orderId, input.orderId), eq(orderRequests.isTest, false),
+          )).for("update");
+          if (!row) return { ok: false, error: "NOT_FOUND" };
+          if (row.revision !== input.expectedRevision || row.status !== input.expectedStatus ||
+              row.packingVersion !== input.expectedPackingVersion) return { ok: false, error: "REVISION_CONFLICT" };
+          const current = (await detail(tx, row.orderId, false, true)).order;
+          if (!current.lineItems.some(item => item.id === input.productId)) return { ok: false, error: "INVALID_PACKING" };
+          const items = row.packingItems.filter(item => item.id !== input.productId);
+          if (input.state !== "Not started") items.push({ id: input.productId, state: input.state });
+          const packing = { version: row.packingVersion + 1, items };
+          await tx.update(orderRequests).set({ packingVersion: packing.version, packingItems: items })
+            .where(eq(orderRequests.orderId, row.orderId));
+          return { ok: true, packing };
+        }
         if (input.action === "vendor-revise") {
           const invalid = revisionInputError(input);
           if (invalid || typeof actor !== "string" || !actor.trim() || !ORDER_STATUSES.includes(input.expectedStatus)) {
@@ -290,8 +312,12 @@ export function createOrderDatabase(db) {
             orderId: row.orderId, revision: row.revision + 1, changedAt: sql`clock_timestamp()`,
             actor, reason: input.reason.trim(), ...values(revised),
           });
-          await tx.update(orderRequests).set({ revision: row.revision + 1 }).where(eq(orderRequests.orderId, row.orderId));
-          return detail(tx, row.orderId);
+          const packingItems = row.packingItems.filter(mark => revised.items.some(item =>
+            item.id === mark.id && current.lineItems.some(original => original.id === item.id && original.quantity === item.quantity)));
+          await tx.update(orderRequests).set({
+            revision: row.revision + 1, packingItems, packingVersion: row.packingVersion + 1,
+          }).where(eq(orderRequests.orderId, row.orderId));
+          return detail(tx, row.orderId, true, true);
         }
         if (input.action === "vendor-status") {
           const updated = await tx.update(orderRequests).set({ status: input.status }).where(and(
@@ -308,7 +334,7 @@ export function createOrderDatabase(db) {
               orderId: input.orderId, fromStatus: input.expectedStatus, toStatus: input.status, actor,
             });
           }
-          return detail(tx, input.orderId);
+          return detail(tx, input.orderId, true, true);
         }
         if (input.action !== "vendor-list") throw new Error("Unknown database action.");
         const filters = [eq(orderRequests.isTest, false)];
@@ -342,7 +368,7 @@ export function createOrderDatabase(db) {
           .orderBy(desc(orderRequests.createdAt), asc(orderRequests.orderId))
           .limit(PAGE_SIZE).offset((input.page - 1) * PAGE_SIZE);
         return { ok: true, orders: rows.map(summary), total, page: input.page, stats };
-      }, !["vendor-status", "vendor-revise"].includes(input.action));
+      }, !["vendor-status", "vendor-revise", "vendor-pack"].includes(input.action));
     },
   };
 }

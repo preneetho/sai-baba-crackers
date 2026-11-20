@@ -2,6 +2,7 @@ import { vendorSettings, vendorJson, vendorSession, sameOriginMutation } from ".
 import { orderBackend } from "../lib/order-backend.mjs";
 import { ORDER_STATUSES, ORDER_ID, PAGE_SIZE, validOrder } from "../../vendor-app/vendor-model.mjs";
 import { revisionFields } from "../../vendor-app/order-revision-model.mjs";
+import { validPacking } from "../../vendor-app/order-packing-model.mjs";
 
 export async function handleVendorOrders(request, {
   env = process.env, fetchImpl = fetch, now = Date.now,
@@ -78,7 +79,8 @@ export async function handleVendorOrders(request, {
       throw new Error("Order action not acknowledged");
     }
     if (input.action !== "vendor-list") {
-      if (!validOrder(result.order, true) || result.order.orderId !== input.orderId ||
+      if (!validOrder(result.order, true) || (result.order.packing !== undefined && !validPacking(result.order.packing)) ||
+          result.order.orderId !== input.orderId ||
           (input.action === "vendor-status" && result.order.status !== input.status)) {
         throw new Error("Order response invalid");
       }
@@ -87,6 +89,7 @@ export async function handleVendorOrders(request, {
       return vendorJson({ order: {
         ...Object.fromEntries(keys.map(key => [key, result.order[key]])),
         ...(backend.name === "netlify-db" ? revisionFields(result.order) : {}),
+        ...(backend.name === "netlify-db" && result.order.packing !== undefined ? { packing: result.order.packing } : {}),
       } });
     }
     if (!Array.isArray(result.orders) || result.orders.length > PAGE_SIZE || !result.orders.every(order => validOrder(order)) ||

@@ -2,6 +2,7 @@ import { vendorSettings, vendorJson, vendorSession, sameOriginMutation } from ".
 import { orderBackend } from "../lib/order-backend.mjs";
 import { ORDER_ID, ORDER_STATUSES, validOrder } from "../../vendor-app/vendor-model.mjs";
 import { revisionInputError, revisionFields, revisionAcknowledged } from "../../vendor-app/order-revision-model.mjs";
+import { validPacking, validPackingInput } from "../../vendor-app/order-packing-model.mjs";
 
 export async function handleVendorOrderRevisions(request, {
   env = process.env, now = Date.now,
@@ -24,19 +25,31 @@ export async function handleVendorOrderRevisions(request, {
   if (!input || typeof input.orderId !== "string" || !ORDER_ID.test(input.orderId) || !ORDER_STATUSES.includes(input.expectedStatus)) {
     return vendorJson({ error: "Use a valid request ID and saved status." }, 400);
   }
-  const invalid = revisionInputError(input);
+  const packingUpdate = input.action === "packing";
+  const invalid = packingUpdate ? (validPackingInput(input) ? null : "Invalid packing update.") : revisionInputError(input);
   if (invalid) return vendorJson({ error: invalid }, 400);
   try {
-    const result = await (await databaseFactory()).dashboard({ ...input, action: "vendor-revise" }, session.email);
+    const result = await (await databaseFactory()).dashboard({ ...input, action: packingUpdate ? "vendor-pack" : "vendor-revise" }, session.email);
     if (result?.error === "NOT_FOUND") return vendorJson({ error: "This order was not found. Refresh the register." }, 404);
     if (result?.error === "REVISION_CONFLICT") return vendorJson({ error: "The order or replacement catalogue changed. Reload the order before editing again." }, 409);
     if (result?.error === "INVALID_REVISION") return vendorJson({ error: result.message }, 400);
+    if (result?.error === "INVALID_PACKING") return vendorJson({ error: "Choose a saved order product and valid packing state." }, 400);
+    if (packingUpdate) {
+      if (result?.ok !== true || !validPacking(result.packing) ||
+          result.packing.version !== input.expectedPackingVersion + 1 ||
+          (result.packing.items.find(item => item.id === input.productId)?.state ?? "Not started") !== input.state) {
+        throw new Error("Packing update was not acknowledged.");
+      }
+      return vendorJson({ packing: result.packing });
+    }
     if (result?.ok !== true || !validOrder(result.order, true) ||
+        (result.order.packing !== undefined && !validPacking(result.order.packing)) ||
         !revisionAcknowledged(result.order, input)) throw new Error("Order revision was not acknowledged.");
     const keys = ["orderId", "createdAt", "status", "name", "phone", "fulfilment", "total",
       "address", "preferredDate", "items", "subtotal", "discountPercent", "discount", "deliveryCharge", "notes", "couponCode"];
     return vendorJson({ order: {
       ...Object.fromEntries(keys.map(key => [key, result.order[key]])), ...revisionFields(result.order),
+      ...(result.order.packing !== undefined && validPacking(result.order.packing) ? { packing: result.order.packing } : {}),
     } });
   } catch {
     console.error("Vendor order revision failed or returned an invalid acknowledgement.");

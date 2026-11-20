@@ -57,6 +57,78 @@ const dashboard = (path = "/api/vendor-orders", body, overrides = {}) => handleV
 });
 const count = async table => Number((await engine.query(`select count(*) as count from ${table}`)).rows[0].count);
 
+test("packing saves privately across reloads without changing prices, order status or revision history", async () => {
+  const order = build(1);
+  await database.save(order);
+  const input = { action: "packing", orderId: order.orderId, productId: 1, state: "Packed",
+    expectedRevision: 0, expectedStatus: "New", expectedPackingVersion: 0 };
+  const response = await handleVendorOrderRevisions(request("/api/vendor-order-revisions", input, true), {
+    env, now: () => now.getTime(), databaseFactory: factory,
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { packing: { version: 1, items: [{ id: 1, state: "Packed" }] } });
+  const saved = (await database.dashboard({ action: "vendor-detail", orderId: order.orderId }, settings.email)).order;
+  assert.deepEqual(saved.packing, { version: 1, items: [{ id: 1, state: "Packed" }] });
+  assert.equal(saved.revision, 0);
+  assert.equal(saved.status, "New");
+  assert.equal(saved.total, order.amounts.total);
+  assert.equal(await count("order_revisions"), 0);
+  const customer = await database.demoPhoneOrder(order.customer.phone, order.orderId);
+  assert.equal("packing" in customer.order, false);
+  assert.equal((await database.demoPhoneHistory(order.customer.phone)).orders.some(row => "packing" in row), false);
+  const stale = await handleVendorOrderRevisions(request("/api/vendor-order-revisions", input, true), {
+    env, now: () => now.getTime(), databaseFactory: factory,
+  });
+  assert.equal(stale.status, 409);
+  const invalid = await database.dashboard({ ...input, action: "vendor-pack", expectedPackingVersion: 1, productId: 999999 }, "owner@example.com");
+  assert.equal(invalid.error, "INVALID_PACKING");
+  const competing = await Promise.all(["Packing", "Not started"].map(state => database.dashboard({
+    ...input, action: "vendor-pack", expectedPackingVersion: 1, state,
+  }, "owner@example.com")));
+  assert.equal(competing.filter(result => result.ok).length, 1);
+  assert.equal(competing.filter(result => result.error === "REVISION_CONFLICT").length, 1);
+});
+
+test("revising quantities resets only affected packing marks and removed products cannot be packed", async () => {
+  const order = buildOrder({ ...input(1), cart: { 1: 2, 2: 1 } }, now);
+  await database.save(order);
+  for (const [version, productId] of [1, 2].entries()) {
+    const result = await database.dashboard({
+      action: "vendor-pack", orderId: order.orderId, productId, state: "Packed",
+      expectedRevision: 0, expectedStatus: "New", expectedPackingVersion: version,
+    }, "owner@example.com");
+    assert.equal(result.ok, true);
+  }
+  const saved = (await database.dashboard({ action: "vendor-detail", orderId: order.orderId })).order;
+  const revise = { action: "vendor-revise", orderId: order.orderId, expectedRevision: 0, expectedStatus: "New",
+    catalogue: { year: 2026, revision: 1 }, deliveryCharge: 0, reason: "Synthetic quantity adjustment",
+    items: saved.lineItems.map(item => ({ id: item.id, quantity: item.id === 1 ? 3 : item.quantity, price: item.price })) };
+  const revised = await database.dashboard(revise, "owner@example.com");
+  assert.equal(revised.ok, true);
+  assert.deepEqual(revised.order.packing, { version: 3, items: [{ id: 2, state: "Packed" }] });
+  const removed = await database.dashboard({ ...revise, expectedRevision: 1,
+    items: revise.items.filter(item => item.id === 1), reason: "Synthetic unavailable product" }, "owner@example.com");
+  assert.deepEqual(removed.order.packing, { version: 4, items: [] });
+  const markRemoved = await database.dashboard({
+    action: "vendor-pack", orderId: order.orderId, productId: 2, state: "Packed",
+    expectedRevision: 2, expectedStatus: "New", expectedPackingVersion: 4,
+  }, "owner@example.com");
+  assert.equal(markRemoved.error, "INVALID_PACKING");
+});
+
+test("packing transport requires vendor authentication, CSRF and valid states before accessing the database", async () => {
+  const body = { action: "packing", orderId: "SBC-TEST", productId: 1, state: "Packed",
+    expectedRevision: 0, expectedStatus: "New", expectedPackingVersion: 0 };
+  const options = { env, now: () => now.getTime(), databaseFactory: async () => { throw new Error("Must not access database"); } };
+  assert.equal((await handleVendorOrderRevisions(request("/api/vendor-order-revisions", body), options)).status, 401);
+  const noCsrf = request("/api/vendor-order-revisions", body, true);
+  noCsrf.headers.delete("X-Vendor-CSRF");
+  assert.equal((await handleVendorOrderRevisions(noCsrf, options)).status, 403);
+  for (const extra of [{ state: "Unavailable" }, { productId: 0 }, { expectedPackingVersion: -1 }]) {
+    assert.equal((await handleVendorOrderRevisions(request("/api/vendor-order-revisions", { ...body, ...extra }, true), options)).status, 400);
+  }
+});
+
 test("saved customer details follow the latest submitted order, stay phone-scoped and exclude retired test records", async () => {
   const first = build(1);
   await database.save(first);
