@@ -5,6 +5,7 @@ import { mediaUrl, isYouTubeMedia } from "./media-model.mjs";
 import { CART_KEY, MAX_QUANTITY, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, money, localDate, validateCustomer, prepareOrderMessage, validateOrderShareLink } from "./order.mjs";
 import { DEFAULT_OFFERS, validOffers, validOfferVersion, normalizeCoupon } from "./offers-model.mjs";
 import { renderOfferWidgets, initializeOfferCarousel } from "./offer-widgets.mjs";
+import { rememberBrowserRequest } from "./browser-customer.mjs";
 
 const $ = selector => document.querySelector(selector);
 let products = [];
@@ -679,6 +680,7 @@ $("#customer-form").addEventListener("submit", async event => {
     track("saved");
     fullMessage = result.message;
     const share = validateOrderShareLink(result.share, window.location.origin, orderId);
+    rememberBrowserRequest(orderId, share);
     const message = prepareOrderMessage(result.summary);
     if (!message.text.includes(share.url)) {
       throw new Error("Your order request is saved, but its WhatsApp summary is missing the details link. Keep checkout open and retry.");

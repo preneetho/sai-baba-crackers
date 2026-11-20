@@ -27,6 +27,7 @@
   <link rel="stylesheet" href="/modern.css">
   <script type="module" src="/modern-ui.mjs"></script>
   <script type="module" src="/auth-callback.mjs"></script>
+  <script type="module" src="/browser-customer-ui.mjs"></script>
   <script type="module" src="/app.mjs"></script>
 </head>
 <body class="modern">
@@ -177,10 +178,17 @@
   </header>
 
   <main>
+    <section class="browser-session" aria-label="Browser customer session">
+      <p id="browser-session-status" role="status">Mobile number entered, not verified. History is limited to this browser.</p>
+      <div class="browser-session-actions">
+        <button id="open-browser-history" class="button secondary" type="button">My browser requests</button>
+        <button id="change-browser-phone" class="button secondary" type="button">Change phone / end session</button>
+      </div>
+    </section>
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
         <p class="eyebrow"><span class="little-star" aria-hidden="true">&#10022;</span> 35 YEARS IN THE CRACKERS TRADE</p>
-        <h1 id="hero-title">Wholesale crackers.<br>At your <em>doorstep.</em></h1>
+        <h1 id="hero-title" tabindex="-1">Wholesale crackers.<br>At your <em>doorstep.</em></h1>
         <p>Shop Sanathnagar's wholesale Diwali collection. Add items to your cart and send your order request on WhatsApp.</p>
         <ul class="hero-highlights" aria-label="Shopping benefits">
           <li>Coupon savings</li><li>Home delivery</li><li>Store pickup available</li>
@@ -285,6 +293,26 @@
   <a id="mobile-cart" class="mobile-cart" href="#requirement" hidden><span><span id="mobile-cart-label"></span><small id="mobile-delivery-progress"></small></span><span>View cart &#8594;</span></a>
   <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
 
+  <dialog id="phone-entry" class="browser-customer-dialog" aria-labelledby="phone-entry-title" aria-describedby="phone-entry-help">
+    <div class="dialog-heading"><h2 id="phone-entry-title">Continue with your mobile number</h2></div>
+    <p id="phone-entry-help">No OTP is sent yet. This is not verified login and does not unlock requests from other browsers or devices.</p>
+    <form id="phone-entry-form">
+      <label>Indian mobile number<input name="mobile" type="tel" inputmode="tel" autocomplete="tel" required maxlength="20" autofocus></label>
+      <p>We keep your number in this tab's session and remember up to 50 request links in this browser. Anyone using this browser with the same phone entry can view those links. Use a private device.</p>
+      <p id="phone-entry-error" role="alert" hidden></p>
+      <div class="browser-session-actions">
+        <button class="button primary" type="submit">Continue to shop</button>
+        <a class="button secondary" href="/">Back to home</a>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="browser-history" class="browser-customer-dialog" aria-labelledby="browser-history-title">
+    <div class="dialog-heading"><h2 id="browser-history-title">My browser requests</h2><button id="close-browser-history" class="icon-button" type="button" aria-label="Close browser history" autofocus>&times;</button></div>
+    <p>Only requests remembered here are listed, not orders looked up by mobile number. Links show submission snapshots, not live status. Details expire after seven days. Clearing browser storage removes this history.</p>
+    <p id="browser-history-status" role="status"></p>
+    <ul id="browser-history-list"></ul>
+    <button id="forget-browser-history" class="button secondary" type="button">Forget history for this phone entry</button>
+  </dialog>
   <dialog id="product-media-dialog" aria-labelledby="product-media-title">
     <div class="dialog-heading"><h2 id="product-media-title">Product media</h2><button id="close-product-media" class="icon-button" type="button" aria-label="Close product media" autofocus>&times;</button></div>
     <div id="product-media-stage" class="product-media-stage"></div>
@@ -300,8 +328,9 @@
       <div class="checkout-body">
       <div class="form-grid">
         <label>Your name <span aria-hidden="true">*</span><input name="name" autocomplete="name" required minlength="2" maxlength="80" placeholder="Full name"></label>
-        <label>Mobile number <span aria-hidden="true">*</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required maxlength="20" placeholder="10-digit number"></label>
+        <label>Mobile number <span aria-hidden="true">*</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required readonly maxlength="20" aria-describedby="checkout-phone-help" placeholder="10-digit number"></label>
       </div>
+      <p id="checkout-phone-help">To change your mobile number, close checkout and use Change phone / end session. This number has not been verified.</p>
       <fieldset class="fulfilment-options">
         <legend>Receive your items <span aria-hidden="true">*</span></legend>
         <div class="fulfilment-grid">

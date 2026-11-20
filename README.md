@@ -134,6 +134,23 @@ registration is performed by these source changes.
 
 ## Local preview
 
+### Temporary phone entry and browser request history
+
+Shopping asks for an Indian mobile number and prefills checkout. No OTP is sent,
+and this is not authenticated login. The number stays in tab session storage;
+**Change phone / end session** clears it. There is no public server order-history
+lookup by phone, and older or cross-device orders cannot be retrieved this way.
+
+After successful submission, the browser remembers up to 50 request references
+and their existing seven-day details links, grouped by a hash of the entered
+number. This hash is not authentication. Anyone using this browser with the same
+phone entry can view its remembered links. Names, addresses and item lists are
+not copied into browser history. Use a private device; **Forget history** removes
+the selected phone entry's links without deleting the vendor's saved records.
+Changing the phone does not delete earlier history. Clearing site storage deletes
+all browser history. Expired entries show only a reference. These are submission
+snapshots, not live order status. Verified customer accounts remain pending OTP.
+
 With Node.js 22.12 or later:
 
 ```powershell

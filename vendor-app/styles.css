@@ -26,6 +26,13 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: var(--vendor-save-offset, 24px); }
 body { margin: 0; }
+.browser-session { padding: 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.browser-session-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.browser-customer-dialog { max-width: 540px; }
+.browser-customer-dialog p, .browser-customer-dialog label { display: block; margin-bottom: 16px; }
+.browser-customer-dialog input { width: 100%; margin-top: 8px; }
+#browser-history-list { padding-inline-start: 20px; }
+#browser-history-list li { overflow-wrap: anywhere; margin-bottom: 16px; }
 button, input, select, textarea { font: inherit; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button, select { cursor: pointer; }

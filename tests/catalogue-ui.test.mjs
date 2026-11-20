@@ -48,6 +48,7 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
   const context = vm.createContext({
     ...offers,
     renderOfferWidgets, initializeOfferCarousel: () => () => {},
+    rememberBrowserRequest() {},
     ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "money", "localDate", "validateCustomer",
       "prepareOrderMessage", "validateOrderShareLink"].map(key => [key, order[key]])),
     checkCart: order.sanitizeCart, getLines: order.cartLines, getPricing: order.pricing, getTotal: order.total,
