@@ -196,13 +196,16 @@ verified customer access is implemented.
 
 ### Vendor order availability edits
 
-Opening a vendor order now opens a cart-style product list automatically. Use the
-large minus/plus buttons (or type a pack quantity), **Mark not available**, or
+Opening a vendor order now opens a compact product list automatically. Use the
+minus/plus buttons (or type a pack quantity), the **Not available** checkbox, or
 expand a unit price to edit it. A suggested, editable change reason is filled in;
 the sticky **Save changes** button shows the revised total and records the revised
 items and totals in customer history.
 
-Each saved product also has **Not started / Packing / Packed** controls. Packing
+Each saved product also has a **Packed** checkbox; unticking it marks the item
+pending. Pending rows are yellow and labelled **Pending**, while unavailable rows
+are muted and labelled **Unavailable**. Existing in-progress marks appear pending.
+Tighter rows show more products without removing quantity or price controls. Packing
 progress saves immediately to Netlify Database and survives reloads; it is
 vendor-only, not included in customer history, shared links or PDFs. Packing does
 not change the overall order status, prices or stock, or send notifications.

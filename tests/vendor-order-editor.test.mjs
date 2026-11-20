@@ -36,6 +36,9 @@ function fixture() {
 function all(node) { return node.children.flatMap(child => [child, ...all(child)]); }
 const click = node => node.events.get("click")();
 const find = (root, tag, text) => all(root).find(node => node.tag === tag && node.textContent === text);
+const checkbox = (root, label) => all(root).find(node => node.tag === "input" &&
+  node.type === "checkbox" && node.attributes.get("aria-label")?.startsWith(`${label}:`));
+const check = (node, value) => { node.checked = value; node.events.get("change")(); };
 
 test("cart controls change pack quantities, disable premature packing and suggest an editable availability reason", () => {
   const { form, editor } = fixture();
@@ -43,35 +46,53 @@ test("cart controls change pack quantities, disable premature packing and sugges
   click(find(first, "button", "+"));
   assert.equal(editor.build().items[0].quantity, 3);
   assert.match(editor.build().reason, /Pack quantities changed: #1/);
-  assert.equal(find(first, "button", "Packed").disabled, true);
+  assert.equal(checkbox(first, "Packed").disabled, true);
   click(find(first, "button", "-"));
-  assert.equal(find(first, "button", "Packed").disabled, false);
-  click(find(first, "button", "Mark not available"));
+  assert.equal(checkbox(first, "Packed").disabled, false);
+  check(checkbox(first, "Not available"), true);
   assert.deepEqual(editor.build().items.map(item => item.id), [2]);
   assert.match(editor.build().reason, /Unavailable: #1/);
-  assert.equal(find(first, "button", "Packed").disabled, true);
+  assert.equal(checkbox(first, "Packed").disabled, true);
+  assert.equal(first.dataset.unavailable, "true");
+  assert.equal(first.dataset.pending, "false");
   const reason = all(form).find(node => node.tag === "textarea");
   reason.value = "Customer asked for a replacement.";
   reason.events.get("input")();
-  click(find(first, "button", "Restore item"));
+  check(checkbox(first, "Not available"), false);
   click(find(first, "button", "+"));
   assert.equal(editor.build().reason, "Customer asked for a replacement.");
 });
 
-test("packing acknowledgements update product buttons without discarding an unsaved order draft", () => {
+test("packed checkbox acknowledgements update pending highlighting without discarding an unsaved order draft", () => {
   const { form, editor, calls } = fixture();
   const first = all(form).find(node => node.tag === "fieldset");
   const second = all(form).filter(node => node.tag === "fieldset")[1];
   click(find(first, "button", "+"));
-  click(find(second, "button", "Packed"));
+  assert.equal(second.dataset.pending, "true");
+  check(checkbox(second, "Packed"), true);
   assert.deepEqual(calls, [{ id: 2, state: "Packed" }]);
   editor.setPacking({ version: 1, items: [{ id: 2, state: "Packed" }] });
-  assert.equal(find(second, "button", "Packed").attributes.get("aria-pressed"), "true");
+  assert.equal(checkbox(second, "Packed").checked, true);
+  assert.equal(second.dataset.pending, "false");
   assert.equal(editor.build().items[0].quantity, 3);
   editor.setBusy(true);
   click(find(first, "button", "+"));
   assert.equal(editor.build().items[0].quantity, 3);
-  assert.equal(find(second, "button", "Packing").disabled, true);
+  assert.equal(checkbox(second, "Packed").disabled, true);
   editor.setBusy(false);
-  assert.equal(find(second, "button", "Packing").disabled, false);
+  assert.equal(checkbox(second, "Packed").disabled, false);
+  check(checkbox(second, "Packed"), false);
+  assert.deepEqual(calls[1], { id: 2, state: "Not started" });
+  editor.setPacking({ version: 2, items: [] });
+  assert.equal(checkbox(second, "Packed").checked, false);
+  assert.equal(second.dataset.pending, "true");
+});
+
+test("legacy in-progress products appear pending without extra packing buttons", () => {
+  const { form, editor } = fixture();
+  const first = all(form).find(node => node.tag === "fieldset");
+  editor.setPacking({ version: 1, items: [{ id: 1, state: "Packing" }] });
+  assert.equal(checkbox(first, "Packed").checked, false);
+  assert.equal(first.dataset.pending, "true");
+  assert.deepEqual(all(first).filter(node => node.tag === "button").map(node => node.textContent), ["-", "+"]);
 });
