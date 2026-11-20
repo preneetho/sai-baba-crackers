@@ -606,7 +606,8 @@ labels its status as **Status at submission**, since a retry must not imply that
 the original "New" status is current. The older PDF API remains available to
 cached clients that send `pdfConsent` instead.
 
-Open a request in `/vendor/` and choose **Create share link**. Then choose
+Open a request in `/vendor/`, expand **Share request** (collapsed by default),
+and choose **Create share link**. Then choose
 **WhatsApp (new tab)**, **Share...** (where supported by the browser), or
 **Copy link** to paste into email or another app. Nothing is sent automatically.
 If clipboard access is blocked, select and copy the displayed link manually.

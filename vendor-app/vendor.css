@@ -96,6 +96,8 @@
 .vendor-homepage-form .vendor-actions a { display: inline-flex; align-items: center; min-height: 44px; }
 .vendor-share { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
 .vendor-share > *, #share-ready > * { margin-top: 12px; }
+details.vendor-share { margin-top: 12px; padding-top: 12px; }
+details.vendor-share > summary { margin-top: 0; font-weight: 600; cursor: pointer; }
 .vendor-order-products { margin-top: 8px; padding-top: 0; border-top: 0; }
 .vendor-order-products > * { margin-top: 6px; }
 .vendor-order-products h3 { margin: 4px 0; }

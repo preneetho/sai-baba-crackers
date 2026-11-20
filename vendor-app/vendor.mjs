@@ -1049,6 +1049,7 @@ function revisionControls() {
 function renderDetail(order) {
   clearRevisionEditor();
   clearShare();
+  $("request-share").open = false;
   selected = order;
   $("detail-content").hidden = false;
   $("detail-id").textContent = order.orderId;

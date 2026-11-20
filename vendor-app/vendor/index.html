@@ -156,8 +156,8 @@
       <dl id="detail-amounts" class="vendor-detail-fields"></dl>
       <p class="vendor-muted">Quantity, availability and price changes create a revision visible to the customer. Packing marks do not change the total or send a notification.</p>
       <details><summary>Order revision history</summary><section id="detail-revisions"></section></details>
-      <section class="vendor-share" aria-labelledby="share-title">
-        <h3 id="share-title">Share request</h3>
+      <details id="request-share" class="vendor-share">
+        <summary id="share-title">Share request</summary>
         <p class="vendor-muted">Anyone with the link can view customer details and all items for seven days. It is a read-only snapshot of saved details, not live updates or unsaved status selections. Share only with trusted recipients.</p>
         <button id="create-share" type="button">Create share link</button>
         <div id="share-ready" hidden>
@@ -170,7 +170,7 @@
           </div>
         </div>
         <p id="share-message" class="vendor-notice" role="status" aria-live="polite"></p>
-      </section>
+      </details>
       <form id="status-form" class="vendor-status-form">
         <label>Request status<select id="detail-status" required></select></label>
         <button id="save-status" class="vendor-primary" type="submit">Save status</button>
