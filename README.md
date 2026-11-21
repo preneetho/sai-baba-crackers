@@ -196,6 +196,11 @@ verified customer access is implemented.
 
 ### Vendor order availability edits
 
+The signed-in vendor dashboard has a Shop-management navigation menu for
+**Coupons & delivery**, **Homepage video** and **Manage yearly price lists**.
+These retain their existing settings flows and remain private to approved vendors;
+the menu wraps on narrow screens and highlights expanded settings.
+
 Opening a vendor order now opens a compact product list automatically. Use the
 minus/plus buttons (or type a pack quantity), the **Not available** checkbox, or
 expand a unit price to edit it. A suggested, editable change reason is filled in;

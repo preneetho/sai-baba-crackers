@@ -33,9 +33,14 @@
       <noscript><p class="vendor-notice">Enable JavaScript to use the vendor dashboard.</p></noscript>
     </section>
     <section id="dashboard" hidden aria-labelledby="dashboard-title">
+      <nav class="vendor-navigation" aria-label="Shop management">
+        <button id="open-offers" type="button" aria-controls="offers-panel" aria-expanded="false">Coupons &amp; delivery</button>
+        <button id="open-homepage" type="button" aria-controls="homepage-panel" aria-expanded="false">Homepage video</button>
+        <button id="open-prices" type="button" aria-controls="price-panel" aria-expanded="false">Manage yearly price lists</button>
+      </nav>
       <div class="vendor-heading">
         <div><p class="eyebrow brand-text">Order register</p><h1 id="dashboard-title">Order requests</h1></div>
-        <div class="vendor-actions"><button id="open-offers" type="button" aria-controls="offers-panel" aria-expanded="false">Coupons &amp; delivery</button><button id="open-homepage" type="button" aria-controls="homepage-panel" aria-expanded="false">Homepage video</button><button id="open-prices" type="button">Manage yearly price lists</button><button id="refresh-orders" type="button">Refresh requests</button></div>
+        <button id="refresh-orders" type="button">Refresh requests</button>
       </div>
       <p class="vendor-muted">Requests are not confirmed sales. Status updates do not send a WhatsApp message or notify customers.</p>
       <section id="offers-panel" class="vendor-panel" aria-labelledby="offers-title" hidden>

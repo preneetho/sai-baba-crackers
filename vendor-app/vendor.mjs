@@ -121,6 +121,7 @@ function clearPrices() {
   priceDirty = false;
   priceNeedsReload = false;
   $("price-panel").hidden = true;
+  $("open-prices").setAttribute("aria-expanded", "false");
   $("price-controls").hidden = true;
   $("price-products").replaceChildren();
   $("price-year").replaceChildren();
@@ -1252,6 +1253,7 @@ $("open-prices").addEventListener("click", () => {
   if (!$("price-panel").hidden) return;
   clearPrices();
   $("price-panel").hidden = false;
+  $("open-prices").setAttribute("aria-expanded", "true");
   loadPrices();
 });
 $("close-prices").addEventListener("click", () => {
