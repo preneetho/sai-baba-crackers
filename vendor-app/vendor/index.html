@@ -34,15 +34,11 @@
     </section>
     <section id="dashboard" hidden aria-labelledby="dashboard-title">
       <nav class="vendor-navigation" aria-label="Shop management">
+        <button id="open-orders" type="button" aria-controls="orders-panel" aria-expanded="true">Order Requests</button>
         <button id="open-offers" type="button" aria-label="Offers and delivery settings" aria-controls="offers-panel" aria-expanded="false">Offers</button>
         <button id="open-homepage" type="button" aria-label="Homepage video settings" aria-controls="homepage-panel" aria-expanded="false">Video</button>
         <button id="open-prices" type="button" aria-controls="price-panel" aria-expanded="false">Manage Price Lists</button>
       </nav>
-      <div class="vendor-heading">
-        <div><p class="eyebrow brand-text">Order register</p><h1 id="dashboard-title">Order requests</h1></div>
-        <button id="refresh-orders" type="button">Refresh requests</button>
-      </div>
-      <p class="vendor-muted">Requests are not confirmed sales. Status updates do not send a WhatsApp message or notify customers.</p>
       <section id="offers-panel" class="vendor-panel" aria-labelledby="offers-title" hidden>
         <div class="vendor-heading"><h2 id="offers-title">Coupons &amp; delivery</h2><button id="close-offers" type="button">Close offer settings</button></div>
         <p>Shared across all years. Enabled codes can be used in the cart. Uncheck Show on website to hide a code from public offers while keeping it usable by anyone you share it with. One percentage coupon per request; no code means no discount. Existing saved requests keep their original amounts.</p>
@@ -106,6 +102,12 @@
           </form>
         </div>
       </section>
+      <section id="orders-panel" aria-labelledby="dashboard-title">
+      <div class="vendor-heading">
+        <div><p class="eyebrow brand-text">Order register</p><h1 id="dashboard-title">Order requests</h1></div>
+        <button id="refresh-orders" type="button">Refresh requests</button>
+      </div>
+      <p class="vendor-muted">Requests are not confirmed sales. Status updates do not send a WhatsApp message or notify customers.</p>
       <form id="filter-form" class="vendor-panel vendor-filters">
         <label>Search by name, phone or request ID<input id="order-search" type="search" maxlength="80" autocomplete="off" placeholder="For example, a mobile number"></label>
         <label>Status<select id="status-filter"><option value="">All statuses</option></select></label>
@@ -140,6 +142,7 @@
         <button id="next-page" type="button">Next page</button>
       </div>
       <p id="last-refreshed" class="vendor-muted"></p>
+      </section>
       <p id="account-message" class="vendor-notice" role="status"></p>
     </section>
   </main>

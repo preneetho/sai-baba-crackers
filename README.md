@@ -201,7 +201,9 @@ The signed-in vendor dashboard has a Shop-management navigation menu for
 These retain their existing settings flows and remain private to approved vendors;
 the menu stays on one line and highlights expanded settings. On exceptionally
 narrow screens or enlarged text, the menu scrolls horizontally rather than wrapping.
-Only the selected settings panel is visible and highlighted. Switching panels
+Order Requests is the first menu item and the default view after signing in.
+Only the selected panel is visible and its menu item highlighted. Closing a
+settings panel returns to Order Requests. Switching panels
 keeps unsaved edits without reloading them; closing a panel retains the existing
 discard confirmation. Switching is blocked while a save or settings load is running.
 

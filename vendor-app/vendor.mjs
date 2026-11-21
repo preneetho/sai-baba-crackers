@@ -90,6 +90,8 @@ function clearPrivateView() {
   detailId = "";
   $("order-dialog").close();
   $("dashboard").hidden = true;
+  $("orders-panel").hidden = true;
+  $("open-orders").setAttribute("aria-expanded", "false");
   $("account").hidden = true;
   $("account-email").textContent = "";
   $("order-list").replaceChildren();
@@ -620,6 +622,7 @@ function setHomepageBusy(value) {
   $("open-prices").disabled = blocked;
   $("sign-out").disabled = blocked;
   $("open-offers").disabled = blocked;
+  $("open-orders").disabled = blocked;
 }
 
 function clearHomepage() {
@@ -841,6 +844,7 @@ async function loadVendorOffers() {
 function selectShopSettings(panelId) {
   if (!session || saving || offerBusy || priceBusy || homepageBusy) return false;
   for (const [panel, button] of [
+    ["orders-panel", "open-orders"],
     ["offers-panel", "open-offers"], ["homepage-panel", "open-homepage"], ["price-panel", "open-prices"],
   ]) {
     const active = panel === panelId;
@@ -857,7 +861,8 @@ $("open-offers").addEventListener("click", () => {
 $("close-offers").addEventListener("click", () => {
   if (offerBusy || (offerDirty && !window.confirm("Discard unsaved coupon and delivery edits?"))) return;
   clearOffers();
-  $("open-offers").focus();
+  selectShopSettings("orders-panel");
+  $("open-orders").focus();
 });
 $("reload-vendor-offers").addEventListener("click", () => {
   if (offerDirty && !window.confirm("Reloading discards visible unsaved offer edits. Continue?")) return;
@@ -927,6 +932,7 @@ async function initialise() {
     $("account").hidden = false;
     $("access-panel").hidden = true;
     $("dashboard").hidden = false;
+    selectShopSettings("orders-panel");
     expiryTimer = setTimeout(() => showAccess("Your vendor session has expired. Sign in again.", true),
       Math.min(result.expiresAt - Date.now(), 8 * 60 * 60 * 1000));
     await loadOrders();
@@ -1241,6 +1247,7 @@ $("next-page").addEventListener("click", () => { if (page * PAGE_SIZE < total) {
 $("refresh-orders").addEventListener("click", loadOrders);
 $("retry-orders").addEventListener("click", loadOrders);
 $("access-retry").addEventListener("click", initialise);
+$("open-orders").addEventListener("click", () => selectShopSettings("orders-panel"));
 $("open-homepage").addEventListener("click", () => {
   if (!selectShopSettings("homepage-panel")) return;
   if (!homepageState && !homepageNeedsReload) loadHomepage();
@@ -1248,7 +1255,8 @@ $("open-homepage").addEventListener("click", () => {
 $("close-homepage").addEventListener("click", () => {
   if (homepageBusy || (homepageDirty() && !window.confirm("Discard unsaved homepage video edits?"))) return;
   clearHomepage();
-  $("open-homepage").focus();
+  selectShopSettings("orders-panel");
+  $("open-orders").focus();
 });
 $("reload-homepage").addEventListener("click", () => {
   if (homepageDirty() && !window.confirm("Reloading discards visible unsaved video edits. Continue?")) return;
@@ -1263,7 +1271,8 @@ $("open-prices").addEventListener("click", () => {
 $("close-prices").addEventListener("click", () => {
   if (priceBusy || (priceDirty && !window.confirm("Discard unsaved price-list edits?"))) return;
   clearPrices();
-  $("open-prices").focus();
+  selectShopSettings("orders-panel");
+  $("open-orders").focus();
 });
 $("reload-prices").addEventListener("click", () => {
   if (priceDirty && !window.confirm("Reloading discards visible unsaved edits. Continue?")) return;

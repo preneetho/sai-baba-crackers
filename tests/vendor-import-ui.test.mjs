@@ -169,40 +169,48 @@ async function harness({ navigator = {} } = {}) {
 
 test("vendor settings show only the selected panel and preserve drafts across menu changes", async () => {
   const ui = await harness();
-  const panels = ["offers-panel", "homepage-panel", "price-panel"];
-  const buttons = ["open-offers", "open-homepage", "open-prices"];
+  const panels = ["orders-panel", "offers-panel", "homepage-panel", "price-panel"];
+  const buttons = ["open-orders", "open-offers", "open-homepage", "open-prices"];
   const active = index => {
     panels.forEach((id, position) => assert.equal(ui.get(id).hidden, position !== index));
     buttons.forEach((id, position) => assert.equal(ui.get(id).getAttribute("aria-expanded"), String(position === index)));
   };
-  await ui.emit("open-offers");
   active(0);
+  const initialRows = ui.get("order-list").children.length;
+  await ui.emit("open-offers");
+  active(1);
   ui.get("delivery-fee").value = "123";
   await ui.emit("offers-form", "input");
   await ui.emit("open-homepage");
-  active(1);
+  active(2);
   ui.get("homepage-video-url").value = "https://youtu.be/abcdefghijk";
   await ui.emit("homepage-video-url", "input");
   await ui.emit("open-prices");
-  active(2);
+  active(3);
   await ui.emit("price-toggle-1");
   ui.get("price-price-1").value = "123";
   await ui.emit("price-price-1", "input");
   const loads = ui.requests.length;
   await ui.emit("open-offers");
-  active(0);
+  active(1);
   assert.equal(ui.get("delivery-fee").value, "123");
   assert.equal(vm.runInContext("offerDirty", ui.context), true);
   await ui.emit("open-homepage");
-  active(1);
+  active(2);
   assert.equal(ui.get("homepage-video-url").value, "https://youtu.be/abcdefghijk");
   await ui.emit("open-prices");
-  active(2);
+  active(3);
   assert.equal(vm.runInContext("priceDirty", ui.context), true);
   assert.equal(vm.runInContext("priceList.products[0].price", ui.context), 123);
   assert.equal(ui.requests.length, loads);
   await ui.emit("open-prices");
-  active(2);
+  active(3);
+  await ui.emit("open-orders");
+  active(0);
+  assert.equal(ui.get("order-list").children.length, initialRows);
+  await ui.emit("open-prices");
+  active(3);
+  assert.equal(vm.runInContext("priceList.products[0].price", ui.context), 123);
   assert.equal(ui.requests.length, loads);
 });
 
@@ -217,17 +225,40 @@ test("vendor settings cannot switch during loading or saving, and close still gu
   for (const busy of ["saving", "offerBusy", "homepageBusy", "priceBusy"]) {
     vm.runInContext(`${busy} = true`, ui.context);
     await ui.emit("open-homepage");
+    await ui.emit("open-orders");
     assert.equal(ui.get("offers-panel").hidden, false);
     assert.equal(ui.get("homepage-panel").hidden, true);
+    assert.equal(ui.get("orders-panel").hidden, true);
     vm.runInContext(`${busy} = false`, ui.context);
   }
   ui.confirm(true);
   await ui.emit("close-offers");
   assert.equal(ui.get("offers-panel").hidden, true);
   assert.equal(ui.get("open-offers").getAttribute("aria-expanded"), "false");
+  assert.equal(ui.get("orders-panel").hidden, false);
+  assert.equal(ui.get("open-orders").getAttribute("aria-expanded"), "true");
   await ui.emit("open-offers");
   assert.equal(vm.runInContext("offerDirty", ui.context), false);
   assert.notEqual(ui.get("delivery-fee").value, "123");
+});
+
+test("closing settings returns to order requests and sign-in resets the default selection", async () => {
+  const ui = await harness();
+  for (const name of ["homepage", "prices"]) {
+    await ui.emit(`open-${name}`);
+    await ui.emit(`close-${name}`);
+    assert.equal(ui.get("orders-panel").hidden, false);
+    assert.equal(ui.get("open-orders").getAttribute("aria-expanded"), "true");
+    assert.equal(ui.focused, ui.get("open-orders"));
+  }
+  await ui.emit("open-homepage");
+  await ui.emit("sign-out");
+  assert.equal(ui.get("orders-panel").hidden, true);
+  assert.equal(ui.get("open-orders").getAttribute("aria-expanded"), "false");
+  await ui.emit("access-retry");
+  assert.equal(ui.get("orders-panel").hidden, false);
+  assert.equal(ui.get("open-orders").getAttribute("aria-expanded"), "true");
+  assert.equal(ui.get("homepage-panel").hidden, true);
 });
 
 test("switching settings retains failed loads until an explicit retry", async () => {
@@ -339,7 +370,7 @@ test("homepage video edits load privately, save explicitly with CSRF/version and
   assert.equal(ui.requests.some(request => request.path.startsWith("/api/vendor-catalogue")), false);
   await ui.emit("close-homepage");
   assert.equal(ui.get("homepage-panel").hidden, true);
-  assert.equal(ui.focused, ui.get("open-homepage"));
+  assert.equal(ui.focused, ui.get("open-orders"));
 });
 
 test("homepage invalid links, save conflicts and unreadable acknowledgements never claim success or discard edits", async () => {
