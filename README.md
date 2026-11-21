@@ -197,9 +197,10 @@ verified customer access is implemented.
 ### Vendor order availability edits
 
 The signed-in vendor dashboard has a Shop-management navigation menu for
-**Coupons & delivery**, **Homepage video** and **Manage yearly price lists**.
+**Coupons**, **Video** and **Manage Price Lists**.
 These retain their existing settings flows and remain private to approved vendors;
-the menu wraps on narrow screens and highlights expanded settings.
+the menu stays on one line and highlights expanded settings. On exceptionally
+narrow screens or enlarged text, the menu scrolls horizontally rather than wrapping.
 
 Opening a vendor order now opens a compact product list automatically. Use the
 minus/plus buttons (or type a pack quantity), the **Not available** checkbox, or
