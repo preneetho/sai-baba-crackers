@@ -197,7 +197,7 @@ verified customer access is implemented.
 ### Vendor order availability edits
 
 The signed-in vendor dashboard has a Shop-management navigation menu for
-**Coupons**, **Video** and **Manage Price Lists**.
+**Offers**, **Video** and **Manage Price Lists**.
 These retain their existing settings flows and remain private to approved vendors;
 the menu stays on one line and highlights expanded settings. On exceptionally
 narrow screens or enlarged text, the menu scrolls horizontally rather than wrapping.
