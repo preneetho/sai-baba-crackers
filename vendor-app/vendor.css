@@ -21,7 +21,8 @@
 .vendor-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; }
 .vendor-page .vendor-navigation { display: flex; flex-wrap: nowrap; align-items: center; gap: 16px; overflow-x: auto; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
 .vendor-page .vendor-navigation button { flex-shrink: 0; white-space: nowrap; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 10px 0; color: var(--muted); font-size: 13px; }
-.vendor-page .vendor-navigation button:hover, .vendor-page .vendor-navigation button[aria-expanded="true"] { color: var(--brand); border-bottom-color: var(--brand); }
+.vendor-page .vendor-navigation button:hover { color: var(--brand); }
+.vendor-page .vendor-navigation button[aria-expanded="true"] { color: var(--brand); border-bottom-color: var(--brand); }
 .vendor-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, .5fr) auto auto; gap: 16px; align-items: end; margin: 24px 0 12px; }
 .vendor-page label { display: grid; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; }
 .vendor-page input, .vendor-page select, .vendor-page textarea { min-width: 0; max-width: 100%; width: 100%; min-height: 44px; border: 1px solid var(--control-border); background: var(--surface); color: var(--ink); border-radius: 9px; padding: 10px; }

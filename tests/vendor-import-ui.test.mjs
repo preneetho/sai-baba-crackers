@@ -8,6 +8,7 @@ import { products } from "../vendor-app/catalog.mjs";
 import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "../vendor-app/media-model.mjs";
 import { inspectMediaFile } from "../vendor-app/media-upload.mjs";
 import { validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl } from "../vendor-app/homepage-model.mjs";
+import { DEFAULT_OFFERS, validOffers, validOfferVersion, checkOffers, normalizeCoupon } from "../vendor-app/offers-model.mjs";
 
 const mediaAsset = { cloudName: "synthetic-cloud", publicId: "sai-baba-crackers/products/00000000-0000-4000-8000-000000000001",
   resourceType: "image", version: 1234567890, format: "jpg", bytes: 1000, width: 640, height: 480,
@@ -117,6 +118,7 @@ async function harness({ navigator = {} } = {}) {
     ORDER_STATUSES, PAGE_SIZE, validOrder, validCatalogue, validYear, catalogueProducts, PRODUCT_TYPES,
     validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId, inspectMediaFile, transferMedia: (...args) => transfer(...args),
     validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl,
+    validOffers, validOfferVersion, checkOffers, normalizeCoupon,
     AbortController, AbortSignal, URL, URLSearchParams, Intl, console, navigator,
     document: { getElementById: get, createElement: tag => new Node(tag),
       documentElement: { style: { setProperty: (key, value) => styles.set(key, value) } } },
@@ -138,6 +140,7 @@ async function harness({ navigator = {} } = {}) {
       if (path.startsWith("/api/vendor-catalogue")) return respondPrice(path, options);
       if (path === "/api/vendor-media") return respondMedia(JSON.parse(options.body), options);
       if (path === "/api/vendor-homepage") return respondHomepage(path, options);
+      if (path === "/api/vendor-offers") return Response.json({ offers: DEFAULT_OFFERS, version: null });
       throw new Error("Unexpected test route");
     },
   });
@@ -163,6 +166,88 @@ async function harness({ navigator = {} } = {}) {
     confirm(value) { confirmed = value; },
   };
 }
+
+test("vendor settings show only the selected panel and preserve drafts across menu changes", async () => {
+  const ui = await harness();
+  const panels = ["offers-panel", "homepage-panel", "price-panel"];
+  const buttons = ["open-offers", "open-homepage", "open-prices"];
+  const active = index => {
+    panels.forEach((id, position) => assert.equal(ui.get(id).hidden, position !== index));
+    buttons.forEach((id, position) => assert.equal(ui.get(id).getAttribute("aria-expanded"), String(position === index)));
+  };
+  await ui.emit("open-offers");
+  active(0);
+  ui.get("delivery-fee").value = "123";
+  await ui.emit("offers-form", "input");
+  await ui.emit("open-homepage");
+  active(1);
+  ui.get("homepage-video-url").value = "https://youtu.be/abcdefghijk";
+  await ui.emit("homepage-video-url", "input");
+  await ui.emit("open-prices");
+  active(2);
+  await ui.emit("price-toggle-1");
+  ui.get("price-price-1").value = "123";
+  await ui.emit("price-price-1", "input");
+  const loads = ui.requests.length;
+  await ui.emit("open-offers");
+  active(0);
+  assert.equal(ui.get("delivery-fee").value, "123");
+  assert.equal(vm.runInContext("offerDirty", ui.context), true);
+  await ui.emit("open-homepage");
+  active(1);
+  assert.equal(ui.get("homepage-video-url").value, "https://youtu.be/abcdefghijk");
+  await ui.emit("open-prices");
+  active(2);
+  assert.equal(vm.runInContext("priceDirty", ui.context), true);
+  assert.equal(vm.runInContext("priceList.products[0].price", ui.context), 123);
+  assert.equal(ui.requests.length, loads);
+  await ui.emit("open-prices");
+  active(2);
+  assert.equal(ui.requests.length, loads);
+});
+
+test("vendor settings cannot switch during loading or saving, and close still guards unsaved edits", async () => {
+  const ui = await harness();
+  await ui.emit("open-offers");
+  ui.get("delivery-fee").value = "123";
+  await ui.emit("offers-form", "input");
+  ui.confirm(false);
+  await ui.emit("close-offers");
+  assert.equal(ui.get("offers-panel").hidden, false);
+  for (const busy of ["saving", "offerBusy", "homepageBusy", "priceBusy"]) {
+    vm.runInContext(`${busy} = true`, ui.context);
+    await ui.emit("open-homepage");
+    assert.equal(ui.get("offers-panel").hidden, false);
+    assert.equal(ui.get("homepage-panel").hidden, true);
+    vm.runInContext(`${busy} = false`, ui.context);
+  }
+  ui.confirm(true);
+  await ui.emit("close-offers");
+  assert.equal(ui.get("offers-panel").hidden, true);
+  assert.equal(ui.get("open-offers").getAttribute("aria-expanded"), "false");
+  await ui.emit("open-offers");
+  assert.equal(vm.runInContext("offerDirty", ui.context), false);
+  assert.notEqual(ui.get("delivery-fee").value, "123");
+});
+
+test("switching settings retains failed loads until an explicit retry", async () => {
+  const ui = await harness();
+  ui.respondHomepage(async () => Response.json({ error: "Video temporarily unavailable" }, { status: 503 }));
+  await ui.emit("open-homepage");
+  const errorMessage = ui.get("homepage-message").textContent;
+  assert.match(errorMessage, /Video temporarily unavailable/);
+  await ui.emit("open-offers");
+  const calls = ui.requests.length;
+  await ui.emit("open-homepage");
+  assert.equal(ui.requests.length, calls);
+  assert.equal(ui.get("homepage-message").textContent, errorMessage);
+  assert.equal(ui.get("homepage-panel").hidden, false);
+  assert.equal(ui.get("offers-panel").hidden, true);
+  ui.respondHomepage(async () => Response.json({ video: { videoId: "hxVU6MC47zU" }, version: null }));
+  await ui.emit("reload-homepage");
+  assert.equal(vm.runInContext("homepageNeedsReload", ui.context), false);
+  assert.equal(ui.requests.length, calls + 1);
+});
 
 test("product effect checkboxes remain drafts, allow multiple types and publish or clear through the existing price-list save", async () => {
   const ui = await harness();

@@ -838,11 +838,21 @@ async function loadVendorOffers() {
   } finally { if (version === offerAccessVersion) setOfferBusy(false); }
 }
 
+function selectShopSettings(panelId) {
+  if (!session || saving || offerBusy || priceBusy || homepageBusy) return false;
+  for (const [panel, button] of [
+    ["offers-panel", "open-offers"], ["homepage-panel", "open-homepage"], ["price-panel", "open-prices"],
+  ]) {
+    const active = panel === panelId;
+    $(panel).hidden = !active;
+    $(button).setAttribute("aria-expanded", String(active));
+  }
+  return true;
+}
+
 $("open-offers").addEventListener("click", () => {
-  if (!session || offerBusy || priceBusy || homepageBusy || !$("offers-panel").hidden) return;
-  $("offers-panel").hidden = false;
-  $("open-offers").setAttribute("aria-expanded", "true");
-  loadVendorOffers();
+  if (!selectShopSettings("offers-panel")) return;
+  if (!offerState && !offerNeedsReload) loadVendorOffers();
 });
 $("close-offers").addEventListener("click", () => {
   if (offerBusy || (offerDirty && !window.confirm("Discard unsaved coupon and delivery edits?"))) return;
@@ -1232,10 +1242,8 @@ $("refresh-orders").addEventListener("click", loadOrders);
 $("retry-orders").addEventListener("click", loadOrders);
 $("access-retry").addEventListener("click", initialise);
 $("open-homepage").addEventListener("click", () => {
-  if (!session || homepageBusy || priceBusy || !$("homepage-panel").hidden) return;
-  $("homepage-panel").hidden = false;
-  $("open-homepage").setAttribute("aria-expanded", "true");
-  loadHomepage();
+  if (!selectShopSettings("homepage-panel")) return;
+  if (!homepageState && !homepageNeedsReload) loadHomepage();
 });
 $("close-homepage").addEventListener("click", () => {
   if (homepageBusy || (homepageDirty() && !window.confirm("Discard unsaved homepage video edits?"))) return;
@@ -1249,12 +1257,8 @@ $("reload-homepage").addEventListener("click", () => {
 $("homepage-video-url").addEventListener("input", () => setHomepageBusy(homepageBusy));
 $("homepage-form").addEventListener("submit", saveHomepage);
 $("open-prices").addEventListener("click", () => {
-  if (!session || priceBusy || homepageBusy) return;
-  if (!$("price-panel").hidden) return;
-  clearPrices();
-  $("price-panel").hidden = false;
-  $("open-prices").setAttribute("aria-expanded", "true");
-  loadPrices();
+  if (!selectShopSettings("price-panel")) return;
+  if (!priceList && !priceNeedsReload) loadPrices();
 });
 $("close-prices").addEventListener("click", () => {
   if (priceBusy || (priceDirty && !window.confirm("Discard unsaved price-list edits?"))) return;
