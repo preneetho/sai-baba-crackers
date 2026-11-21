@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createOrderEditor } from "../vendor-app/vendor-order-editor.mjs";
 
-function fixture() {
+function fixture({ deferPacking = false } = {}) {
   const document = { createElement: tag => new Node(tag) };
   class Node {
     constructor(tag) {
@@ -30,7 +30,10 @@ function fixture() {
     ] };
   const calls = [];
   const editor = createOrderEditor(order, { year: 2026, revision: 1, products: order.lineItems },
-    form, () => {}, (id, state) => calls.push({ id, state }));
+    form, () => {}, (id, state) => {
+      calls.push({ id, state });
+      if (deferPacking) editor.setPackingBusy(true, id, state);
+    });
   return { form, editor, calls };
 }
 function all(node) { return node.children.flatMap(child => [child, ...all(child)]); }
@@ -95,4 +98,48 @@ test("legacy in-progress products appear pending without extra packing buttons",
   assert.equal(checkbox(first, "Packed").checked, false);
   assert.equal(first.dataset.pending, "true");
   assert.deepEqual(all(first).filter(node => node.tag === "button").map(node => node.textContent), ["-", "+"]);
+});
+
+test("one packed click stays checked during saving and does not block availability edits", () => {
+  const { form, editor, calls } = fixture({ deferPacking: true });
+  const [first, second] = all(form).filter(node => node.tag === "fieldset");
+  const packed = checkbox(first, "Packed");
+  check(packed, true);
+  assert.deepEqual(calls, [{ id: 1, state: "Packed" }]);
+  assert.equal(packed.checked, true);
+  assert.equal(packed.disabled, true);
+  const unavailable = checkbox(second, "Not available");
+  assert.equal(unavailable.disabled, false);
+  check(unavailable, true);
+  assert.equal(unavailable.checked, true);
+  assert.deepEqual(editor.build().items.map(item => item.id), [1]);
+  const save = all(form).find(node => node.tag === "button" && node.type === "submit");
+  assert.equal(save.disabled, true);
+  editor.setPacking({ version: 1, items: [{ id: 1, state: "Packed" }] });
+  editor.setPackingBusy(false);
+  assert.equal(packed.checked, true);
+  assert.equal(packed.disabled, false);
+  assert.equal(unavailable.checked, true);
+  assert.equal(save.disabled, false);
+
+  check(packed, false);
+  assert.deepEqual(calls[1], { id: 1, state: "Not started" });
+  assert.equal(packed.checked, false);
+  editor.setPacking({ version: 2, items: [] });
+  editor.setPackingBusy(false);
+  assert.equal(packed.checked, false);
+  assert.equal(first.dataset.pending, "true");
+});
+
+test("unconfirmed packing restores saved state without losing availability edits", () => {
+  const { form, editor } = fixture({ deferPacking: true });
+  const [first, second] = all(form).filter(node => node.tag === "fieldset");
+  check(checkbox(first, "Packed"), true);
+  check(checkbox(second, "Not available"), true);
+  editor.setPackingBusy(false);
+  editor.setBusy(true);
+  assert.equal(checkbox(first, "Packed").checked, false);
+  assert.equal(first.dataset.pending, "true");
+  assert.equal(checkbox(second, "Not available").checked, true);
+  assert.deepEqual(editor.build().items.map(item => item.id), [1]);
 });

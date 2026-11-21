@@ -1430,7 +1430,7 @@ async function savePacking(productId, state) {
     expectedStatus: order.status, expectedPackingVersion: order.packing.version,
   };
   saving = true;
-  revisionEditor.setBusy(true);
+  revisionEditor.setPackingBusy(true, productId, state);
   revisionControls();
   notice("detail-message", `Saving packing progress for product #${productId}...`);
   try {
@@ -1454,6 +1454,7 @@ async function savePacking(productId, state) {
   } finally {
     saving = false;
     if (version === detailVersion && session) {
+      revisionEditor?.setPackingBusy(false);
       revisionEditor?.setBusy(revisionNeedsReload);
       revisionControls();
     }

@@ -205,6 +205,10 @@ items and totals in customer history.
 Each saved product also has a **Packed** checkbox; unticking it marks the item
 pending. Pending rows are yellow and labelled **Pending**, while unavailable rows
 are muted and labelled **Unavailable**. Existing in-progress marks appear pending.
+Packed selections stay visible with **Saving...** while awaiting acknowledgement;
+quantity and availability edits remain usable, but further packing and order saves
+wait for the response. Failed packing saves restore the last confirmed state and
+require reload, preserving availability edits.
 Tighter rows show more products without removing quantity or price controls. Packing
 progress saves immediately to Netlify Database and survives reloads; it is
 vendor-only, not included in customer history, shared links or PDFs. Packing does

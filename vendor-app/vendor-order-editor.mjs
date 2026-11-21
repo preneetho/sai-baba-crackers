@@ -26,6 +26,7 @@ export function createOrderEditor(order, catalogue, form, onChange, onPacking) {
     return input;
   };
   let busy = false;
+  let pendingPacking = null;
   const draft = order.lineItems.map(item => ({ ...item, included: true }));
   form.replaceChildren();
   const help = node("p", "Packed autosaves. Qty / Not available: Save changes.");
@@ -84,7 +85,7 @@ export function createOrderEditor(order, catalogue, form, onChange, onPacking) {
       const amounts = calculateRevision(input.items, order.discountPercent, input.deliveryCharge);
       preview.textContent = `Revised subtotal: ${money(amounts.subtotal)}; discount (${amounts.discountPercent}%): ${money(amounts.discount)}; delivery: ${money(amounts.deliveryCharge)}; total: ${money(amounts.total)}.`;
       save.textContent = `Save changes - ${money(amounts.total)}`;
-      save.disabled = busy || !changed();
+      save.disabled = busy || pendingPacking !== null || !changed();
     } catch (error) {
       preview.textContent = error.message;
       save.disabled = true;
@@ -156,12 +157,16 @@ export function createOrderEditor(order, catalogue, form, onChange, onPacking) {
       group.dataset.unavailable = String(!item.included);
       minus.disabled = busy || !item.included || !Number.isInteger(item.quantity) || item.quantity <= 1;
       plus.disabled = busy || !item.included || !Number.isInteger(item.quantity) || item.quantity >= 99;
-      const state = order.packing?.items.find(mark => mark.id === item.id)?.state ?? "Not started";
+      const savingPacking = pendingPacking?.productId === item.id;
+      const state = savingPacking ? pendingPacking.state :
+        order.packing?.items.find(mark => mark.id === item.id)?.state ?? "Not started";
       const quantityMatches = original && original.quantity === item.quantity;
       packed.checked = state === "Packed" && item.included && quantityMatches;
-      packed.disabled = busy || !onPacking || !validPacking(order.packing) || !item.included || !quantityMatches;
+      packed.disabled = busy || pendingPacking !== null || !onPacking ||
+        !validPacking(order.packing) || !item.included || !quantityMatches;
       group.dataset.pending = String(item.included && !packed.checked);
-      stateLabel.textContent = !item.included ? "Unavailable" : packed.checked ? "Packed" : "Pending";
+      stateLabel.textContent = !item.included ? "Unavailable" : savingPacking ? "Saving..." :
+        packed.checked ? "Packed" : "Pending";
       packingHelp.textContent = item.included && !quantityMatches ?
         "Save quantity changes before marking packed." : "";
       packingHelp.hidden = !packingHelp.textContent;
@@ -233,6 +238,11 @@ export function createOrderEditor(order, catalogue, form, onChange, onPacking) {
     setPacking(packing) {
       if (!validPacking(packing)) throw new Error("Packing progress could not be verified.");
       order.packing = packing;
+      pendingPacking = null;
+      update();
+    },
+    setPackingBusy(value, productId, state) {
+      pendingPacking = value ? { productId, state } : null;
       update();
     },
     build() {
