@@ -842,7 +842,7 @@ async function loadCatalogue() {
       showStorageWarning("Your saved cart is no longer available. Please select your items again.", true);
     }
     document.title = `${vendor.name} | Diwali ${result.year}`;
-    for (const node of document.querySelectorAll("[data-catalogue-year]")) node.textContent = result.year;
+    for (const node of document.querySelectorAll("[data-catalogue-year]")) node.textContent = result.name ?? result.year;
     $("#catalogue-status").textContent = "";
     $("#catalogue-status").hidden = true;
     renderCategories();

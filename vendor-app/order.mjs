@@ -105,7 +105,7 @@ export function createRequirement(cart, input, today, catalogue = { products, ye
   const delivery = customer.fulfilment === "delivery";
   const arrangement = delivery ? "delivery" : "pickup";
   return [
-    `New order request - ${vendor.name} (${catalogue.year})`,
+    `New order request - ${vendor.name} (${catalogue.name ?? catalogue.year})`,
     "",
     `Customer: ${customer.name}`,
     `Mobile: +91 ${customer.phone}`,

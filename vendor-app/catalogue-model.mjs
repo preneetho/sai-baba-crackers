@@ -16,8 +16,14 @@ export function validYear(year) {
   return Number.isInteger(year) && year >= 2000 && year <= 9999;
 }
 
+export function validPriceSheetName(name) {
+  return typeof name === "string" && name.trim() === name && name.length > 0 &&
+    name.length <= 120 && !/[\u0000-\u001f\u007f]/.test(name);
+}
+
 export function validCatalogue(value, { allowEmpty = false } = {}) {
-  if (!value || !validYear(value.year) || !Number.isSafeInteger(value.revision) ||
+  if (!value || !validYear(value.year) || (value.name !== undefined && !validPriceSheetName(value.name)) ||
+      !Number.isSafeInteger(value.revision) ||
       value.revision < 0 || !Array.isArray(value.products) ||
       value.products.length < (allowEmpty ? 0 : 1) || value.products.length > 200) return false;
   const ids = new Set();

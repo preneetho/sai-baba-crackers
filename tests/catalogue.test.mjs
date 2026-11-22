@@ -10,7 +10,7 @@ import { handleOrderRequest, buildOrder } from "../netlify/functions/orders.mjs"
 import { DEFAULT_OFFERS } from "../vendor-app/offers-model.mjs";
 import { createSession, unseal, vendorSettings } from "../netlify/lib/vendor-auth.mjs";
 import { products } from "../vendor-app/catalog.mjs";
-import { validCatalogue, catalogueProducts, PRODUCT_TYPES, validProductTypes } from "../vendor-app/catalogue-model.mjs";
+import { validCatalogue, validPriceSheetName, catalogueProducts, PRODUCT_TYPES, validProductTypes } from "../vendor-app/catalogue-model.mjs";
 import { mediaProof } from "../netlify/lib/product-media.mjs";
 
 const engine = new PGlite();
@@ -81,6 +81,51 @@ beforeEach(async () => {
     [JSON.stringify(migrationSeed.products)]);
 });
 after(async () => { await engine.close(); });
+
+test("named seasonal sheets copy saved products, remain inactive and retain independent prices and order snapshots", async () => {
+  const response = await edit({ action: "create", name: "Diwali Special", sourceYear: 2026, expectedRevision: 1 });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.activeYear, 2026);
+  assert.equal(result.catalogue.name, "Diwali Special");
+  assert.notEqual(result.catalogue.year, 2026);
+  assert.deepEqual(result.catalogue.products, base.products);
+  assert.equal(result.years.find(sheet => sheet.year === 2026).name, "2026");
+  assert.equal((await database.activeCatalogue()).name, undefined);
+  const rows = catalogueProducts(products);
+  rows[0].price = 15.75;
+  await save(result.catalogue.year, 1, rows);
+  assert.equal((await database.activeCatalogue()).products[0].price, products[0].price);
+  await activate(result.catalogue.year, 2);
+  const visible = await (await publicList()).json();
+  assert.equal(visible.name, "Diwali Special");
+  assert.equal(visible.products[0].price, 15.75);
+  assert.equal((await database.catalogueVersion(result.catalogue.year, 1)).products[0].price, products[0].price);
+  assert.equal((await database.catalogueVersion(2026, 1)).products[0].price, products[0].price);
+  assert.equal((await submit(payload())).status, 409);
+  assert.equal((await submit(payload(2, result.catalogue.year))).status, 200);
+});
+
+test("numeric and multilingual sheet names are text, while invalid or duplicate names cannot create sheets", async () => {
+  for (const name of ["7", "2027", "Summer రంగు", "a".repeat(120)]) {
+    assert.equal(validPriceSheetName(name), true);
+    const response = await edit({ action: "create", name, sourceYear: 2026, expectedRevision: 1 });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).catalogue.name, name);
+  }
+  for (const name of ["", "  ", " padded ", "a".repeat(121), "bad\nname", "bad\u0000name", null, 2028]) {
+    assert.equal(validPriceSheetName(name), false);
+    assert.equal((await edit({ action: "create", name, sourceYear: 2026, expectedRevision: 1 })).status, 400);
+  }
+  for (const name of ["7", "summer రంగు", "2026"]) {
+    const duplicate = await edit({ action: "create", name, sourceYear: 2026, expectedRevision: 1 });
+    assert.equal(duplicate.status, 409);
+    assert.match((await duplicate.json()).error, /name already exists/);
+  }
+  assert.equal((await database.priceLists()).years.length, 5);
+  assert.equal((await edit({ action: "create", name: "Stale copy", sourceYear: 2026, expectedRevision: 2 })).status, 409);
+  assert.equal((await database.priceLists()).years.length, 5);
+});
 
 test("product types are optional, strictly enumerated, unique and copied without aliasing", () => {
   const all = PRODUCT_TYPES.map(type => type.id);

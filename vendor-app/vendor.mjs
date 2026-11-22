@@ -1,5 +1,5 @@
 import { ORDER_STATUSES, PAGE_SIZE, validOrder } from "./vendor-model.mjs";
-import { validCatalogue, validYear, catalogueProducts, PRODUCT_TYPES } from "./catalogue-model.mjs";
+import { validCatalogue, validYear, validPriceSheetName, catalogueProducts, PRODUCT_TYPES } from "./catalogue-model.mjs";
 import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "./media-model.mjs";
 import { inspectMediaFile, transferMedia } from "./media-upload.mjs";
 import { validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl } from "./homepage-model.mjs";
@@ -162,7 +162,7 @@ function setPriceBusy(value) {
     !priceList.products.some(product => product.hidden !== true);
   $("add-price-product").disabled = blocked || priceNeedsReload || !priceList || priceList.products.length >= 200;
   const hiddenCount = priceList?.products.filter(product => product.hidden === true).length ?? 0;
-  const state = !priceList ? "" : `${priceList.year} - ${priceList.products.length} products${hiddenCount ? `, ${hiddenCount} hidden` : ""}. ${
+  const state = !priceList ? "" : `${priceList.name ?? priceList.year} - ${priceList.products.length} products${hiddenCount ? `, ${hiddenCount} hidden` : ""}. ${
     value ? "Working... Please wait." : priceNeedsReload ? "Reload required. Edits kept." :
       priceDirty ? "Unsaved changes." : "All changes saved."}`;
   if ($("price-save-state").textContent !== state) $("price-save-state").textContent = state;
@@ -257,7 +257,7 @@ function renderPriceProducts() {
     }
     const types = element("fieldset", undefined, "vendor-product-types");
     types.append(element("legend", "Shop by type"));
-    const typeHelp = element("p", "Select every effect that applies. Leave all unchecked if unsure; the product stays in All types. Save price list to publish.", "vendor-muted");
+    const typeHelp = element("p", "Select every effect that applies. Leave all unchecked if unsure; the product stays in All types. Save price sheet to publish.", "vendor-muted");
     typeHelp.id = `price-types-help-${product.id}`;
     types.setAttribute("aria-describedby", typeHelp.id);
     const typeOptions = element("div", undefined, "vendor-type-options");
@@ -287,7 +287,7 @@ function renderPriceProducts() {
     visible.type = "checkbox";
     visible.checked = product.hidden !== true;
     const visibilityText = element("span", "Visible to customers");
-    visibilityText.append(element("small", "Uncheck when out of stock. Save price list to apply; hidden products stay in this year's list."));
+    visibilityText.append(element("small", "Uncheck when out of stock. Save price sheet to apply; hidden products stay in this sheet."));
     visible.addEventListener("change", () => {
       if (priceBusy || priceNeedsReload) return;
       product.hidden = !visible.checked;
@@ -305,7 +305,7 @@ function renderPriceProducts() {
         notice("price-message", "Keep at least one product in the price list.", true);
         return;
       }
-      if (!window.confirm(`Remove product #${product.id} from this year's list? Existing orders will not change.`)) return;
+      if (!window.confirm(`Remove product #${product.id} from this sheet? Existing orders will not change.`)) return;
       priceList.products = priceList.products.filter(item => item.id !== product.id);
       priceDirty = true;
       renderPriceProducts();
@@ -406,7 +406,7 @@ function renderProductMedia(product) {
     const remove = element("button", "Remove media");
     remove.type = "button";
     remove.addEventListener("click", () => {
-      if (priceBusy || priceNeedsReload || !window.confirm("Remove this media from this year's listing? The original source and older catalogues will be kept.")) return;
+      if (priceBusy || priceNeedsReload || !window.confirm("Remove this media from this sheet? The original source and older catalogues will be kept.")) return;
       product.media = media.filter((_, position) => position !== index);
       priceDirty = true;
       renderPriceProducts();
@@ -427,7 +427,7 @@ function renderProductMedia(product) {
     input.setAttribute("aria-describedby", `youtube-help-${product.id}`);
     input.addEventListener("input", () => input.setCustomValidity(""));
     label.append(input);
-    const help = element("p", "Paste an HTTPS YouTube watch, share or Shorts link. Choose Add YouTube video, then Save price list. The video must allow embedding; YouTube links need no Cloudinary setup.", "vendor-muted");
+    const help = element("p", "Paste an HTTPS YouTube watch, share or Shorts link. Choose Add YouTube video, then Save price sheet. The video must allow embedding; YouTube links need no Cloudinary setup.", "vendor-muted");
     help.id = `youtube-help-${product.id}`;
     const add = element("button", "Add YouTube video");
     add.type = "button";
@@ -449,7 +449,7 @@ function renderProductMedia(product) {
     upload.addEventListener("click", () => uploadProductMedia(product, file));
     details.append(label, upload);
   }
-  details.append(element("p", "The first item is the cover. Uploads and media edits are not published until you choose Save price list. Removed or abandoned uploads remain in Cloudinary; do not delete files used by older yearly lists.", "vendor-muted"));
+  details.append(element("p", "The first item is the cover. Uploads and media edits are not published until you choose Save price sheet. Removed or abandoned uploads remain in Cloudinary; do not delete files used by older price sheets.", "vendor-muted"));
   return details;
 }
 
@@ -474,7 +474,7 @@ function addYouTubeVideo(product, input) {
   renderPriceProducts();
   setPriceBusy(false);
   $(`media-product-${product.id}`).focus({ preventScroll: true });
-  notice("price-message", "YouTube video added to the draft. Review its description and credits, then choose Save price list to publish. Check that the video is available and allows embedding.");
+  notice("price-message", "YouTube video added to the draft. Review its description and credits, then choose Save price sheet to publish. Check that the video is available and allows embedding.");
 }
 
 async function uploadProductMedia(product, input) {
@@ -517,7 +517,7 @@ async function uploadProductMedia(product, input) {
     openMediaProducts.add(product.id);
     renderPriceProducts();
     $(`media-product-${product.id}`).focus({ preventScroll: true });
-    notice("price-message", `Media added to product #${product.id}'s draft. Review its description and credits, then choose Save price list to publish.`);
+    notice("price-message", `Media added to product #${product.id}'s draft. Review its description and credits, then choose Save price sheet to publish.`);
   } catch (error) {
     if (version !== priceVersion || !session) return;
     if (error.status === 409) priceNeedsReload = true;
@@ -531,7 +531,8 @@ function acceptPrices(result, expectedYear) {
   if (!validCatalogue(result.catalogue) || !validYear(result.activeYear) ||
       (expectedYear !== undefined && result.catalogue.year !== expectedYear) ||
       !Array.isArray(result.years) || !result.years.some(year => year.year === result.activeYear) ||
-      !result.years.every(year => validYear(year.year) && Number.isSafeInteger(year.revision) && year.revision > 0)) {
+      !result.years.every(year => validYear(year.year) && Number.isSafeInteger(year.revision) && year.revision > 0 &&
+        (year.name === undefined || validPriceSheetName(year.name)))) {
     throw new Error("The price-list acknowledgement could not be verified. Reload before editing.");
   }
   if (priceList?.year !== result.catalogue.year) {
@@ -544,13 +545,14 @@ function acceptPrices(result, expectedYear) {
   priceDirty = false;
   priceNeedsReload = false;
   $("price-year").replaceChildren(...result.years.map(year => {
-    const option = element("option", `${year.year}${year.year === result.activeYear ? " (active)" : ""}`);
+    const option = element("option", `${year.name ?? year.year}${year.year === result.activeYear ? " (active)" : ""}`);
     option.value = year.year;
     return option;
   }));
   $("price-year").value = priceList.year;
-  $("price-active").textContent = `Customers currently see ${result.activeYear}. Selected list: ${priceList.year}, version ${priceList.revision}.`;
-  $("new-price-year").value = Math.min(priceList.year + 1, 9999);
+  const activeSheet = result.years.find(sheet => sheet.year === result.activeYear);
+  $("price-active").textContent = `Customers currently see ${activeSheet.name ?? activeSheet.year}. Selected sheet: ${priceList.name ?? priceList.year}, version ${priceList.revision}.`;
+  $("new-price-year").value = "";
   $("price-controls").hidden = false;
   renderPriceProducts();
 }
@@ -560,12 +562,12 @@ async function loadPrices(year) {
   const version = ++priceVersion;
   priceNeedsReload = false;
   setPriceBusy(true);
-  notice("price-message", "Loading saved yearly price lists...");
+  notice("price-message", "Loading saved price sheets...");
   try {
     const result = await api(`/api/vendor-catalogue${year === undefined ? "" : `?year=${year}`}`);
     if (version !== priceVersion || !session) return;
     acceptPrices(result, year);
-    notice("price-message", `${priceList.products.length} products loaded. Changes are saved only when you choose Save price list.`);
+    notice("price-message", `${priceList.products.length} products loaded. Changes are saved only when you choose Save price sheet.`);
   } catch (error) {
     if (version !== priceVersion || !session) return;
     priceNeedsReload = true;
@@ -586,17 +588,17 @@ async function changePrices(input) {
       body: JSON.stringify(input),
     });
     if (version !== priceVersion || !session) return;
-    if (result.catalogue?.year !== input.year ||
+    if ((input.action !== "create" && result.catalogue?.year !== input.year) ||
         (input.action === "activate" && result.activeYear !== input.year) ||
         (input.action === "save" && result.catalogue.revision !== input.expectedRevision + 1) ||
-        (input.action === "create" && result.catalogue.revision !== 1)) {
+        (input.action === "create" && (result.catalogue?.revision !== 1 || result.catalogue?.name !== input.name))) {
       throw new Error("The change could not be verified.");
     }
     acceptPrices(result, input.year);
     notice("price-message", input.action === "activate" ?
-      `Customers now see the ${priceList.year} price list. Existing orders are unchanged.` :
-      `Price list saved for ${priceList.year}. ${activePriceYear === priceList.year ?
-        "Current prices apply to new requests." : "This year is not active for customers."} Existing orders are unchanged.`);
+      `Customers now see the ${priceList.name ?? priceList.year} price sheet. Existing orders are unchanged.` :
+      `Price sheet saved for ${priceList.name ?? priceList.year}. ${activePriceYear === priceList.year ?
+        "Current prices apply to new requests." : "This sheet is not active for customers."} Existing orders are unchanged.`);
   } catch (error) {
     if (version !== priceVersion || !session) return;
     priceNeedsReload = true;
@@ -1283,7 +1285,7 @@ $("download-price-pdf").addEventListener("click", async () => {
   const version = priceVersion;
   const { year, revision } = priceList;
   setPriceBusy(true);
-  notice("price-message", `Preparing the ${year} price-list PDF...`);
+  notice("price-message", `Preparing the ${priceList.name ?? year} price-sheet PDF...`);
   try {
     const blob = await api(`/api/vendor-price-list-pdf?year=${year}&revision=${revision}`, { pdf: true });
     if (version !== priceVersion || !session) return;
@@ -1298,7 +1300,7 @@ $("download-price-pdf").addEventListener("click", async () => {
     } finally {
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
-    notice("price-message", `PDF download started for ${year}, version ${revision}. Check your browser's downloads.`);
+    notice("price-message", `PDF download started for ${priceList.name ?? year}, version ${revision}. Check your browser's downloads.`);
   } catch (error) {
     if (version !== priceVersion || !session) return;
     if (error.status === 409) priceNeedsReload = true;
@@ -1313,7 +1315,7 @@ $("price-view-message").addEventListener("click", () => {
 });
 $("price-year").addEventListener("change", () => {
   const year = Number($("price-year").value);
-  if (priceDirty && !window.confirm("Discard unsaved edits and select another year?")) {
+  if (priceDirty && !window.confirm("Discard unsaved edits and select another price sheet?")) {
     $("price-year").value = priceList.year;
     return;
   }
@@ -1325,13 +1327,17 @@ $("create-price-year").addEventListener("submit", event => {
     notice("price-message", "Save or reload your current edits before copying this list.", true);
     return;
   }
-  const year = Number($("new-price-year").value);
-  if (!validYear(year)) { notice("price-message", "Enter a whole year between 2000 and 9999.", true); return; }
-  changePrices({ action: "create", year, sourceYear: priceList.year, expectedRevision: priceList.revision });
+  const name = $("new-price-year").value.trim();
+  if (!validPriceSheetName(name)) {
+    notice("price-message", "Enter a price-sheet name with 1-120 characters and no control characters.", true);
+    $("new-price-year").focus();
+    return;
+  }
+  changePrices({ action: "create", name, sourceYear: priceList.year, expectedRevision: priceList.revision });
 });
 $("activate-prices").addEventListener("click", () => {
   if (!priceList || priceDirty || activePriceYear === priceList.year ||
-      !window.confirm(`Show the ${priceList.year} price list to all customers? Existing orders will not change.`)) return;
+      !window.confirm(`Show the ${priceList.name ?? priceList.year} price sheet to all customers? Existing orders will not change.`)) return;
   changePrices({ action: "activate", year: priceList.year, expectedRevision: priceList.revision, expectedActiveYear: activePriceYear });
 });
 $("add-price-product").addEventListener("click", () => {
@@ -1368,7 +1374,7 @@ $("price-form").addEventListener("submit", event => {
     return;
   }
   if (activePriceYear === priceList.year &&
-      !window.confirm(`Update the active ${priceList.year} price list for new requests? Existing orders will not change.`)) return;
+      !window.confirm(`Update the active ${priceList.name ?? priceList.year} price sheet for new requests? Existing orders will not change.`)) return;
   changePrices({ action: "save", year: priceList.year, expectedRevision: priceList.revision, products });
 });
 window.addEventListener("beforeunload", event => {

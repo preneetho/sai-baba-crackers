@@ -20,10 +20,10 @@ export async function handleVendorPriceListPdf(request, {
   const revision = Number(params.get("revision"));
   if (params.size !== 2 || !/^\d{4}$/.test(params.get("year") ?? "") || !validYear(year) ||
       !/^[1-9]\d*$/.test(params.get("revision") ?? "") || !Number.isSafeInteger(revision)) {
-    return vendorJson({ error: "Choose a saved price-list year and version." }, 400);
+    return vendorJson({ error: "Choose a saved price sheet and version." }, 400);
   }
   if (orderBackend(env)?.name !== "netlify-db") {
-    return vendorJson({ error: "Yearly price lists require Netlify Database." }, 503);
+    return vendorJson({ error: "Price sheets require Netlify Database." }, 503);
   }
   try {
     const database = await databaseFactory();
@@ -34,7 +34,8 @@ export async function handleVendorPriceListPdf(request, {
     }
     const products = catalogueProducts(catalogue.products, true);
     if (!products.length) return vendorJson({ error: "This saved price list has no customer-visible products." }, 400);
-    const data = await generatePdf({ year, revision, products }, new Date(now()).toISOString());
+    const data = await generatePdf({ year, revision, ...(catalogue.name !== undefined ? { name: catalogue.name } : {}),
+      products }, new Date(now()).toISOString());
     return new Response(data, { headers: {
       "Content-Type": "application/pdf", "Content-Length": String(data.length),
       "Content-Disposition": `attachment; filename="sai-baba-price-list-${year}-v${revision}.pdf"`,

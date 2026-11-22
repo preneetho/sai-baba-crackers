@@ -197,7 +197,7 @@ verified customer access is implemented.
 ### Vendor order availability edits
 
 The signed-in vendor dashboard has a Shop-management navigation menu for
-**Offers**, **Video** and **Manage Price Lists**.
+**Offers**, **Video** and **Manage Price Sheets**.
 These retain their existing settings flows and remain private to approved vendors;
 the menu stays on one line and highlights expanded settings. On exceptionally
 narrow screens or enlarged text, the menu scrolls horizontally rather than wrapping.
@@ -350,7 +350,7 @@ deployment; for database mode, follow the development setup below. The page
 reports unavailable access until configured.
 The storefront and customer WhatsApp flow do not require Google sign-in.
 
-## Yearly database price lists
+## Named database price sheets
 
 With `ORDER_BACKEND=netlify-db`, products, pack descriptions, brands, categories
 and prices are read from Netlify Database rather than the static JavaScript list.
@@ -362,31 +362,41 @@ Push this source to `main` and publish a Git-connected Netlify deployment so
 the migration and both new Functions (`catalogue` and `vendor-catalogue`) ship
 together; a static drag-and-drop deploy is insufficient.
 
-At `/vendor/`, sign in and choose **Manage yearly price lists**:
+The additive `price_sheet_names` migration lets new sheets have text names without
+rewriting existing sheet identifiers, revisions or order references. Existing
+year-based sheets keep their numeric display names. Names can be numbers or text
+(1-120 characters, trimmed, no control characters) and must be unique regardless
+of case, including existing numeric names. Internal `year` API fields remain
+stable numeric identifiers for compatibility; they are not the sheet's name.
+Deploy the migration and Functions together.
 
-1. Select an existing year, or enter a new year and choose **Copy selected list
-   to new year**. Copying does not change the active year.
+At `/vendor/`, sign in and choose **Manage Price Sheets**:
+
+1. Select an existing price sheet, or enter a name under **New Price Sheet**,
+   such as `Diwali Special`, `Summer Sale` or `2026`, and choose
+   **Copy selected sheet to new price sheet**. Copying uses the saved products
+   and does not change the active sheet.
 2. Select a compact table row (or its product-name button using the keyboard)
    to expand the product's fields and media actions. Edit product names,
    brands, selling packs, categories and prices. Closing a row keeps its draft.
-   The sticky **Save price list** bar stays visible while scrolling and shows
+   The sticky **Save price sheet** bar stays visible while scrolling and shows
    unsaved/saving/saved or reload-required state. **View error** returns to the
    detailed message if an action fails. You can
-   add/remove products (1-200 per year). Existing product numbers stay stable;
+   add/remove products (1-200 per sheet). Existing product numbers stay stable;
    new numbers are allocated automatically. Prices allow two decimals, from
    Rs.0 to Rs.100,000 per selling pack.
-3. Choose **Save price list**. Saving the active year changes prices for new
-   requests immediately after confirmation. Other years remain unpublished.
-4. Choose **Make this the active year** to switch the customer catalogue.
-   There is one selected year, with no automatic calendar rollover.
+3. Choose **Save price sheet**. Saving the active sheet changes prices for new
+   requests immediately after confirmation. Other sheets remain unpublished.
+4. Choose **Make this the active sheet** to switch the customer catalogue.
+   There is one active sheet, with no automatic calendar or season rollover.
 
 **Out-of-stock products:** Expand a product row, uncheck **Visible to customers**
-and **Save price list**. The vendor row shows **Hidden from customers** and the
+and **Save price sheet**. The vendor row shows **Hidden from customers** and the
 sticky save bar counts hidden products. Hidden products keep their number,
-price and media in that year's list but are omitted from the public catalogue;
+price and media in that sheet but are omitted from the public catalogue;
 checkout rejects hidden items rather than silently dropping them from an order.
-Recheck and save when restocked. Visibility is independent for each year;
-copying a year copies its saved visibility too. All products may be hidden, in
+Recheck and save when restocked. Visibility is independent for each sheet;
+copying a sheet copies its saved visibility too. All products may be hidden, in
 which case customers see a no-products-available message rather than an error.
 This is manual availability, not quantity tracking or automatic stock depletion.
 Visibility changes create a revision and invalidate older carts like price edits.
@@ -396,11 +406,11 @@ environment variable is required.
 Coupon and delivery settings are managed separately from the price list. Each save retains
 an immutable revision with the authenticated editor and timestamp. Concurrent
 edits are rejected rather than overwritten. If a response is uncertain, visible
-drafts remain on screen but further changes require **Reload saved list**;
-reload/close/year changes warn before discarding unsaved edits.
+drafts remain on screen but further changes require **Reload saved sheet**;
+reload/close/sheet changes warn before discarding unsaved edits.
 
-Customers see only the active year at `/api/catalogue`. Saved carts are bound
-to that year and revision; when they change, customers must select items again
+Customers see only the active sheet at `/api/catalogue`, including its name.
+Saved carts are bound to its identifier and revision; when they change, customers must select items again
 rather than silently accepting different prices. Checkout rebuilds every line
 and total from the database, rejects stale new requests, and preserves the
 original prices, timestamp and status when retrying an already-saved request.
@@ -417,11 +427,11 @@ category navigation. Selecting a tile filters the catalogue and moves focus to
 the results; the mobile category rail scrolls horizontally.
 
 **Shop by type** offers Sound, Sky, Colour & Light and Ground. In the vendor
-dashboard, expand a yearly price-list product, select all applicable effects
-under **Shop by type**, then **Save price list**. No types are inferred from
+dashboard, expand a price-sheet product, select all applicable effects
+under **Shop by type**, then **Save price sheet**. No types are inferred from
 product names. Untagged products remain visible under All types. These optional,
 validated `types` arrays are stored in the existing product JSON; no migration,
-new API or environment variable is needed. Copying a year copies its saved types.
+new API or environment variable is needed. Copying a sheet copies its saved types.
 Type edits follow the same revision/conflict rules and invalidate stale carts
 like other catalogue edits. Order line items, prices and discounts are unchanged.
 
@@ -463,7 +473,7 @@ use a unique public ID and refuse overwrite. The API key must support signed
 uploads and server-side Admin API resource lookup. Never use an unsigned
 preset or put the API secret in source, a browser or chat.
 
-At `/vendor/`, open **Manage yearly price lists**, choose the year, select a
+At `/vendor/`, open **Manage Price Sheets**, choose the sheet, select a
 product row, and expand **Photos & video**:
 
 1. Save a newly added product before uploading. Choose a file and select
@@ -473,13 +483,13 @@ product row, and expand **Photos & video**:
    Include essential visual/audio information in the description.
 3. Use **Use as cover**, **Move earlier/later**, or **Remove media** as needed.
    The first item is the cover; a video cover uses a still poster.
-4. Choose **Save price list**. Uploading alone does not publish a catalogue
-   change. Saving the active year makes changes visible to customers;
-   inactive years remain unpublished.
+4. Choose **Save price sheet**. Uploading alone does not publish a catalogue
+   change. Saving the active sheet makes changes visible to customers;
+   inactive sheets remain unpublished.
 
 **YouTube alternative:** In the same **Photos & video** section, paste an HTTPS
 YouTube URL and select **Add YouTube video**, review the description/credit, then
-**Save price list**. Standard watch, `youtu.be`, Shorts, live-video and embed
+**Save price sheet**. Standard watch, `youtu.be`, Shorts, live-video and embed
 links are supported. Only the video ID is stored; tracking, playlist and start-time
 parameters are discarded. Each product can have either one YouTube video or one
 uploaded video, not both. Remove the existing video before replacing it.
@@ -510,7 +520,7 @@ or separate caption strip.
 
 **Retention and privacy:** Files use public Cloudinary delivery, even before
 their draft is saved. Upload only permitted product media, never customer data
-or private information. Copying a year reuses asset references; later edits
+or private information. Copying a sheet reuses asset references; later edits
 are independent. Removal detaches a reference from the new revision, not from
 older revisions, and never deletes Cloudinary assets. Abandoned/rejected
 uploads may remain in the Media Library and consume quota. Before manual

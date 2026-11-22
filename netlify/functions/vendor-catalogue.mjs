@@ -1,6 +1,6 @@
 import { vendorSettings, vendorJson, vendorSession, sameOriginMutation } from "../lib/vendor-auth.mjs";
 import { orderBackend } from "../lib/order-backend.mjs";
-import { validCatalogue, validYear, catalogueProducts } from "../../vendor-app/catalogue-model.mjs";
+import { validCatalogue, validYear, validPriceSheetName, catalogueProducts } from "../../vendor-app/catalogue-model.mjs";
 import { cloudinarySettings, verifiedMedia, mediaIdentity, mediaProof } from "../lib/product-media.mjs";
 import { isYouTubeMedia } from "../../vendor-app/media-model.mjs";
 
@@ -15,13 +15,13 @@ export async function handleVendorCatalogue(request, {
   const session = vendorSession(request, settings, now());
   if (!session) return vendorJson({ error: "Your vendor session has expired. Sign in again." }, 401);
   if (!["GET", "POST"].includes(request.method)) return vendorJson({ error: "Use GET or POST." }, 405);
-  if (orderBackend(env)?.name !== "netlify-db") return vendorJson({ error: "Yearly price lists require Netlify Database." }, 503);
+  if (orderBackend(env)?.name !== "netlify-db") return vendorJson({ error: "Price sheets require Netlify Database." }, 503);
   let input;
   if (request.method === "GET") {
     const params = new URL(request.url).searchParams;
     if (params.size && (params.size !== 1 || !params.has("year") ||
         !/^\d{4}$/.test(params.get("year")) || !validYear(Number(params.get("year"))))) {
-      return vendorJson({ error: "Choose a valid price-list year." }, 400);
+      return vendorJson({ error: "Choose a valid price sheet." }, 400);
     }
     input = params.size ? { year: Number(params.get("year")) } : {};
   } else {
@@ -35,12 +35,14 @@ export async function handleVendorCatalogue(request, {
       if (Buffer.byteLength(body) > 5000000) return vendorJson({ error: "Price list is too large." }, 413);
       input = JSON.parse(body);
       if (!input || !["create", "save", "activate"].includes(input.action) ||
-          !validYear(input.year) || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 1 ||
-          (input.action === "create" && !validYear(input.sourceYear)) ||
+          !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 1 ||
+          (input.action === "create" ? (!validYear(input.sourceYear) ||
+            (input.name !== undefined ? (!validPriceSheetName(input.name) || input.year !== undefined) : !validYear(input.year))) :
+            !validYear(input.year)) ||
           (input.action === "activate" && !validYear(input.expectedActiveYear)) ||
           (input.action === "save" && !validCatalogue({
             year: input.year, revision: input.expectedRevision, products: input.products,
-          }))) return vendorJson({ error: "Use a valid year, version and product list (1-200 products; prices up to Rs.100,000 with at most two decimals). Product types must be unique choices from Sound, Sky, Colour & Light and Ground." }, 400);
+          }))) return vendorJson({ error: "Use a valid price-sheet name (1-120 characters), version and product list (1-200 products; prices up to Rs.100,000 with at most two decimals). Product types must be unique choices from Sound, Sky, Colour & Light and Ground." }, 400);
     } catch {
       return vendorJson({ error: "The price-list update could not be read." }, 400);
     }
@@ -67,13 +69,15 @@ export async function handleVendorCatalogue(request, {
     const result = await database.priceLists(input, session.email);
     if (!validCatalogue(result.catalogue) || !validYear(result.activeYear) || !Array.isArray(result.years) ||
         !result.years.some(year => year.year === result.activeYear) ||
-        !result.years.every(year => validYear(year.year) && Number.isSafeInteger(year.revision) && year.revision > 0)) {
+        !result.years.every(year => validYear(year.year) && Number.isSafeInteger(year.revision) && year.revision > 0 &&
+          (year.name === null || year.name === undefined || validPriceSheetName(year.name)))) {
       throw new Error("Invalid price-list acknowledgement.");
     }
     return vendorJson({
       activeYear: result.activeYear,
-      years: result.years.map(({ year, revision }) => ({ year, revision })),
+      years: result.years.map(({ year, revision, name }) => ({ year, revision, name: name ?? String(year) })),
       catalogue: { year: result.catalogue.year, revision: result.catalogue.revision,
+        ...(result.catalogue.name !== undefined ? { name: result.catalogue.name } : {}),
         products: catalogueProducts(result.catalogue.products) },
     });
   } catch (error) {

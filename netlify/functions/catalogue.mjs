@@ -18,7 +18,9 @@ export async function handleCatalogue(request, {
     const catalogue = backend.name === "netlify-db" ? await (await databaseFactory()).activeCatalogue() :
       { year: vendor.year, revision: 0, products };
     if (!validCatalogue(catalogue)) throw new Error("Invalid catalogue response.");
-    return respond({ year: catalogue.year, revision: catalogue.revision, products: catalogueProducts(catalogue.products, true) });
+    return respond({ year: catalogue.year, revision: catalogue.revision,
+      ...(catalogue.name !== undefined ? { name: catalogue.name } : {}),
+      products: catalogueProducts(catalogue.products, true) });
   } catch {
     console.error("Active catalogue could not be loaded. Check database availability and migrations.");
     return respond({ error: "The price list is unavailable. Retry loading it or contact the shop." }, 503);

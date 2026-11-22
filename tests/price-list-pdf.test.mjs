@@ -89,12 +89,25 @@ test("real price-list PDFs retain Unicode and paginate the maximum catalogue wit
     ...products[0], id: index + 1, name: `Product ${index + 1} - రంగు दीप`,
     category: `Category ${Math.floor(index / 20) + 1}`, price: 123.45,
   }));
-  const bytes = await generatePriceListPdf({ year: 2027, revision: 3, products: items }, new Date(now).toISOString());
+  const bytes = await generatePriceListPdf({ year: 2027, name: "Diwali రంగు दीप", revision: 3, products: items }, new Date(now).toISOString());
   assert.equal(bytes.subarray(0, 5).toString(), "%PDF-");
   assert.ok(bytes.subarray(-20).toString().includes("%%EOF"));
   const pages = bytes.toString("latin1").match(/\/Type \/Page\b/g)?.length ?? 0;
   assert.ok(pages > 1 && pages < 12, `A complete 200-product price list should paginate compactly: ${pages}`);
   assert.ok(bytes.length < 1024 * 1024);
+});
+
+test("PDF generation receives the saved sheet name, not its internal numeric identifier", async () => {
+  const response = await handleVendorPriceListPdf(request(), {
+    ...options,
+    databaseFactory: async () => ({ priceLists: async () => ({ catalogue: { ...catalogue, name: "Diwali Special" } }) }),
+    generatePdf: async value => {
+      assert.equal(value.name, "Diwali Special");
+      assert.equal(value.year, 2027);
+      return Buffer.from("%PDF-test");
+    },
+  });
+  assert.equal(response.status, 200);
 });
 
 test("the original 68-product catalogue prints on two Legal-size order-form pages", async () => {

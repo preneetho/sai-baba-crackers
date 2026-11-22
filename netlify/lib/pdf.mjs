@@ -39,6 +39,9 @@ export function generateOrderPdf(message, orderId, createdAt) {
 }
 
 export async function generatePriceListPdf(catalogue, createdAt) {
+  const sheetName = catalogue.name ?? String(catalogue.year);
+  const headingRuns = await orderTextRuns(`PRICE LIST - ${sheetName}`);
+  const footerRuns = await orderTextRuns(`${sheetName} price list`);
   const [fonts, logo, rows] = await Promise.all([
     loadFonts(),
     readFile(new URL("../../vendor-app/sai-baba-logo.png", import.meta.url)),
@@ -55,7 +58,7 @@ export async function generatePriceListPdf(catalogue, createdAt) {
       size: "LEGAL", margins: { top: 36, right: 36, bottom: 36, left: 36 },
       font: fonts[0].data, bufferPages: true,
       info: {
-        Title: `${vendor.name} - ${catalogue.year} price list`, Author: vendor.name,
+        Title: `${vendor.name} - ${sheetName} price list`, Author: vendor.name,
         CreationDate: new Date(createdAt), ModDate: new Date(createdAt),
       },
     });
@@ -73,6 +76,16 @@ export async function generatePriceListPdf(catalogue, createdAt) {
         });
       const line = (x1, y1, x2, y2) => document.lineWidth(.5).strokeColor("black").moveTo(x1, y1).lineTo(x2, y2).stroke();
       const widthOf = (value, font, size) => document.font(font).fontSize(size).widthOfString(value);
+      function sheetText(runs, y, size) {
+        const length = runs.reduce((sum, run) => sum + widthOf(run.text, run.font, size), 0);
+        const fittedSize = length > 540 ? size * 540 / length : size;
+        const fittedWidth = runs.reduce((sum, run) => sum + widthOf(run.text, run.font, fittedSize), 0);
+        let x = 36 + (540 - fittedWidth) / 2;
+        for (const run of runs) {
+          text(run.text, x, y, 540, fittedSize, "left", run.font);
+          x += widthOf(run.text, run.font, fittedSize);
+        }
+      }
       function cellLayout(runs, width, size) {
         const lines = [[]];
         let lineWidth = 0;
@@ -133,7 +146,7 @@ export async function generatePriceListPdf(catalogue, createdAt) {
       text("OM SAI RAM", 36, 102, 540, 8, "center");
       text(vendor.name.toUpperCase(), 36, 118, 540, 25, "center", "Times-Bold");
       text(`${vendor.location.toUpperCase()}. CELL: ${vendor.phone} / ${vendor.alternatePhone}`, 36, 150, 540, 9, "center");
-      text(`PRICE LIST - ${catalogue.year}`, 36, 168, 540, 9, "center");
+      sheetText(headingRuns, 168, 9);
       text("Name:", 36, 190, 40, 10);
       text("Mobile:", 36, 214, 40, 10);
       text("Phone:", 292, 214, 40, 10);
@@ -165,14 +178,16 @@ export async function generatePriceListPdf(catalogue, createdAt) {
       text("Applicable consumer rights are not excluded.", 36, y + 31, 255, 7.5);
       text("Rates per selling pack. Coupons and delivery charges are not included.", 36, y + 59, 540, 7.5);
       text("Availability and final prices require shop confirmation.", 36, y + 71, 540, 7.5);
-      text(`Wish you Happy Diwali ${catalogue.year}`, 36, y + 92, 260, 15, "center", "Times-Italic");
+      text(catalogue.name === undefined ? `Wish you Happy Diwali ${catalogue.year}` : "Wish you Happy Diwali",
+        36, y + 92, 260, 15, "center", "Times-Italic");
       text(vendor.name.toUpperCase(), 306, y + 88, 270, 11, "center", "Times-Bold");
       text("(Signature)", 306, y + 109, 270, 8, "center");
       const pages = document.bufferedPageRange();
       for (let page = pages.start; page < pages.start + pages.count; page++) {
         document.switchToPage(page);
-        text(`${catalogue.year} price list | Saved version ${catalogue.revision} | Generated ${generated} IST | Page ${page + 1} of ${pages.count}`,
-          36, document.page.height - 28, 540, 7, "center");
+        sheetText([...footerRuns, { font: families[0],
+          text: ` | Saved version ${catalogue.revision} | Generated ${generated} IST | Page ${page + 1} of ${pages.count}` }],
+        document.page.height - 28, 7);
       }
       document.end();
     } catch (error) {

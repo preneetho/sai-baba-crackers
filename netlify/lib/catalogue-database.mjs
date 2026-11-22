@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { catalogueYears, catalogueRevisions, catalogueSettings } from "./catalogue-schema.mjs";
-import { validCatalogue, validYear, catalogueProducts } from "../../vendor-app/catalogue-model.mjs";
+import { validCatalogue, validYear, validPriceSheetName, catalogueProducts } from "../../vendor-app/catalogue-model.mjs";
 
 export function catalogueConflict(message = "The price list changed. Reload it before trying again.") {
   const error = new Error(message);
@@ -8,7 +8,7 @@ export function catalogueConflict(message = "The price list changed. Reload it b
   return error;
 }
 
-// Catalogue edits, year switches and new-order price checks share the same transaction lock.
+// Catalogue edits, sheet creation/switches and new-order price checks share the same transaction lock.
 export const catalogueLock = sql`select pg_advisory_xact_lock(2026, 6801)`;
 
 export async function activeCatalogue(tx) {
@@ -18,17 +18,18 @@ export async function activeCatalogue(tx) {
 }
 
 async function readCatalogue(tx, year, revision) {
-  if (!validYear(year)) throw new Error("Invalid catalogue year.");
+  if (!validYear(year)) throw new Error("Invalid price-sheet identifier.");
+  const [current] = await tx.select().from(catalogueYears).where(eq(catalogueYears.year, year));
+  if (!current) throw catalogueConflict("That price sheet is unavailable. Reload the price sheets.");
   if (revision === undefined) {
-    const [current] = await tx.select().from(catalogueYears).where(eq(catalogueYears.year, year));
-    if (!current) throw catalogueConflict("That price-list year is unavailable. Reload the price lists.");
     revision = current.revision;
   }
   const [row] = await tx.select().from(catalogueRevisions).where(and(
     eq(catalogueRevisions.year, year), eq(catalogueRevisions.revision, revision),
   ));
   if (!validCatalogue(row)) throw catalogueConflict("That price-list version is unavailable. Refresh the catalogue.");
-  return { year: row.year, revision: row.revision, products: catalogueProducts(row.products) };
+  return { year: row.year, revision: row.revision, ...(current.name !== null ? { name: current.name } : {}),
+    products: catalogueProducts(row.products) };
 }
 
 export function createCatalogueDatabase(db) {
@@ -53,14 +54,28 @@ export function createCatalogueDatabase(db) {
     async priceLists(input = {}, actor) {
       if (!input.action) return transaction(tx => view(tx, input.year));
       return transaction(async tx => {
+        let selectedYear = input.year;
         if (input.action === "create") {
-          const [exists] = await tx.select().from(catalogueYears).where(eq(catalogueYears.year, input.year));
-          if (exists) throw catalogueConflict("That year already has a price list. Select it to edit.");
+          const name = input.name ?? String(input.year);
+          if (!validPriceSheetName(name)) throw new Error("Invalid price-sheet name.");
+          const sheets = await tx.select().from(catalogueYears);
+          if (sheets.some(sheet => (sheet.name ?? String(sheet.year)).toLowerCase() === name.toLowerCase())) {
+            throw catalogueConflict("That price-sheet name already exists. Choose another name or select it to edit.");
+          }
+          if (input.name !== undefined) {
+            const used = new Set(sheets.map(sheet => sheet.year));
+            selectedYear = 2000;
+            while (used.has(selectedYear)) selectedYear++;
+            if (!validYear(selectedYear)) throw catalogueConflict("The price-sheet storage limit has been reached. Select an existing sheet to edit.");
+          } else if (sheets.some(sheet => sheet.year === selectedYear)) {
+            throw catalogueConflict("That price sheet already exists. Select it to edit.");
+          }
           const source = await readCatalogue(tx, input.sourceYear);
           if (source.revision !== input.expectedRevision) throw catalogueConflict();
-          await tx.insert(catalogueYears).values({ year: input.year, revision: 1 });
+          await tx.insert(catalogueYears).values({ year: selectedYear, revision: 1,
+            ...(input.name !== undefined ? { name } : {}) });
           await tx.insert(catalogueRevisions).values({
-            year: input.year, revision: 1, products: source.products, actor,
+            year: selectedYear, revision: 1, products: source.products, actor,
           });
         } else {
           const current = await readCatalogue(tx, input.year);
@@ -76,11 +91,11 @@ export function createCatalogueDatabase(db) {
             await tx.update(catalogueYears).set({ revision }).where(eq(catalogueYears.year, input.year));
           } else if (input.action === "activate") {
             const active = await activeCatalogue(tx);
-            if (active.year !== input.expectedActiveYear) throw catalogueConflict("The active year changed. Reload before switching years.");
+            if (active.year !== input.expectedActiveYear) throw catalogueConflict("The active price sheet changed. Reload before switching sheets.");
             await tx.update(catalogueSettings).set({ activeYear: input.year }).where(eq(catalogueSettings.id, 1));
           } else throw new Error("Unknown price-list action.");
         }
-        return view(tx, input.year);
+        return view(tx, selectedYear);
       }, true);
     },
   };

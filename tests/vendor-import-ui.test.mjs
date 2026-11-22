@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 import { ORDER_STATUSES, PAGE_SIZE, validOrder } from "../vendor-app/vendor-model.mjs";
-import { validCatalogue, validYear, catalogueProducts, PRODUCT_TYPES } from "../vendor-app/catalogue-model.mjs";
+import { validCatalogue, validYear, validPriceSheetName, catalogueProducts, PRODUCT_TYPES } from "../vendor-app/catalogue-model.mjs";
 import { products } from "../vendor-app/catalog.mjs";
 import { validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId } from "../vendor-app/media-model.mjs";
 import { inspectMediaFile } from "../vendor-app/media-upload.mjs";
@@ -115,7 +115,7 @@ async function harness({ navigator = {} } = {}) {
     { cloudName: mediaAsset.cloudName, resourceType: "image", params: { public_id: mediaAsset.publicId }, ticket: "synthetic.ticket" } :
     { media: { ...mediaAsset } });
   const context = vm.createContext({
-    ORDER_STATUSES, PAGE_SIZE, validOrder, validCatalogue, validYear, catalogueProducts, PRODUCT_TYPES,
+    ORDER_STATUSES, PAGE_SIZE, validOrder, validCatalogue, validYear, validPriceSheetName, catalogueProducts, PRODUCT_TYPES,
     validMedia, MEDIA_LIMITS, mediaUrl, isYouTubeMedia, youtubeVideoId, inspectMediaFile, transferMedia: (...args) => transfer(...args),
     validHomepageVideo, validHomepageVersion, homepageVideoFromUrl, homepageVideoUrl,
     validOffers, validOfferVersion, checkOffers, normalizeCoupon,
@@ -762,7 +762,7 @@ test("vendor uploads remain drafts, require explicit save and retain description
   assert.equal(ui.requests.filter(req => req.path === "/api/vendor-media").length, 2);
   assert.equal(ui.requests.find(req => req.path === "/api/vendor-media").headers["X-Vendor-CSRF"], "a".repeat(43));
   assert.equal(ui.requests.filter(req => req.path === "/api/vendor-catalogue" && req.method === "POST").length, 0);
-  assert.match(ui.get("price-message").textContent, /draft.*Save price list/);
+  assert.match(ui.get("price-message").textContent, /draft.*Save price sheet/);
   assert.equal(ui.get("save-prices").disabled, false);
   let details = ui.get("media-product-1");
   const firstItem = details.children[2].children[0];
@@ -835,7 +835,7 @@ test("vendors add validated YouTube links as drafts without upload calls and sav
     alt: products[0].name, credit: "" }]);
   assert.equal(ui.requests.some(req => req.path === "/api/vendor-media"), false);
   assert.equal(ui.requests.some(req => req.method === "POST"), false);
-  assert.match(ui.get("price-message").textContent, /draft.*Save price list/);
+  assert.match(ui.get("price-message").textContent, /draft.*Save price sheet/);
   assert.equal(ui.get("save-prices").disabled, false);
   await add.events.get("click")();
   assert.match(ui.get("price-message").textContent, /maximum 1 video/);
@@ -928,6 +928,50 @@ test("visibility edits remain in drafts across rows and save hidden products wit
   assert.equal(ui.get("price-visible-1").disabled, true);
 });
 
+test("named price sheets create from saved products and display names instead of internal identifiers", async () => {
+  for (const name of ["Diwali Special", "7", "Summer 2026 - రంగు"]) {
+    const ui = await harness();
+    await ui.emit("open-prices");
+    assert.equal(ui.get("new-price-year").value, "");
+    ui.get("new-price-year").value = ` ${name} `;
+    ui.respondPrice(async (_path, options) => {
+      assert.deepEqual(JSON.parse(options.body), { action: "create", name, sourceYear: 2026, expectedRevision: 1 });
+      return Response.json({ activeYear: 2026, years: [{ year: 2026, revision: 1, name: "2026" },
+        { year: 2000, revision: 1, name }],
+      catalogue: { year: 2000, name, revision: 1, products: catalogueProducts(products.slice(0, 1)) } });
+    });
+    await ui.emit("create-price-year", "submit");
+    assert.equal(ui.get("price-year").value, 2000);
+    assert.equal(ui.get("price-year").children[1].textContent, name);
+    assert.match(ui.get("price-active").textContent, /Customers currently see 2026/);
+    assert.ok(ui.get("price-active").textContent.includes(`Selected sheet: ${name}`));
+    assert.ok(ui.get("price-save-state").textContent.startsWith(`${name} - `));
+    assert.equal(ui.get("activate-prices").disabled, false);
+    assert.match(ui.get("price-message").textContent, /This sheet is not active/);
+  }
+});
+
+test("invalid names and mismatched creation acknowledgements never claim a successful sheet creation", async () => {
+  const ui = await harness();
+  await ui.emit("open-prices");
+  const before = ui.requests.length;
+  for (const name of ["", "   ", "a".repeat(121), "Bad\nName"]) {
+    ui.get("new-price-year").value = name;
+    await ui.emit("create-price-year", "submit");
+    assert.equal(ui.requests.length, before);
+    assert.match(ui.get("price-message").textContent, /Enter a price-sheet name/);
+  }
+  ui.get("new-price-year").value = "Diwali Special";
+  ui.respondPrice(async () => Response.json({ activeYear: 2026,
+    years: [{ year: 2026, revision: 1 }, { year: 2000, revision: 1, name: "Different sheet" }],
+    catalogue: { year: 2000, revision: 1, name: "Different sheet", products: catalogueProducts(products.slice(0, 1)) } }));
+  await ui.emit("create-price-year", "submit");
+  assert.match(ui.get("price-message").textContent, /change could not be verified/);
+  assert.equal(ui.get("new-price-year").value, "Diwali Special");
+  assert.equal(ui.get("save-prices").disabled, true);
+  assert.equal(vm.runInContext("priceList.year", ui.context), 2026);
+});
+
 test("dashboard access, price lists, refresh and sign-out work without historical-import controls or requests", async () => {
   const ui = await harness();
   assert.equal(ui.get("dashboard").hidden, false);
@@ -976,7 +1020,7 @@ test("dashboard access, price lists, refresh and sign-out work without historica
       }));
     });
     await ui.emit("price-form", "submit");
-    assert.match(ui.get("price-message").textContent, /Price list saved for 2026/);
+    assert.match(ui.get("price-message").textContent, /Price sheet saved for 2026/);
     assert.equal(ui.get("save-prices").disabled, true);
   });
 

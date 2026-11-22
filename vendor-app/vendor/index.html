@@ -37,11 +37,11 @@
         <button id="open-orders" type="button" aria-controls="orders-panel" aria-expanded="true">Order Requests</button>
         <button id="open-offers" type="button" aria-label="Offers and delivery settings" aria-controls="offers-panel" aria-expanded="false">Offers</button>
         <button id="open-homepage" type="button" aria-label="Homepage video settings" aria-controls="homepage-panel" aria-expanded="false">Video</button>
-        <button id="open-prices" type="button" aria-controls="price-panel" aria-expanded="false">Manage Price Lists</button>
+        <button id="open-prices" type="button" aria-controls="price-panel" aria-expanded="false">Manage Price Sheets</button>
       </nav>
       <section id="offers-panel" class="vendor-panel" aria-labelledby="offers-title" hidden>
         <div class="vendor-heading"><h2 id="offers-title">Coupons &amp; delivery</h2><button id="close-offers" type="button">Close offer settings</button></div>
-        <p>Shared across all years. Enabled codes can be used in the cart. Uncheck Show on website to hide a code from public offers while keeping it usable by anyone you share it with. One percentage coupon per request; no code means no discount. Existing saved requests keep their original amounts.</p>
+        <p>Shared across all price sheets. Enabled codes can be used in the cart. Uncheck Show on website to hide a code from public offers while keeping it usable by anyone you share it with. One percentage coupon per request; no code means no discount. Existing saved requests keep their original amounts.</p>
         <p id="offers-message" class="vendor-notice" role="status" aria-live="polite"></p>
         <button id="reload-vendor-offers" type="button">Reload saved offers</button>
         <form id="offers-form">
@@ -61,7 +61,7 @@
       </section>
       <section id="homepage-panel" class="vendor-panel vendor-homepage-panel" aria-labelledby="homepage-title" hidden>
         <div class="vendor-heading"><h2 id="homepage-title">Homepage video</h2><button id="close-homepage" type="button">Close video settings</button></div>
-        <p>Change the video on the public homepage. This setting is shared across all price-list years; prices, carts and order requests are unchanged.</p>
+        <p>Change the video on the public homepage. This setting is shared across all price sheets; prices, carts and order requests are unchanged.</p>
         <p id="homepage-message" class="vendor-notice" role="status" aria-live="polite"></p>
         <button id="reload-homepage" type="button">Reload saved video</button>
         <form id="homepage-form" class="vendor-homepage-form">
@@ -72,30 +72,31 @@
         </form>
       </section>
       <section id="price-panel" class="vendor-panel" aria-labelledby="price-title" hidden>
-        <div class="vendor-heading"><h2 id="price-title">Yearly price lists</h2><button id="close-prices" type="button">Close price lists</button></div>
-        <p>Customers see one active year. Saving changes to the active list updates prices for new requests immediately. Existing orders keep their saved prices. Manage discounts separately in Coupons &amp; delivery.</p>
-        <p class="vendor-muted">Select a product row to edit its details, effect types, visibility, photos and videos. Choose all applicable effects under Shop by type to help customers filter products. Uncheck Visible to customers when out of stock; recheck it when restocked. Files uploaded to Cloudinary are public; never include private information. Choose Save price list to publish changes. Effect types, visibility, photos and videos are independent for each year.</p>
+        <div class="vendor-heading"><h2 id="price-title">Price sheets</h2><button id="close-prices" type="button">Close price sheets</button></div>
+        <p>Customers see one active price sheet. Create separate sheets for seasons, offers or any name you choose. Saving changes to the active sheet updates prices for new requests immediately. Existing orders keep their saved prices. Manage discounts separately in Offers.</p>
+        <p class="vendor-muted">Select a product row to edit its details, effect types, visibility, photos and videos. Choose all applicable effects under Shop by type to help customers filter products. Uncheck Visible to customers when out of stock; recheck it when restocked. Files uploaded to Cloudinary are public; never include private information. Choose Save price sheet to publish changes. Effect types, visibility, photos and videos are independent for each sheet.</p>
         <p id="price-message" class="vendor-notice" role="status" aria-live="polite" tabindex="-1"></p>
-        <button id="reload-prices" type="button">Reload saved list</button>
+        <button id="reload-prices" type="button">Reload saved sheet</button>
         <div id="price-controls" hidden>
           <div class="vendor-price-toolbar">
-            <label>Price-list year<select id="price-year"></select></label>
+            <label>Price sheet<select id="price-year"></select></label>
             <p id="price-active" class="vendor-muted"></p>
-            <button id="activate-prices" type="button">Make this the active year</button>
-            <button id="download-price-pdf" type="button" aria-describedby="price-pdf-help" disabled>Download price list PDF</button>
+            <button id="activate-prices" type="button">Make this the active sheet</button>
+            <button id="download-price-pdf" type="button" aria-describedby="price-pdf-help" disabled>Download price sheet PDF</button>
           </div>
-          <p id="price-pdf-help" class="vendor-muted">PDF includes the selected year's saved prices and excludes hidden products. Save changes before downloading. Coupons and delivery charges are not included.</p>
+          <p id="price-pdf-help" class="vendor-muted">PDF includes the selected sheet's saved prices and excludes hidden products. Save changes before downloading. Coupons and delivery charges are not included.</p>
           <form id="create-price-year" class="vendor-price-toolbar">
-            <label>New year<input id="new-price-year" type="number" min="2000" max="9999" step="1" required></label>
-            <button type="submit">Copy selected list to new year</button>
+            <label>New Price Sheet<input id="new-price-year" type="text" maxlength="120" autocomplete="off" required aria-describedby="new-price-sheet-help"></label>
+            <button type="submit">Copy selected sheet to new price sheet</button>
           </form>
+          <p id="new-price-sheet-help" class="vendor-muted">Enter a unique name, such as Diwali Special, Summer Sale or 2026. The new sheet stays inactive until you activate it.</p>
           <form id="price-form" novalidate>
-            <div id="price-save-bar" class="vendor-price-save-bar" role="group" aria-label="Price list changes">
+            <div id="price-save-bar" class="vendor-price-save-bar" role="group" aria-label="Price sheet changes">
               <p id="price-save-state" class="vendor-muted" role="status" aria-live="polite"></p>
-              <div class="vendor-actions"><button id="price-view-message" type="button" hidden>View error</button><button id="add-price-product" type="button">Add product</button><button id="save-prices" class="vendor-primary" type="submit" disabled>Save price list</button></div>
+              <div class="vendor-actions"><button id="price-view-message" type="button" hidden>View error</button><button id="add-price-product" type="button">Add product</button><button id="save-prices" class="vendor-primary" type="submit" disabled>Save price sheet</button></div>
             </div>
             <table class="vendor-price-table">
-              <caption class="sr-only">Price-list products. Select a product to expand editing and media controls. Changes are saved together using Save price list.</caption>
+              <caption class="sr-only">Price-sheet products. Select a product to expand editing and media controls. Changes are saved together using Save price sheet.</caption>
               <thead><tr><th scope="col" class="vendor-price-secondary">No.</th><th scope="col">Product</th><th scope="col" class="vendor-price-secondary">Category</th><th scope="col" class="vendor-price-secondary">Pack</th><th scope="col" class="vendor-price-number">Price (Rs.)</th><th scope="col" class="vendor-price-number">Media</th></tr></thead>
               <tbody id="price-products"></tbody>
             </table>

@@ -1,11 +1,15 @@
-import { pgTable, integer, jsonb, text, timestamp, primaryKey, check } from "drizzle-orm/pg-core";
+import { pgTable, integer, jsonb, text, timestamp, primaryKey, check, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const catalogueYears = pgTable("catalogue_years", {
   year: integer("year").primaryKey(),
   revision: integer("revision").notNull(),
+  name: text("name"),
 }, table => [
   check("catalogue_year_values", sql`${table.year} between 2000 and 9999 and ${table.revision} > 0`),
+  check("catalogue_sheet_name", sql`${table.name} is null or (length(${table.name}) between 1 and 120
+    and ${table.name} = btrim(${table.name}) and ${table.name} !~ '[[:cntrl:]]')`),
+  uniqueIndex("catalogue_sheet_name_unique").on(sql`lower(coalesce(${table.name}, ${table.year}::text))`),
 ]);
 
 export const catalogueRevisions = pgTable("catalogue_revisions", {

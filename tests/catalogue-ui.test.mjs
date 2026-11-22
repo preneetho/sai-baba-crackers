@@ -93,6 +93,19 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
   };
 }
 
+test("customers see the active sheet name while cart identity remains bound to its saved identifier and revision", async () => {
+  const ui = await harness();
+  ui.respond(async () => Response.json({ year: 2000, name: "Diwali Special", revision: 1, products: [products[0]] }));
+  await ui.emit("#reload-catalogue", "click");
+  assert.equal(ui.get("year-label").textContent, "Diwali Special");
+  ui.run("updateQuantity(1, 2, false)");
+  assert.equal(JSON.parse(ui.storage.get(order.CART_KEY)).year, 2000);
+  const message = order.createRequirement({ 1: 2 }, { name: "Synthetic", phone: "9876543210", fulfilment: "pickup",
+    address: "Synthetic address", preferredDate: "", notes: "" }, "2026-11-22",
+  { year: 2000, name: "Diwali Special", revision: 1, products: [products[0]] });
+  assert.ok(message.includes("Diwali Special"));
+});
+
 test("cart coupon apply/remove updates post-discount delivery progress and pickup/delivery totals", async () => {
   const ui = await harness();
   ui.run(`offers = { coupons: [{ code: "SALE15", percent: 15, enabled: true }], freeDeliveryMinimum: 2500, deliveryFee: 100 }`);
