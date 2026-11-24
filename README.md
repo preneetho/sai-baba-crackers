@@ -68,8 +68,9 @@ friends-only code while leaving **Enabled** checked. Hidden codes are omitted
 from public offer listings, the homepage and catalogue but work when entered in the
 cart; anyone with the code can use it or share it. Existing codes remain visible
 until explicitly hidden. Advertised codes have a homepage **Copy code** button
-with success/error feedback. Customers must apply one code in
-their cart. There is no automatic discount and no stacking. Disabling or removing
+with success/error feedback. On **Shop crackers**, public offers have an **Apply**
+button that applies the code directly; the cart still accepts private codes manually.
+Applying another coupon replaces the previous one. There is no automatic discount and no stacking. Disabling or removing
 a code affects new requests, not saved amounts or historical discounts.
 
 The same editor sets the **free-delivery minimum** and **delivery fee below
@@ -77,8 +78,16 @@ minimum**, in rupees with at most two decimal places. Eligibility uses merchandi
 after the coupon discount, excluding delivery fees. Exactly at the minimum is
 free; pickup is always free. Set the minimum or fee to 0 for free delivery on every request.
 The cart/mobile shortcut shows the amount remaining or **Free delivery unlocked**.
-The final checkout total includes any delivery fee after the customer chooses delivery.
+The cart's always-visible breakdown shows the subtotal, applied discount, home-delivery
+fee and estimated delivery total alongside the estimated pickup total. Delivery estimates
+show **Unavailable** when offer settings cannot be loaded. The final checkout total
+follows the customer's chosen fulfilment method.
 Delivery area, availability and timing still require shop confirmation.
+
+Product cards, cart rows and revision snapshots explain the selling unit, for example
+**1 box = 10 pieces**, **1 packet = 5 boxes** and **2 boxes x Rs.100 = Rs.200**.
+Unrecognised pack descriptions are preserved without guessing their contents from
+product names. Quantities and server calculations continue to count selling units.
 
 Settings persist separately from price lists in Netlify Blobs `site-settings`,
 key `checkout-offers`. The absent-record default is no coupons, minimum 0 and
@@ -247,7 +256,12 @@ revision pointer. Original `order_items`, recorded amounts, submission fingerpri
 and submission/PDF/share snapshots remain unchanged. The first edit preserves
 revision 0 as the original request; each save adds a dated revision and reason.
 Customer **My orders** and vendor details show the latest items and totals, with
-expandable original and subsequent snapshots. Vendor lists/statistics use the
+expandable original and subsequent snapshots. A visible latest-update summary compares
+the latest revision with the immediately preceding version: added/removed products,
+quantity, pack and unit-price changes, fees/discounts and the net total change.
+Each historical revision also includes its own comparison. Customer acceptance remains
+deferred until OTP-verified access is implemented; these summaries are read-only.
+Vendor lists/statistics use the
 latest revised amounts. Newly created vendor share links snapshot the latest saved
 details; old links do not change.
 

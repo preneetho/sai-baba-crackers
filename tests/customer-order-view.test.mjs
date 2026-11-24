@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { renderCustomerOrderTable, renderCustomerOrderDetails, prefillCustomerDetails } from "../vendor-app/browser-customer.mjs";
 import { validateDemoProfile } from "../vendor-app/browser-customer-model.mjs";
 import { validRevisionView, revisionAcknowledged } from "../vendor-app/order-revision-model.mjs";
+import { renderRevisionHistory } from "../vendor-app/order-revision-view.mjs";
+import { sellingPack } from "../vendor-app/order.mjs";
 
 function dom() {
   const document = { createElement: tag => new Node(tag) };
@@ -100,6 +102,42 @@ test("customer detail history shows original and latest line-item snapshots with
   assert.match(content, /Original pack/);
   assert.match(content, /Replacement pack/);
   assert.match(content, /<script>Unavailability reason<\/script>/);
+});
+
+test("pack descriptions distinguish selling boxes, packets and pieces without guessing ambiguous pack contents", () => {
+  assert.deepEqual(sellingPack("10 pcs / box", 3), { noun: "box", count: "3 boxes", description: "1 box = 10 pieces" });
+  assert.equal(sellingPack("5 boxes / packet", 2).description, "1 packet = 5 boxes");
+  assert.equal(sellingPack("1 piece", 2).count, "2 pieces");
+  assert.equal(sellingPack("5 pieces", 2).count, "2 packs");
+  assert.equal(sellingPack("Assorted special", 2).description, "1 pack = Assorted special");
+});
+
+test("revision comparisons highlight removed, added and changed lines, fees and net changes against the previous version", () => {
+  const { root } = dom();
+  const item = { id: 1, name: "Original <item>", brand: "Synthetic", unit: "10 pcs / box",
+    quantity: 2, price: 100, amount: 200 };
+  const original = { items: [item, { ...item, id: 2 }], subtotal: 400, discountPercent: 0,
+    discount: 0, deliveryCharge: 100, total: 500, revision: 0, changedAt: order.createdAt, reason: "Original request." };
+  const first = { ...original, revision: 1, reason: "Changed availability", items: [
+    { ...item, quantity: 1, price: 90, amount: 90 }, { ...item, id: 3, amount: 200 },
+  ], subtotal: 290, deliveryCharge: 0, total: 290 };
+  const second = { ...first, revision: 2, reason: "Delivery correction", deliveryCharge: 50, total: 340 };
+  renderRevisionHistory({ revision: 2, revisionHistory: [original, first, second] }, root);
+  const latest = root.children.find(node => node.tag === "section");
+  assert.match(text(latest), /0 product lines changed; total increased by.*50/);
+  assert.match(text(latest), /Delivery fee:.*0 to.*50/);
+  assert.doesNotMatch(text(latest), /Removed:/);
+  const history = text(root);
+  assert.match(history, /3 product lines changed; total reduced by.*210/);
+  assert.match(history, /Removed: #2/);
+  assert.match(history, /Added: #3/);
+  assert.match(history, /quantity 2 boxes to 1 box; unit price.*100 to.*90/);
+  assert.match(history, /Original <item>/);
+  assert.ok(root.children.filter(node => node.tag === "details").every(node => !node.open));
+  assert.doesNotMatch(history, /Accept revised order/);
+  const unchanged = dom().root;
+  renderRevisionHistory({ revision: 1, revisionHistory: [original, { ...original, revision: 1 }] }, unchanged);
+  assert.match(text(unchanged), /0 product lines changed; total unchanged/);
 });
 
 test("revision validation preserves recorded manual discounts but rejects inconsistent amounts and wrong save acknowledgements", () => {

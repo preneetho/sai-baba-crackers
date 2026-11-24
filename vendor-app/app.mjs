@@ -5,6 +5,7 @@ import { mediaUrl, isYouTubeMedia } from "./media-model.mjs";
 import { MAX_QUANTITY, sanitizeCart as checkCart, cartLines as getLines, pricing as getPricing, money, localDate, validateCustomer, prepareOrderMessage, validateOrderShareLink } from "./order.mjs";
 import { DEFAULT_OFFERS, validOffers, validOfferVersion, normalizeCoupon } from "./offers-model.mjs";
 import { renderOfferWidgets, initializeOfferCarousel } from "./offer-widgets.mjs";
+import { sellingPack } from "./order.mjs";
 import { browserCartKey, rememberBrowserRequest } from "./browser-customer.mjs";
 
 const $ = selector => document.querySelector(selector);
@@ -93,16 +94,17 @@ function quantityControl(product, compact = false) {
   const quantity = cart[product.id] ?? 0;
   const decrease = element("button", "", "\u2212");
   decrease.type = "button";
-  decrease.setAttribute("aria-label", `Remove one pack of ${product.name}, ${product.brand}, product ${product.id}`);
+  const pack = sellingPack(product.unit, quantity);
+  decrease.setAttribute("aria-label", `Remove one ${pack.noun} of ${product.name}, ${product.brand}, product ${product.id}`);
   decrease.disabled = quantity === 0;
   decrease.dataset.direction = "decrease";
   const amount = element("span", "", String(quantity));
-  amount.setAttribute("aria-label", `${quantity} pack${quantity === 1 ? "" : "s"}`);
+  amount.setAttribute("aria-label", pack.count);
   const increase = element("button", "", "+");
   increase.type = "button";
   increase.disabled = quantity === MAX_QUANTITY;
   increase.dataset.direction = "increase";
-  increase.setAttribute("aria-label", `Add one pack of ${product.name}, ${product.brand}, product ${product.id}`);
+  increase.setAttribute("aria-label", `Add one ${pack.noun} of ${product.name}, ${product.brand}, product ${product.id}`);
   decrease.addEventListener("click", () => updateQuantity(product.id, -1, compact));
   increase.addEventListener("click", () => updateQuantity(product.id, 1, compact));
   control.append(decrease, amount, increase);
@@ -129,7 +131,8 @@ function updateQuantity(id, change, fromCart) {
   saveCart();
   renderProducts();
   renderCart();
-  $("#announcement").textContent = `${products.find(product => product.id === id).name}: ${next} pack${next === 1 ? "" : "s"} in your cart. Items total ${money(total(cart))}.`;
+  const product = products.find(product => product.id === id);
+  $("#announcement").textContent = `${product.name}: ${sellingPack(product.unit, next).count} in your cart. Items total ${money(total(cart))}.`;
   const scope = fromCart ? "#cart-items" : "#products";
   const direction = change > 0 ? "increase" : "decrease";
   const active = $(`${scope} [data-id="${id}"] [data-direction="${direction}"]:not(:disabled)`) ??
@@ -276,7 +279,7 @@ function renderProducts() {
     const meta = element("div", "product-meta");
     meta.append(number, element("p", "product-brand", product.brand));
     body.append(meta, element("h3", "", product.name),
-      element("p", "product-unit", product.unit));
+      element("p", "product-unit", sellingPack(product.unit).description));
     if (product.types?.length) {
       const types = element("p", "product-type-labels",
         PRODUCT_TYPES.filter(type => product.types.includes(type.id)).map(type => type.label).join(" \u00b7 "));
@@ -284,7 +287,7 @@ function renderProducts() {
     }
     const bottom = element("div", "product-bottom");
     const price = element("div", "product-price");
-    price.append(element("strong", "", money(product.price)), element("span", "", "per pack"));
+    price.append(element("strong", "", money(product.price)), element("span", "", `per ${sellingPack(product.unit).noun}`));
     bottom.append(price, quantityControl(product));
     body.append(bottom);
     card.append(art, body);
@@ -422,6 +425,7 @@ $("#product-media-dialog").addEventListener("close", () => {
 
 function pricingSummary(withIds = false) {
   const amounts = pricing(cart, !withIds && $("#fulfilment-delivery").checked ? "delivery" : "pickup");
+  const delivery = pricing(cart, "delivery");
   const summary = element("div", "pricing-summary");
   const rows = [
     ["Subtotal", money(amounts.subtotal), "pricing-row", "cart-subtotal"],
@@ -429,6 +433,10 @@ function pricingSummary(withIds = false) {
       `\u2212${money(amounts.discount)}`, "pricing-row discount-row", "cart-discount"]] : []),
     ...(!withIds && $("#fulfilment-delivery").checked ?
       [["Delivery fee", amounts.deliveryCharge ? money(amounts.deliveryCharge) : "FREE", "pricing-row", "delivery-charge"]] : []),
+    ...(withIds ? [
+      ["Home delivery fee", offers ? (delivery.deliveryCharge ? money(delivery.deliveryCharge) : "FREE") : "Unavailable", "pricing-row", "cart-delivery-fee"],
+      ["Estimated home delivery total", offers ? money(delivery.total) : "Unavailable", "pricing-row", "cart-delivery-total"],
+    ] : []),
     ...(!withIds ? [["Estimated total", money(amounts.total), "cart-total", "cart-total"]] : []),
   ];
   for (const [label, value, className, id] of rows) {
@@ -488,7 +496,8 @@ function renderCart() {
     row.dataset.id = line.id;
     const heading = element("div", "cart-item-heading");
     heading.append(element("h3", "", line.name), element("strong", "", money(line.amount)));
-    row.append(heading, element("p", "", `${line.brand} \u00b7 ${line.unit}`));
+    row.append(heading, element("p", "", `${line.brand} \u00b7 ${sellingPack(line.unit).description}`),
+      element("p", "cart-pack-summary", `${sellingPack(line.unit, line.quantity).count} x ${money(line.price)} = ${money(line.amount)}`));
     const controls = element("div", "cart-item-controls");
     const remove = element("button", "text-button", "Remove");
     remove.type = "button";
@@ -913,7 +922,7 @@ async function loadOffers() {
     }
     $("#offer-status").textContent = "";
     $("#reload-offers").hidden = true;
-    renderOfferWidgets($("#shop-offers"), offers, $("#shop-coupon-copy-status"));
+    renderOfferWidgets($("#shop-offers"), offers, $("#shop-coupon-copy-status"), { onApply: applyCoupon });
     $("#shop-offers-ribbon").hidden = false;
     updateOfferCarousel();
   } catch (error) {
@@ -928,19 +937,20 @@ async function loadOffers() {
     renderCart();
   }
 }
-$("#coupon-form").addEventListener("submit", async event => {
-  event.preventDefault();
-  if (!offers || saving || offersLoading) return;
+async function applyCoupon(value) {
+  if (!offers || saving || offersLoading) throw new Error("Please wait for the current operation, or reload offers before applying a coupon.");
   offersLoading = true;
   $("#coupon-status").textContent = "Checking coupon...";
   renderCart();
   try {
-    const code = normalizeCoupon($("#coupon-code").value);
+    const code = normalizeCoupon(value);
     if (!code) throw new Error("Enter a coupon code.");
     const coupon = await findCoupon(code);
     couponCode = coupon.code;
     $("#coupon-code").value = couponCode;
     $("#coupon-status").textContent = `${coupon.percent}% discount applied with ${couponCode}.`;
+    $("#cart-details").open = true;
+    updateFulfilment();
   } catch (error) {
     $("#coupon-status").textContent = error.message;
     if (error.status === 409) {
@@ -950,9 +960,18 @@ $("#coupon-form").addEventListener("submit", async event => {
       $("#offer-status").textContent = error.message;
       $("#reload-offers").hidden = false;
     }
+    throw error;
   } finally {
     offersLoading = false;
     renderCart();
+  }
+}
+$("#coupon-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  try { await applyCoupon($("#coupon-code").value); }
+  catch (error) {
+    $("#coupon-status").textContent = error.message;
+    $("#coupon-status").focus();
   }
 });
 $("#remove-coupon").addEventListener("click", () => {
@@ -961,6 +980,7 @@ $("#remove-coupon").addEventListener("click", () => {
   $("#coupon-code").value = "";
   $("#coupon-status").textContent = "Coupon removed. No discount applied.";
   renderCart();
+  updateFulfilment();
 });
 $("#reload-offers").addEventListener("click", loadOffers);
 loadCatalogue();

@@ -177,6 +177,11 @@ h2 { font-family: Georgia, "Times New Roman", serif; font-size: 27px; font-weigh
 .pricing-summary { display: grid; gap: 12px; }
 .pricing-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; line-height: 1.7; }
 .pricing-row strong { white-space: nowrap; font-weight: 600; }
+.cart-pack-summary { color: var(--ink); overflow-wrap: anywhere; }
+.revision-change-summary { padding: 12px; margin-block: 12px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--soft); overflow-wrap: anywhere; }
+.revision-change-summary h5 { font-size: inherit; margin-bottom: 8px; }
+.revision-change-summary ul { padding-inline-start: 20px; }
+.revision-change-summary li { margin-block: 8px; }
 .discount-row { color: var(--brand); }
 .discount-row > span { font-weight: 600; }
 .estimate-note { font-size: 10px; color: var(--muted); line-height: 1.7; margin: 12px 0 17px; }

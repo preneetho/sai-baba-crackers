@@ -1,7 +1,7 @@
 import { isPublicCoupon } from "./offers-model.mjs";
 import { money } from "./order.mjs";
 
-export function renderOfferWidgets(list, offers, feedback) {
+export function renderOfferWidgets(list, offers, feedback, { onApply } = {}) {
   const document = list.ownerDocument;
   const make = (tag, text, className = "") => {
     const node = document.createElement(tag);
@@ -22,21 +22,28 @@ export function renderOfferWidgets(list, offers, feedback) {
     const card = make("li", "", "offer-card offer-coupon");
     const label = make("div", "", "offer-card-copy");
     label.append(heading(`${coupon.percent}% off`, "\u{1F39F}\uFE0F"), make("span", `Use code ${coupon.code}`),
-      make("p", "More sparkle for less. Apply this code in your cart to unlock your discount."));
-    const copy = make("button", "Copy code", "button secondary");
+      make("p", onApply ? "Apply this offer directly. Only one coupon can be used per request." :
+        "More sparkle for less. Apply this code in your cart to unlock your discount."));
+    const copy = make("button", onApply ? "Apply" : "Copy code", "button secondary");
     copy.type = "button";
-    copy.setAttribute("aria-label", `Copy coupon ${coupon.code}`);
+    copy.setAttribute("aria-label", `${onApply ? "Apply" : "Copy"} coupon ${coupon.code}`);
     copy.addEventListener("click", async () => {
       copy.disabled = true;
+      if (onApply) feedback.textContent = `Applying ${coupon.code}...`;
       try {
+        if (onApply) {
+          await onApply(coupon.code);
+          feedback.textContent = `${coupon.code} applied to your cart. Only one coupon is applied at a time.`;
+          return;
+        }
         const clipboard = document.defaultView.navigator.clipboard;
         if (!clipboard?.writeText) throw new Error("Clipboard access is unavailable.");
         await clipboard.writeText(coupon.code);
         copy.textContent = "Copied";
         feedback.textContent = `${coupon.code} copied. Paste it into the coupon field in your cart.`;
-      } catch {
-        copy.textContent = "Copy code";
-        feedback.textContent = `Could not copy automatically. Select and copy ${coupon.code} above.`;
+      } catch (error) {
+        copy.textContent = onApply ? "Apply" : "Copy code";
+        feedback.textContent = onApply ? error.message : `Could not copy automatically. Select and copy ${coupon.code} above.`;
       } finally { copy.disabled = false; }
     });
     card.append(label, copy);

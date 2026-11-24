@@ -51,7 +51,7 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
     rememberBrowserRequest() {},
     browserCartKey: () => order.CART_KEY,
     ...Object.fromEntries(["CART_KEY", "MAX_QUANTITY", "money", "localDate", "validateCustomer",
-      "prepareOrderMessage", "validateOrderShareLink"].map(key => [key, order[key]])),
+      "prepareOrderMessage", "validateOrderShareLink", "sellingPack"].map(key => [key, order[key]])),
     checkCart: order.sanitizeCart, getLines: order.cartLines, getPricing: order.pricing, getTotal: order.total,
     vendor, validCatalogue, PRODUCT_TYPES, mediaUrl, isYouTubeMedia, track() {}, URL, AbortSignal, console, Intl, navigator,
     setTimeout, clearTimeout, crypto: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
@@ -92,6 +92,52 @@ async function harness({ stored, unavailableStorage = false, price = 70, navigat
     async emit(selector, type) { await get(selector).events.get(type)({ preventDefault() {}, target: get(selector), currentTarget: get(selector) }); await tick(); },
   };
 }
+
+test("public offers apply in one tap, replace the previous coupon and leave private coupons out of the cards", async () => {
+  const ui = await harness();
+  ui.respondOffers(async () => Response.json({ offers: { coupons: [
+    { code: "SALE10", percent: 10, enabled: true },
+    { code: "SALE20", percent: 20, enabled: true },
+    { code: "SECRET", percent: 30, enabled: true, showOnWebsite: false },
+  ], freeDeliveryMinimum: 200, deliveryFee: 50 }, version: null }));
+  await ui.emit("#reload-offers", "click");
+  ui.run("updateQuantity(1, 2, false)");
+  const cards = ui.get("#shop-offers").children;
+  assert.ok(!text(ui.get("#shop-offers")).includes("SECRET"));
+  const apply10 = cards.find(card => text(card).includes("SALE10")).children[1];
+  assert.equal(apply10.textContent, "Apply");
+  ui.run("offersLoading = true");
+  await apply10.events.get("click")();
+  assert.match(ui.get("#shop-coupon-copy-status").textContent, /Please wait/);
+  assert.equal(apply10.disabled, false);
+  assert.equal(ui.run("couponCode"), "");
+  ui.run("offersLoading = false");
+  await apply10.events.get("click")();
+  assert.equal(ui.run("couponCode"), "SALE10");
+  assert.equal(ui.run("total(cart)"), 126);
+  const apply20 = cards.find(card => text(card).includes("SALE20")).children[1];
+  await apply20.events.get("click")();
+  assert.equal(ui.run("total(cart)"), 112);
+  assert.match(ui.get("#shop-coupon-copy-status").textContent, /SALE20 applied/);
+  assert.equal(ui.get("#cart-details").open, true);
+  assert.match(text(ui.get("#cart-pricing")), /Home delivery fee.*50.*Estimated home delivery total.*162/);
+  assert.match(text(ui.get("#cart-items")), /2 boxes x.*70.*140/);
+  assert.match(text(ui.get("#products")), /1 box = 10 pieces/);
+  await ui.emit("#remove-coupon", "click");
+  assert.equal(ui.run("total(cart)"), 140);
+});
+
+test("cart delivery estimates update at the discounted threshold and unavailable offers never show a free quote", async () => {
+  const ui = await harness({ price: 100 });
+  ui.run(`offers = { coupons: [{ code: "SALE10", percent: 10, enabled: true }], freeDeliveryMinimum: 200, deliveryFee: 50 }`);
+  ui.run("updateQuantity(1, 2, false)");
+  assert.match(text(ui.get("#cart-pricing")), /Home delivery fee FREE.*Estimated home delivery total.*200/);
+  await ui.run('applyCoupon("SALE10")');
+  assert.match(text(ui.get("#cart-pricing")), /Home delivery fee.*50.*Estimated home delivery total.*230/);
+  assert.match(ui.get("#delivery-progress-text").textContent, /20 more/);
+  ui.run("offers = null; renderCart()");
+  assert.match(text(ui.get("#cart-pricing")), /Home delivery fee Unavailable.*Estimated home delivery total Unavailable/);
+});
 
 test("customers see the active sheet name while cart identity remains bound to its saved identifier and revision", async () => {
   const ui = await harness();
@@ -164,9 +210,11 @@ test("cart keeps total and Continue outside the initially collapsed coupon and p
   assert.doesNotMatch(details.split(">")[0], /\bopen\b/);
   assert.match(details, /id="coupon-form"/);
   assert.match(details, /id="coupon-status"/);
-  assert.match(details, /id="cart-pricing"/);
+  assert.doesNotMatch(details, /id="cart-pricing"/);
   assert.doesNotMatch(details, /id="cart-total"|id="review"|id="delivery-progress-text"/);
-  assert.match(html, /<\/details>\s*<div class="cart-total">/);
+  assert.match(html, /<\/details>\s*<div id="cart-pricing"/);
+  assert.match(html, /Estimated pickup total/);
+  assert.doesNotMatch(html, /Delivery fee at checkout/);
 });
 
 test("unlisted coupons are verified on entry, survive offer reloads and stop applying when disabled", async () => {
@@ -202,9 +250,8 @@ test("unlisted coupons are verified on entry, survive offer reloads and stop app
   assert.match(ui.get("#coupon-status").textContent, /no longer active/);
 });
 
-test("shopping offer cards advertise only public coupons, copy their codes and disappear after a settings failure", async () => {
-  let copied;
-  const ui = await harness({ navigator: { clipboard: { async writeText(code) { copied = code; } } } });
+test("shopping offer cards advertise only public coupons, apply their codes and disappear after a settings failure", async () => {
+  const ui = await harness();
   ui.respondOffers(async () => Response.json({
     offers: { coupons: [
       { code: "SALE15", percent: 15, enabled: true },
@@ -219,8 +266,8 @@ test("shopping offer cards advertise only public coupons, copy their codes and d
   assert.match(text(cards[1]), /Free delivery.*2,500.*after coupon discount.*100/);
   assert.doesNotMatch(text(ui.get("#shop-offers")), /FRIENDS20|OLD50/);
   await cards[0].children[1].events.get("click")();
-  assert.equal(copied, "SALE15");
-  assert.match(ui.get("#shop-coupon-copy-status").textContent, /SALE15 copied/);
+  assert.equal(ui.run("couponCode"), "SALE15");
+  assert.match(ui.get("#shop-coupon-copy-status").textContent, /SALE15 applied/);
   ui.respondOffers(async () => Response.json({ error: "Settings unavailable." }, { status: 503 }));
   await ui.emit("#reload-offers", "click");
   assert.equal(ui.get("#shop-offers-ribbon").hidden, true);
@@ -532,7 +579,7 @@ test("compact product cards omit category text but preserve the number, brand, n
   const ui = await harness();
   const card = ui.get("#products").children[0];
   const content = text(card);
-  for (const value of ["NO. 01", products[0].brand, products[0].name, products[0].unit]) assert.ok(content.includes(value));
+  for (const value of ["NO. 01", products[0].brand, products[0].name, order.sellingPack(products[0].unit).description]) assert.ok(content.includes(value));
   assert.equal(content.includes(products[0].category), false);
   assert.ok(text(ui.get("#categories")).includes(products[0].category));
 });

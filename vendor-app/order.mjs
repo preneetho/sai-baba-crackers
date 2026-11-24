@@ -9,6 +9,17 @@ export const money = value => new Intl.NumberFormat("en-IN", {
   minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2,
 }).format(value);
 
+export function sellingPack(unit, quantity = 1) {
+  const contents = /^([1-9]\d*) (pcs|pieces|boxes|packets) \/ (box|packet)$/i.exec(unit);
+  const single = /^1 (box|packet|piece)$/i.exec(unit);
+  const noun = (contents?.[3] ?? single?.[1] ?? "pack").toLowerCase();
+  const plural = noun === "box" ? "boxes" : `${noun}s`;
+  const count = `${quantity} ${quantity === 1 ? noun : plural}`;
+  const description = contents ? `1 ${noun} = ${contents[1]} ${contents[2].toLowerCase() === "pcs" ? "pieces" : contents[2].toLowerCase()}` :
+    single ? `Sold per ${noun}` : `1 pack = ${unit}`;
+  return { noun, count, description };
+}
+
 export function sanitizeCart(value, catalogue = products) {
   const byId = new Map(catalogue.map(product => [product.id, product]));
   if (!value || typeof value !== "object" || Array.isArray(value)) {

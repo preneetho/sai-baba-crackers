@@ -239,7 +239,7 @@
           <div id="product-types" class="categories" role="group" aria-labelledby="type-heading"></div>
         </div>
         <div class="results-bar"><p id="results-count" role="status" tabindex="-1"></p><label>Sort by <select id="sort"><option value="catalogue">Default order</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name: A to Z</option></select></label></div>
-        <p class="unit-hint">Prices are per listed pack. Select the number of packs, not individual pieces. Enter a valid coupon in your cart for a discount.</p>
+        <p class="unit-hint">Prices are per listed box, packet, piece or pack. Check the contents beside each product. Apply a public offer above, or enter a private coupon in your cart.</p>
         <div id="products" class="product-grid"></div>
         <div id="no-results" class="empty-state" hidden><span aria-hidden="true">&#10023;</span><h3 id="no-results-title">No products found</h3><p id="no-results-message">Try a different product name or category.</p><button id="reset-filters" class="button secondary" type="button">Clear filters</button></div>
       </section>
@@ -270,13 +270,13 @@
           <button id="apply-coupon" class="button secondary" type="submit" disabled>Apply</button>
           <button id="remove-coupon" class="text-button" type="button" hidden>Remove</button>
         </form>
-        <p id="coupon-status" class="checkout-help" role="status" aria-live="polite"></p>
-        <p id="delivery-progress-note" class="checkout-help"></p>
-        <div id="cart-pricing"></div>
+        <p id="coupon-status" class="checkout-help" role="status" aria-live="polite" tabindex="-1"></p>
         </div>
         </details>
-        <div class="cart-total"><span>Items total</span><strong id="cart-total"></strong></div>
-        <p class="estimate-note">Delivery fee at checkout. No payment now.</p>
+        <div id="cart-pricing" aria-label="Estimated price breakdown"></div>
+        <div class="cart-total"><span>Estimated pickup total</span><strong id="cart-total"></strong></div>
+        <p id="delivery-progress-note" class="checkout-help"></p>
+        <p class="estimate-note">Choose pickup or delivery at checkout. Totals include the applied coupon. Subject to shop confirmation; no payment now.</p>
         <button id="review" class="button primary wide" type="button" disabled>Continue to checkout <span aria-hidden="true">&#8594;</span></button>
         </div>
       </aside>
